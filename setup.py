@@ -13,10 +13,13 @@ INSTALL_REQUIRES = [
     "click",
 
     # DS/ML core
-    "pandas >= 1.2.4",
-    "scikit-learn >= 0.24.1",
+    "pandas == 1.2.4",
+    "scikit-learn == 0.24.1",
     "joblib == 1.0.1",
     "numpy == 1.19.5",
+
+    # Auth
+    "pydata-google-auth",
 
     # NLP
     "gensim == 4.0.1",
