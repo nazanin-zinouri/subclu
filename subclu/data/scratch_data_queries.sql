@@ -95,3 +95,55 @@ num_safe_sub
 from all_geo ag left join active av
 on ag.pt = av.pt
 ;
+
+
+-- Query to see some duplicated post_ids in clv2
+SELECT
+DISTINCT * EXCEPT (text)
+
+FROM `reddit-protected-data.language_detection.comment_language_v2`
+WHERE DATE(_PARTITIONTIME) = "2021-04-15"
+    AND thing_type = 'post'
+    AND post_id = "t3_mrp2n5"
+    # in doesn't work because the other dupes happen in other dates
+    # AND post_id IN ("t3_mrp2n5", "t3_mtqj0m", "muaycq")
+
+# GROUP BY 1  #, post_id, subreddit_id, user_id
+ORDER BY post_id ASC
+
+LIMIT 100
+;
+
+-- check SP table for uniques
+--  In this one we still see some duplicates but not as many as in
+--  language detection
+SELECT
+    COUNT(*)                    AS total_rows
+    , COUNT(DISTINCT post_id)   AS post_id_uniques
+    , COUNT(DISTINCT uuid)      AS uuid_uniques
+FROM `data-prod-165221.cnc.successful_posts` AS sp
+WHERE sp.dt = "2021-04-15"
+    # AND post_id = 't3_mrp2n5'
+    # AND uuid = '31b58f37-7c38-4427-9e6b-7bbf8dfdd2c9'
+# LIMIT 100
+
+-- Output:
+-- Row	total_rows	post_id_uniques	uuid_uniques
+-- 1	1021597     1009079         1009079
+;
+
+
+-- Example  to remove duplicates
+select * except(row_num)
+from (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY Firstname, Lastname
+            ORDER BY creation_date desc
+        ) row_num
+    FROM
+        dataset.table_name
+) t
+WHERE row_num=1
+;
