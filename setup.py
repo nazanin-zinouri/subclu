@@ -27,6 +27,7 @@ INSTALL_REQUIRES = [
 
     # Visualization
     "seaborn == 0.11.1",
+    "plotly == 4.14.3"
 
 ]
 

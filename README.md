@@ -133,7 +133,8 @@ Follow github's guide to create an SSH key & add it to your agent.
 
 ## Add SSH key to ssh-agent
 After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
-<br>`eval "$(ssh-agent -s)"`
+
+`eval "$(ssh-agent -s)"`
 
 `ssh-add ~/.ssh/id_ed25519`
 
