@@ -139,3 +139,6 @@ dmypy.json
 
 # Mac OS-specific storage files
 .DS_Store
+
+# exclude testing/scratch notebooks
+*djb*-IGNORE.*py
