@@ -1,4 +1,4 @@
-
+-- noinspection SqlNoDataSourceInspectionForFile
 
 -- Turns out that the language_detect_v2 table doesn't have unique posts/comments
 --    so I have to create an intermediary table to remove duplicates
@@ -7,7 +7,7 @@
 DECLARE start_date DATE DEFAULT '2021-04-01';
 DECLARE end_date DATE DEFAULT '2021-05-08';
 
-CREATE TABLE `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210510`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210510`
 PARTITION BY submit_date
 AS (
 
@@ -33,7 +33,7 @@ SELECT
     , sp.post_url
     , sp.post_nsfw
 
-FROM `reddit-employee-datasets.david_bermejo.subclu_selected_subs_20210506` AS gsubs
+FROM `reddit-employee-datasets.david_bermejo.subclu_selected_subs` AS gsubs
 LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
     ON gsubs.subreddit_name = sp.subreddit_name
 
@@ -123,15 +123,15 @@ FROM tl_unique_with_meta
 ;
 
 -- Export data to google cloud storage (GCS)
--- EXPORT DATA OPTIONS(
---   uri='gs://i18n-subreddit-clustering/posts/2021-05-10/*.parquet',
---   format='PARQUET',
---   overwrite=true
---   ) AS
---
--- SELECT * EXCEPT (uuid, created_timestamp)
--- FROM `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210510`
--- ;
+# EXPORT DATA OPTIONS(
+#   uri='gs://i18n-subreddit-clustering/posts/2021-05-10/*.parquet',
+#   format='PARQUET',
+#   overwrite=true
+#   ) AS
+
+# SELECT * EXCEPT (uuid, created_timestamp)
+# FROM `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210510`
+# ;
 
 
 -- Preview table
