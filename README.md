@@ -161,7 +161,8 @@ Project Organization (Cookiecutter)
     │   ├── _00_external       <- Data from third party sources.
     │   ├── _01_raw            <- The original, immutable data dump.
     │   ├── _02_interim        <- Intermediate data that has been transformed.
-    │   └── _03_processed      <- The final, canonical data sets for modeling.
+    │   ├── _03_processed      <- The final, canonical data sets for modeling.
+    │   └── embeddings         <- NLP embeddings used to convert posts & comments into vectors.
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
     │
@@ -181,7 +182,7 @@ Project Organization (Cookiecutter)
     │                         generated with `pip freeze > requirements.txt`
     │
     ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── src                <- Source code for use in this project.
+    ├── subclu             <- Source code for use in this project.
     │   ├── __init__.py    <- Makes src a Python module
     │   │
     │   ├── data           <- Scripts to download or generate data

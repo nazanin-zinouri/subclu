@@ -24,6 +24,7 @@ INSTALL_REQUIRES = [
     # NLP
     "gensim == 4.0.1",
     "fse == 0.1.15",
+    "fasttext == 0.9.2",
 
     # Visualization
     "seaborn == 0.11.1",
@@ -45,7 +46,7 @@ EXTRAS_REQUIRE["complete"] = sorted({v for req in EXTRAS_REQUIRE.values() for v 
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.1.0',
+    version='0.1.1',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',
