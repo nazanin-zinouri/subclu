@@ -3,7 +3,7 @@
 -- Turns out that the language_detect_v2 table doesn't have unique posts/comments
 --    so I have to create an intermediary table to remove duplicates
 -- Select POSTS + detected language for topic modeling
--- Ambassador program only started aroud 05-01 so try to get data that includes posts after that date
+-- Ambassador program only started around 05-01 so try to get data that includes posts after that date
 DECLARE start_date DATE DEFAULT '2021-04-01';
 DECLARE end_date DATE DEFAULT '2021-05-08';
 

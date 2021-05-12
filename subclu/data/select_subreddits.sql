@@ -11,6 +11,7 @@ AS
         , geo.rank_no
 
     FROM `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
+    -- option: "approved"/sfw list: geo_relevant_subreddits_intl_20200818_approved
 
     WHERE geo.geo_country_code = "DE"
         and geo.rank_no <= 30
@@ -18,6 +19,7 @@ AS
 
 UNION ALL
 
+-- TODO(djb): update from Wacy's query that links directly to google sheet (auto updates)
 (
     SELECT
         filt.subreddit_name
