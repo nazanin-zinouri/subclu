@@ -22,7 +22,7 @@ INSTALL_REQUIRES = [
     "pydata-google-auth",
 
     # NLP
-    "gensim == 4.0.1",
+    "gensim == 3.8.3",  # 4.0 is not compatible with fse
     "fse == 0.1.15",
     "fasttext == 0.9.2",
 

@@ -16,6 +16,7 @@ from logging import info
 from pathlib import Path
 from typing import Union, List, Any, Optional, Tuple
 import sys
+from pkg_resources import get_distribution
 
 import numpy as np
 import pandas as pd
@@ -112,7 +113,10 @@ def print_lib_versions(
 
     for lib_ in lib_list:
         sep_ = '\t' if len(lib_.__name__) > 7 else '\t\t'
-        print(f"{lib_.__name__}{sep_}v {lib_.__version__}")
+        try:
+            print(f"{lib_.__name__}{sep_}v: {lib_.__version__}")
+        except AttributeError:
+            print(f"{lib_.__name__}{sep_}v: {get_distribution(f'{lib_.__name__}').version}")
 
 
 def notebook_display_config(
