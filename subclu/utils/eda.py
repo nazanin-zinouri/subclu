@@ -42,7 +42,7 @@ def setup_logging(
     customization non-trivial.
     Also includes some logic for stdout logs when running inside of ipython
     """
-    dtm_start_log = datetime.now()
+    dtm_start_log = datetime.utcnow()
     str_dtm_start = dtm_start_log.strftime('%Y-%m-%d_%H-%M-%S')
     if log_format == 'basic_with_time':
         ch_datetime_format = '%H:%M:%S'

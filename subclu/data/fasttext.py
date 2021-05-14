@@ -14,6 +14,33 @@ import pandas as pd
 from subclu.utils import set_working_directory
 
 
+def get_project_subfolder(
+        subfolder_path: str,
+        project_root: str = '/subreddit_clustering_i18n',
+) -> Path:
+    """"""
+    path_cwd_original = Path.cwd()
+
+    # This approach only manually checks 2 levels up from cwd
+    p_1_level = path_cwd_original.parents[0]
+    p_2_level = path_cwd_original.parents[1]
+
+    if str(path_cwd_original).endswith(project_root):
+        path_project = deepcopy(path_cwd_original)
+    elif str(p_1_level).endswith(project_root):
+        path_project = deepcopy(p_1_level)
+    elif str(p_2_level).endswith(project_root):
+        path_project = deepcopy(p_2_level)
+    else:
+        raise FileNotFoundError(f"Couldn't find project {project_root}"
+                                f" in path: {path_cwd_original}")
+
+    path_abs_new = path_project / subfolder_path
+    Path.mkdir(path_abs_new, exist_ok=True, parents=True)
+
+    return path_abs_new
+
+
 def download_ft_pretrained_model(
         lang_id: str,
         if_exists: str = 'ignore',
@@ -91,8 +118,9 @@ def get_df_for_most_similar(
 
     if print_oov_check:
         for word_ in list_of_words:
-            print(f"{word_ in ft_model} -> {word_} in vocabulary?")
-
+            # gensim docs say to use `ft_model.key_to_index`, but that doesn't exist anymore
+            #  instead use: ft_model.index2word OR ft_model.index2entity
+            print(f"{word_ in ft_model.index2word} -> {word_} in vocabulary?")
     df = pd.DataFrame(l_sim[0])
 
     if 1 == len(l_sim):
