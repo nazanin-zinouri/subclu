@@ -4,7 +4,7 @@
 -- Expected output: ~180 subreddits
 DECLARE partition_date DATE DEFAULT '2021-05-18';
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_selected_subs_2021_05_19`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_selected_subs_20210519`
 AS
 
 WITH selected_subs AS
