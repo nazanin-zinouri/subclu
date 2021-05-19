@@ -2,7 +2,7 @@
 
 -- Create table with selected subs for initial clustering in German
 -- Expected output: ~180 subreddits
-DECLARE partition_date DATE DEFAULT '2021-05-17';
+DECLARE partition_date DATE DEFAULT '2021-05-18';
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_selected_subs_2021_05_19`
 AS
@@ -28,21 +28,23 @@ WITH selected_subs AS
     ) AS asr
         ON geo.subreddit_name = asr.subreddit_name
 
-    -- besides geo.rank_no, select based on number of users w/ screen views
+    -- Besides geo.rank_no, select based on posts + number of users w/ screen views
     -- D A CH = German, Austria, & Switzerland
-    WHERE (
-        (
-            geo.geo_country_code = "DE"
-            AND (geo.rank_no <= 30 OR asr.users_l28 >= 30000)
+    WHERE asr.posts_l28 >= 3
+        AND (
+            (
+                geo.geo_country_code = "DE"
+                AND (geo.rank_no <= 30 OR asr.users_l28 >= 29000)
+            )
+            OR (
+                geo.geo_country_code = "AT"
+                AND (geo.rank_no <= 5 OR asr.users_l28 >= 29000)
+            )
+            OR (
+                geo.geo_country_code = "CH"
+                AND (geo.rank_no <= 5 OR asr.users_l28 >= 29000)
+            )
         )
-        OR (
-            geo.geo_country_code = "AT"
-            AND (geo.rank_no <= 5 OR asr.users_l28 >= 30000)
-        )
-        OR (geo.geo_country_code = "CH"
-            AND (geo.rank_no <= 5 OR asr.users_l28 >= 30000)
-        )
-    )
 )
 
 UNION ALL
@@ -105,15 +107,32 @@ UNION ALL
 SELECT
     sel.*
 
+    , COALESCE (
+        sel.subreddit_info_ambassador,
+        LOWER(dst.topic),
+        "uncategorized"
+    ) AS combined_topic
+    , CASE
+        WHEN rt.rating IN ("x", "nc17") THEN "over18_nsfw"
+        WHEN dst.topic = "Mature Themes and Adult Content" THEN "over18_nsfw"
+        ELSE COALESCE (
+            sel.subreddit_info_ambassador,
+            LOWER(dst.topic),
+            "uncategorized"
+        )
+        END         AS combined_topic_and_rating
+
     , rt.rating
-    , rt.version AS rating_version
+    , rt.version    AS rating_version
 
     , dst.topic
     , dst.version   AS topic_version
 
-    , dsc.category
-    , dsc.subcategory
-    , dsc.ads_prod_iab
+    -- Exclude subreddit_categories_view for now
+    -- this table might be deprecated
+    -- , dsc.category
+    -- , dsc.subcategory
+    -- , dsc.ads_prod_iab
 
     , asr.first_screenview_date
     , asr.last_screenview_date
@@ -123,6 +142,8 @@ SELECT
     , asr.posts_l28
     , asr.comments_l7
     , asr.comments_l28
+
+    , CURRENT_DATE() as pt
 
 FROM selected_subs AS sel
 
@@ -148,9 +169,22 @@ LEFT JOIN(
 -- subreddit_categories_view is a mix of:
 --  subreddit_categories_inferred + subreddit_categories
 --  where the manual labels are supposed to replace the inferred categories
-LEFT JOIN `data-prod-165221.ds_subreddit_whitelist_tables.subreddit_categories_view` AS dsc
-    ON sel.subreddit_name = dsc.subreddit_name
+-- Turns out this info is probably deprecated so don't use it for now
+-- LEFT JOIN `data-prod-165221.ds_subreddit_whitelist_tables.subreddit_categories_view` AS dsc
+--     ON sel.subreddit_name = dsc.subreddit_name
 
 
 ORDER BY subreddit_name ASC, rank_no ASC
 ;
+
+
+-- count posts & comments for last 28 days (l28)
+-- Unclear if this includes removed posts & comments
+-- Row	row_count	unique_subreddits_count	total_posts_l28	total_comments_l28
+-- 1	174         174                     88725           808371
+# SELECT
+#     COUNT(*) AS row_count
+#     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
+#     , SUM(posts_l28)    AS total_posts_l28
+#     , SUM(comments_l28) AS total_comments_l28
+# FROM `reddit-employee-datasets.david_bermejo.subclu_selected_subs_2021_05_19`
