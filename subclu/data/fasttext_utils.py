@@ -18,7 +18,22 @@ def get_project_subfolder(
         subfolder_path: str,
         project_root: str = '/subreddit_clustering_i18n',
 ) -> Path:
-    """"""
+    """
+    Note: this assumes that the `project_root` is unique.
+    If there's a nested folder with the same name, this function will return the deepest folder.
+
+    If `subfolder` doesn't exist, this function will create it.
+
+    Example subfolder_input:    'data/embeddings'
+    Example output:             Path('../<project_root>/data/embeddings`)
+
+    Args:
+        subfolder_path: the location of the desired path, relative to `project_root`
+        project_root: the name of the top-level project folder
+
+    Returns:
+        Path object with absolute location.
+    """
     path_cwd_original = Path.cwd()
 
     # This approach only manually checks 2 levels up from cwd
@@ -69,23 +84,10 @@ def download_ft_pretrained_model(
     EMBEDDINGS_SUBFOLDER = 'data/embeddings'
     FASTTEXT_SUBFOLDER = f"{EMBEDDINGS_SUBFOLDER}/fasttext"
 
-    path_cwd_original = Path.cwd()
-
-    # This approach only manually checks 2 levels up from cwd
-    p_1_level = path_cwd_original.parents[0]
-    p_2_level = path_cwd_original.parents[1]
-    if str(path_cwd_original).endswith(PROJECT_NAME_FOLDER):
-        path_project = deepcopy(path_cwd_original)
-    elif str(p_1_level).endswith(PROJECT_NAME_FOLDER):
-        path_project = deepcopy(p_1_level)
-    elif str(p_2_level).endswith(PROJECT_NAME_FOLDER):
-        path_project = deepcopy(p_2_level)
-    else:
-        raise FileNotFoundError(f"Couldn't find project {PROJECT_NAME_FOLDER}"
-                                f" in path: {path_cwd_original}")
-
-    path_ft_embeddings = path_project / FASTTEXT_SUBFOLDER
-    Path.mkdir(path_ft_embeddings, exist_ok=True, parents=True)
+    path_ft_embeddings = get_project_subfolder(
+        subfolder_path=EMBEDDINGS_SUBFOLDER,
+        project_root=PROJECT_NAME_FOLDER,
+    )
     print(f"Saving embeddings to:\n  {path_ft_embeddings}")
 
     # use context manager to change working directory to ft-embeddings
