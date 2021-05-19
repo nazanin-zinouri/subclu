@@ -28,7 +28,8 @@ INSTALL_REQUIRES = [
 
     # Visualization
     "seaborn == 0.11.1",
-    "plotly == 4.14.3"
+    "plotly == 4.14.3",
+    "kaleido == 0.2.1",
 
 ]
 
@@ -36,11 +37,21 @@ INSTALL_REQUIRES = [
 #   $ pip install sampleproject[dev]
 EXTRAS_REQUIRE = {
     "cookiecutter": ["Sphinx", "coverage", "awscli", "flake8"],
-    "dev": ["jupyterlab >= 1.2.16", "ipython == 7.22.0",
-            "pyarrow == 3.0.0",
-            ],
+    "devcpu": [
+        "jupyterlab >= 1.2.16",
+        "ipython == 7.22.0",
+        "pyarrow == 3.0.0",
+    ],
+    # torch = pytorch GPU machine
+    "torch": [
+        "torch == 1.8.0",
+        "torchvision == 0.9.0+cu111",
+    ],
 }
-EXTRAS_REQUIRE["complete"] = sorted({v for req in EXTRAS_REQUIRE.values() for v in req})
+
+# Don't do a 'complete' because we might have conflicting requirements between
+#  CPU & GPU environments or TF & pyTorch
+# EXTRAS_REQUIRE["complete"] = sorted({v for req in EXTRAS_REQUIRE.values() for v in req})
 
 
 setup(

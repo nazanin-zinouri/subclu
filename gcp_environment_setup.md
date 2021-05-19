@@ -54,58 +54,80 @@ NOTE: When you are logged in via the JupyterLab GUI (HTTPS server), your home di
 <br>`/home/jupyter`
 
 # PyCharm Setup
-### Add SSH connection to PyCharm
+## Add SSH connection to PyCharm
 The notes below are a summary of Pycharm's detailed guides here:
 <br>https://www.jetbrains.com/help/pycharm/create-ssh-configurations.html
 
 - Open the Settings/Preferences dialog (`⌘,`)
 - Go to **Tools > SSH Configurations**.
 - Fill out the Host, User name, & other information to look like the screenshot below.
-    - Host should be the same as what you use to connect via the command line, e.g., `djb-100-2021-04-28-djb-eda-german-subs.us-west1-b.data-prod-165221`
+    - Host should be the same as what you use to connect via the command line, e.g., `djb-100-XXX-subs.us-west1-b.data-prod-165221`
 - For **Authentication type** select `Key pair`
   - Note that `gcloud` will create the **Private key file** in: `~/.ssh/google_compute_engine`
   - Save the passphrase so that PyCharm can automatically upload without asking for it on each sync 
 
 ![PyCharm configuration for remote SSH interpreter](images/pycharm_config_ssh_for_gcp.png)
 
-### Add remote interpreter to PyCharm
-The notes below are a summary of Pycharm's detailed guides here:
-<br>https://www.jetbrains.com/help/pycharm/configuring-remote-interpreters-via-ssh.html#ssh
-- Python interpreter path:
-<br>`opt/conda/bin/python`
 
-![PyCharm configuration for remote SSH interpreter](images/pycharm_remote_python_interpreter.png)
-
-
-### Add deployment configuration (remote syncing)
-After you've set an ssh connection & an intepreter, you can connect to the same host to sync changes between the two locations. You can find most of these options under the `deployment` menu:
+## Add deployment configuration (remote syncing)
+After you've set an ssh connection, you can connect to the same host to sync changes between the two locations. You can find most of these options under the `deployment` menu:
 <br>https://www.jetbrains.com/help/pycharm/creating-a-remote-server-configuration.html
 
+- Settings ( `⌘` + `,`) > `Deployment` > Add (plus sign)
 - When you use SSH, you should select the `SFTP` type.
 - Set **Root path** to `/`
   - PyCharm uses relative paths later on that can be confusing
 - For mappings, make sure to map local repo to remote repo location
+  - Local path: `/Users/david.bermejo/repos/subreddit_clustering_i18n`
+  - Deployment path: `/home/david.bermejo/repos/subreddit_clustering_i18n`
 - Exclude `/data` subfolder unless needed
+  - Exclude path (data folder): `/Users/david.bermejo/repos/subreddit_clustering_i18n/data` 
 
-![PyCharm configuration deployment](images/pycharm_deployment_01_connection.png)
+![PyCharm configuration deployment connection](images/pycharm_deployment_01_connection.png)
 
-![PyCharm configuration deployment](images/pycharm_deployment_02_mappings.png)
+![PyCharm configuration deployment mappings](images/pycharm_deployment_02_mappings.png)
 
-![PyCharm configuration deployment](images/pycharm_deployment_03_excluded_paths.png)
+![PyCharm configuration deployment excluded paths](images/pycharm_deployment_03_excluded_paths.png)
 
+### Upload & sync
+The first time you create a deployment config, you might need to manually push all your local code to the new remote. One way to do it is to:
+- `Right click` on the top-level (root) folder of your path
+- \> `Deployment` > `Upload to <deployment>`
+
+![PyCharm configuration upload to deployment menu](images/pycharm_deployment_upload_menu.png)
 
 Other options: I prefer to sync only saved files, but you can change as you like.
-- Go to: **Tools > Deployment > Options**
+- Go to: **`Tools` > `Deployment` > `Options`**
 
 ![PyCharm configuration deployment options](images/pycharm_deployment_options.png)
 
 
+## Add remote interpreter to PyCharm
+After you've set the remote connection you can use the remote interpreter. The notes below are a summary of Pycharm's detailed guides here:
+<br>https://www.jetbrains.com/help/pycharm/configuring-remote-interpreters-via-ssh.html#ssh
+- Settings ( `⌘` + `,`) > `Python Interpreter` > `Add...` (gear icon)
+- Python interpreter path:
+<br>`opt/conda/bin/python`
+
+![PyCharm complete configuration for remote SSH interpreter](images/pycharm_python_interpreter_shh_setup.png)
+
+![PyCharm complete configuration for remote SSH interpreter](images/pycharm_python_interpreter_ssh_complete.png)
+
 # Install our module in `editable` mode
+After you have the code for this project on your remote, you can install it as a module.
+
 Editable makes it easy to continue editing your module and use the updated code without having to re-install it. This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-import the package.
 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
-<br>`sudo su - david.bermejo`
-<br>`pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/`
+
+```
+sudo su - david.bermejo
+
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
+
+# or if you're installing a superset of requirements add `[<extra_name>]`
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[torch]
+```
 
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
 ```
@@ -120,10 +142,11 @@ Follow github's guide to create an SSH key & add it to your agent.
 
 ## Add SSH key to ssh-agent
 After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
+```
+eval "$(ssh-agent -s)"
 
-`eval "$(ssh-agent -s)"`
-
-`ssh-add ~/.ssh/id_ed25519`
+ssh-add ~/.ssh/id_ed25519
+```
 
 Note: you'll be prompted for your git passphrase.
 

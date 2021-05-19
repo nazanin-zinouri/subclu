@@ -35,6 +35,16 @@ Example installation in GCP notebooks
 <br>`sudo su - david.bermejo`
 2) Use pip to install from location that's synced to PyCharm (active development).
 <br>`pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/`
+   - If you're installing a superset of requirements add: `[<extra_name>]` at the end of path
+
+```
+sudo su - david.bermejo
+
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
+
+# or if you're installing a superset of requirements add `[<extra_name>]`
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[torch]
+```
 
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code without having to re-import modules.
 ```
