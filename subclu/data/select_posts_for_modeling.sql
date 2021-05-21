@@ -174,12 +174,12 @@ FROM (
 
 -- Export data to google cloud storage (GCS)
 # EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/posts/2021-05-10/*.parquet',
+#   uri='gs://i18n-subreddit-clustering/posts/2021-05-19/*.parquet',
 #   format='PARQUET',
 #   overwrite=true
 #   ) AS
 # SELECT * EXCEPT (uuid, created_timestamp)
-# FROM `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210510`
+# FROM `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210519`
 # ;
 
 
