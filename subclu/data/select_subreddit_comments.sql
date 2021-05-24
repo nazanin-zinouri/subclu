@@ -1,13 +1,14 @@
--- noinspection SqlNoDataSourceInspectionForFile
+-- Goal: pick comments for the subreddits we've already selected so that we can use comments
+--  AND posts to create topic models (instead of only posts)
 
 -- Turns out that the language_detect_v2 table doesn't have unique posts/comments
---    so I have to create an intermediary table to remove duplicates
+--    so we have to create an intermediary table to remove duplicates
 -- Select POSTS + detected language for topic modeling
 -- Ambassador program only started around 05-01 so try to get data that includes posts after that date
 DECLARE start_date DATE DEFAULT '2021-04-01';
 DECLARE end_date DATE DEFAULT '2021-05-19';
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210519`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.comments_for_germany_topic_clustering_20210519`
 PARTITION BY submit_date
 AS (
 
@@ -18,6 +19,7 @@ SELECT
     gs.subreddit_name
     , sp.subreddit_id
     , sp.post_id
+    , sp.comment_id
     , sp.user_id
     , sp.uuid
 
@@ -40,8 +42,11 @@ SELECT
     , gs.rating
     , gs.rating_version
 
+    -- Text
+    , sp.comment_body_text
+
 FROM `reddit-employee-datasets.david_bermejo.subclu_selected_subs_20210519` AS gs
-LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
+LEFT JOIN `data-prod-165221.cnc.successful_comments` AS sp
     ON gs.subreddit_name = sp.subreddit_name
 
 WHERE sp.dt BETWEEN start_date AND end_date
@@ -59,6 +64,7 @@ SELECT
     , geo.subreddit_name
     , tl.subreddit_id
     , tl.post_id
+    , geo.comment_id
     , tl.user_id
     , tl.thing_type
 
@@ -92,7 +98,8 @@ SELECT
     #  Wait to do relatively expensive string manipulation until AFTER removing duplicates
     # , CHAR_LENGTH(tl.text) AS text_len
     # , array_length(regexp_extract_all(tl.text, r"\b\w+\b")) text_word_count_estimate
-    , tl.text
+    , tl.text AS comment_body_text_for_translation
+    , geo.comment_body_text
 
     # Metadata to add separately?
     # , tl.possible_alternatives  # unwieldy field, analyze later
@@ -102,7 +109,7 @@ FROM (
     SELECT *
     FROM `reddit-protected-data.language_detection.comment_language_v2`
     WHERE _PARTITIONTIME BETWEEN TIMESTAMP(start_date) AND TIMESTAMP(end_date)
-        AND thing_type = 'post'
+        AND thing_type = 'comment'
 ) AS tl
 INNER JOIN geo
     ON tl.subreddit_id = geo.subreddit_id
@@ -110,6 +117,8 @@ INNER JOIN geo
         AND tl.thing_type = geo.noun
         AND tl.user_id = geo.user_id
 
+-- Exclude some known bots
+WHERE geo.user_id NOT IN ("t2_4kh8rj3k")
 ),
 
 tl_unique_with_meta AS
@@ -134,52 +143,31 @@ ORDER BY post_id
 -- This is the de-duped table used for modeling
 --   Comment this section out if you want to preview with queries below
 SELECT
-    * EXCEPT (text)
-    , text
+    * EXCEPT (uuid, post_url, comment_body_text, comment_body_text_for_translation)
+    , comment_body_text
 
 FROM (
     SELECT *
-        -- Create a new column that cleans up the post_url col for embeddings
-        -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
-        , CHAR_LENGTH(text) AS text_len
-        , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
-        , CASE
-            WHEN REGEXP_INSTR(
-                post_url,
-                ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
-                ) > 0 THEN NULL
-            ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, "https://|www.|/r/|.html", ""), r"/|-|_|\?", " "))
-            END AS post_url_for_embeddings
+        , CHAR_LENGTH(comment_body_text) AS comment_text_len
+        , array_length(regexp_extract_all(comment_body_text, r"\b\w+\b")) comment_text_word_count
 
     FROM tl_unique_with_meta
 )
+-- Preview table
+# LIMIT 500
 
-)  -- close create table parens
+) -- close create table parens
 ;
-
-
--- Count totals v. unique AFTER joining with language-detection page
-# SELECT
-#     COUNT(*)                AS total_rows
-#     , COUNT(DISTINCT uuid)  AS uuid_unique
-#     , COUNT(DISTINCT post_id)  AS post_id_unique
-#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
-#     , COUNT(DISTINCT user_id)  AS user_id_unique
-# FROM tl_unique_with_meta
-# ;
--- # Expected counts
--- Row	total_rows	uuid_unique	post_id_unique	subreddit_id_unique	user_id_unique
--- 1	111669      111669      111669          167                 42937
 
 
 -- Export data to google cloud storage (GCS)
 # EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/posts/2021-05-19/*.parquet',
+#   uri='gs://i18n-subreddit-clustering/comments/2021-05-19/*.parquet',
 #   format='PARQUET',
 #   overwrite=true
 #   ) AS
-# SELECT * EXCEPT (uuid, created_timestamp)
-# FROM `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210519`
+# SELECT * EXCEPT (created_timestamp)
+# FROM `reddit-employee-datasets.david_bermejo.comments_for_germany_topic_clustering_20210519`
 # ;
 
 
@@ -194,4 +182,30 @@ FROM (
 #     , COUNT(DISTINCT user_id)  AS user_id_unique
 # FROM geo
 # ;
+
+
+-- Count checks
+# SELECT
+#     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+#     , COUNT(DISTINCT post_id) AS post_id_unique_count
+#     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
+#     , COUNT(*)        AS total_rows
+# FROM tl_unique_with_meta
+# ;
+
+
+-- Find users with lots of posts, as proxy to investigate bots
+# SELECT
+#     user_id
+#     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
+#     , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+#     , COUNT(DISTINCT post_id) AS post_id_unique_count
+
+# FROM tl_unique_with_meta
+# GROUP BY user_id
+# ORDER BY comment_id_unique_count DESC
+
+# LIMIT 100
+# ;
+
 

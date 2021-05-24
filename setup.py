@@ -17,6 +17,7 @@ INSTALL_REQUIRES = [
     "scikit-learn == 0.24.1",
     "joblib == 1.0.1",
     "numpy == 1.19.5",
+    "mlflow == 1.16.0",
 
     # Auth
     "pydata-google-auth",
