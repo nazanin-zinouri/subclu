@@ -26,6 +26,7 @@ INSTALL_REQUIRES = [
     "gensim == 3.8.3",  # 4.0 is not compatible with fse
     "fse == 0.1.15",
     "fasttext == 0.9.2",
+    "spacy == 3.0.5",
 
     # Visualization
     "seaborn == 0.11.1",
