@@ -160,3 +160,16 @@ Here's what the JupyterLab file explorer should look like after cloning the repo
 
 ![GCP notebook dashboard with available notebooks](images/jupyterlab_folders_after_cloning.png)
 
+
+# Running mlflow server on GCP
+
+Run this command in GCP Notebok/VM:
+```
+mlflow server --backend-store-uri sqlite:///mlflow/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
+```
+
+Need to tunnel into it from local using custom ssh functio:
+```
+dj_ssh_mlflow cpu
+```
+

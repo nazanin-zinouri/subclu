@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List
 
 import mlflow
+from mlflow.exceptions import MlflowException
 
 
 class MlflowLogger:
@@ -56,6 +57,26 @@ class MlflowLogger:
             name,
             artifact_location=artifact_location
         )
+
+    def set_experiment(
+            self,
+            name: str,
+            artifact_location: str = None,
+    ) -> str:
+        """Wrapper around mlflow.create_experiment()/set_experiment
+        This one uses the `default_artifact_root` set at the class-init to set
+        the experiment location by auto-incrementing based on latest ACTIVE experiment.
+
+        There could be weird results if we delete an experiment with runs & artifacts and
+         then we create a new experiment. It's possible that both experiments might share the
+         same artifact location, but the UUIDs for all runs should still be unique.
+        """
+        try:
+            self.create_experiment(name=name, artifact_location=artifact_location)
+        except MlflowException:
+            pass
+
+        return mlflow.set_experiment(name)
 
     def reset_sqlalchemy_logging(self) -> None:
         """
