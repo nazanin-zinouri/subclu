@@ -3,8 +3,8 @@ Call these function(s) to download fastText embeddings
 This is a wrapper around fastText's utilities that makes sure to save embeddings
 to a default location.
 """
-
 from copy import deepcopy
+from logging import info
 from pathlib import Path
 from typing import List
 
@@ -59,6 +59,8 @@ def get_project_subfolder(
 def download_ft_pretrained_model(
         lang_id: str,
         if_exists: str = 'ignore',
+        project_name_folder: str = '/subreddit_clustering_i18n',
+        fastttext_subfolder: str = 'data/embeddings/fasttext',
 ) -> Path:
     """
     Save fastText model to expected embeddings folder.
@@ -76,19 +78,24 @@ def download_ft_pretrained_model(
             'ignore' -> keep existing, don't download again
             'overwrite' -> re-download even if it exists
 
+        project_name_folder:
+            What's the root of this project? append subfolder to this folder
+        fastttext_subfolder:
+            Create subfolder (if it doesn't exist) and save embeddings here
+
     Returns:
         Path to model file (absolute)
     """
     # TODO(djb): move these vars into a config file (dotenv? configparser?)
-    PROJECT_NAME_FOLDER = '/subreddit_clustering_i18n'
-    EMBEDDINGS_SUBFOLDER = 'data/embeddings'
-    FASTTEXT_SUBFOLDER = f"{EMBEDDINGS_SUBFOLDER}/fasttext"
+    # PROJECT_NAME_FOLDER = '/subreddit_clustering_i18n'
+    # EMBEDDINGS_SUBFOLDER = 'data/embeddings'
+    # FASTTEXT_SUBFOLDER = f"{EMBEDDINGS_SUBFOLDER}/fasttext"
 
     path_ft_embeddings = get_project_subfolder(
-        subfolder_path=EMBEDDINGS_SUBFOLDER,
-        project_root=PROJECT_NAME_FOLDER,
+        subfolder_path=fastttext_subfolder,
+        project_root=project_name_folder,
     )
-    print(f"Saving embeddings to:\n  {path_ft_embeddings}")
+    info(f"Saving embeddings to:\n  {path_ft_embeddings}")
 
     # use context manager to change working directory to ft-embeddings
     #  and change it back to original directory
