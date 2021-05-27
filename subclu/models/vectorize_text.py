@@ -197,8 +197,13 @@ def process_text_for_fse(
         custom_index=[d_id_to_ix[post_id] for post_id in df[col_id_to_map]],
         custom_split=custom_split_fxn
     )
+    return indexed_text, d_ix_to_id, d_id_to_ix
 
-    return indexed_text, d_id_to_ix, d_ix_to_id
+
+# def filter_text_for_fse_training(
+#
+# ):
+#     """TODO, move filtering logic to a function, instead of a big block of code"""
 
 
 def vectorize_text_with_fse(

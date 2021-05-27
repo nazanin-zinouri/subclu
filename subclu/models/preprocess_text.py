@@ -4,7 +4,6 @@ Using classes/functions/pipelines makes it easier to make sure
 we apply the same preprocessing at training & inference.
 """
 from functools import partial
-import logging
 from logging import info
 import re
 import string
@@ -108,7 +107,7 @@ class TextPreprocessor(BaseEstimator, TransformerMixin):
 
 def transform_and_tokenize_text(
         doc: str,
-        tokenizer: str,
+        tokenizer: Union[callable, str],
         lowercase: bool = False,
         # remove_digits: bool = False,
 ) -> Iterable[str]:
@@ -161,8 +160,12 @@ def transform_and_tokenize_text(
 
         elif tokenizer == 'gensim':
             return tokenize(doc, lowercase=lowercase)
-        else:
+        elif isinstance(tokenizer, str):
             raise NotImplementedError(f"Unknown tokenizer: {tokenizer}")
+
+        else:
+            return tokenizer(doc)
+
 
 #
 # ~ fin
