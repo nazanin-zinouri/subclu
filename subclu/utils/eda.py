@@ -63,7 +63,7 @@ def setup_logging(
     if file_root_name is not None:
         path_logs = Path('logs')
         Path.mkdir(path_logs, parents=False, exist_ok=True)
-        logging.basicConfig(filename=path_logs / f'{str_dtm_start}_{file_root_name}.log',
+        logging.basicConfig(filename=str(path_logs / f'{str_dtm_start}_{file_root_name}.log'),
                             level=file_level,
                             format=log_format,
                             datefmt='%Y-%m-%d %H:%M:%S'
@@ -91,6 +91,9 @@ def setup_logging(
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    # For some reason, sqlalchemy can sometimes be set to the wrong level, so se it back
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARN)
+
     if verbose:
         print("Final handlers")
         for handler in logger.handlers:
@@ -117,6 +120,40 @@ def print_lib_versions(
             print(f"{lib_.__name__}{sep_}v: {lib_.__version__}")
         except AttributeError:
             print(f"{lib_.__name__}{sep_}v: {get_distribution(f'{lib_.__name__}').version}")
+
+
+def elapsed_time(
+        start_time,
+        measure=None,
+        log_label: str = ' ',
+        verbose: bool = False,
+) -> float:
+    """
+    Given a datetime object as a start time, calculate how many days/hours/minutes/seconds
+    since the start time.
+    """
+    time_now = datetime.utcnow()
+    time_elapsed = (time_now - start_time)
+    if measure is None:
+        pass  # keep as datetime.timedelta object
+    elif measure == 'seconds':
+        time_elapsed = time_elapsed / timedelta(seconds=1)
+    elif measure == 'minutes':
+        time_elapsed = time_elapsed / timedelta(minutes=1)
+    elif measure == 'hours':
+        time_elapsed = time_elapsed / timedelta(hours=1)
+    elif measure == 'days':
+        time_elapsed = time_elapsed / timedelta(days=1)
+    else:
+        raise NotImplementedError(f"Measure unknown: {measure}")
+
+    if verbose:
+        if measure is not None:
+            logging.info(f"  {time_elapsed:,.3f} {measure} <- {log_label} time elapsed")
+        else:
+            logging.info(f"  {time_elapsed} <- {log_label} time elapsed")
+
+    return time_elapsed
 
 
 def notebook_display_config(
@@ -184,15 +221,30 @@ def value_counts_and_pcts(
         returns a Styler object (object to render HTML/CSS for displaying in jupyter)
     else
         return a df
-    :param df:
-    :param cols:
-        if one column, then do value_counts on it.
-        if multiple columns, then groupby those columns & count them
-    :param count_type:
-    :param sort_index:
-    :param pct_digits:
-    :param return_df:
-    :return:
+
+    Args:
+        df:
+        cols:
+            if one column, then do value_counts on it.
+            if multiple columns, then groupby those columns & count them
+        count_type:
+        sort_index:
+        index_group_cols:
+        pct_digits:
+        return_df:
+        top_n:
+        cumsum:
+        cumsum_count:
+        add_col_prefix:
+        bar_pct:
+        bar_cumsum:
+        reset_index:
+        sort_index_ascending:
+        observed:
+        rename_cols_for_display:
+        int_labels:
+
+    Returns:
     """
     if isinstance(cols, str):
         col = cols
