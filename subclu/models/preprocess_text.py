@@ -159,7 +159,7 @@ def transform_and_tokenize_text(
                 return doc.split()
 
         elif tokenizer == 'gensim':
-            return tokenize(doc, lowercase=lowercase)
+            return list(tokenize(doc, lowercase=lowercase))
 
         elif isinstance(tokenizer, str):
             raise NotImplementedError(f"Unknown tokenizer: {tokenizer}")
