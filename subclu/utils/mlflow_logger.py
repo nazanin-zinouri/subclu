@@ -2,12 +2,15 @@
 Utils to set up base mlflow setup & config
 Currently everything is local, but at some point we might switch to a server
 """
+import os
 import json
 import logging
 from pathlib import Path
+import subprocess
 from typing import List
 
 import mlflow
+from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
 
 
@@ -78,6 +81,19 @@ class MlflowLogger:
 
         return mlflow.set_experiment(name)
 
+    @staticmethod
+    def add_git_hash_to_active_run() -> None:
+        """
+        Check whether mlflow has set a tag for git commit,
+        if it doesn't, set it.
+
+        Returns: None
+        """
+        active_run = mlflow.active_run()
+        git_commit = active_run.data.tags.get(mlflow_tags.MLFLOW_GIT_COMMIT)
+        if git_commit is None:
+            mlflow.set_tag('mlflow.source.git.commit', get_git_hash())
+
     def reset_sqlalchemy_logging(self) -> None:
         """
         For some reason my function to set logging info in notebooks can reset
@@ -108,6 +124,26 @@ class MlflowLogger:
         Use it to set the artifact location as 1+ max
         """
         return max([int(e['experiment_id']) for e in self.list_experiment_meta()])
+
+
+def get_git_hash() -> str:
+    """
+    Borrowed from soverflow. Use it to get current git hash and add as a tag, IFF
+    mlflow hasn't detected the current git tag.
+    https://stackoverflow.com/questions/14989858/
+
+    Returns: git-hash as a string
+    """
+    try:
+        git_hash = (
+        subprocess.check_output(['git', 'rev-parse', 'HEAD'])
+        .strip()
+        .decode('ascii')
+    )
+    except OSError:
+        git_hash = None
+
+    return git_hash
 
 
 #

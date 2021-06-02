@@ -35,7 +35,7 @@ def get_fasttext_usif(
     """"""
     # Load a pretrained fasttext model & set up as fse.uSIF
     if verbose:
-        info(f"Downloading pretrained model for language: {lang_id}...")
+        info(f"  Getting pretrained model for language: {lang_id}...")
     f_ft_model = download_ft_pretrained_model(lang_id=lang_id, if_exists='ignore')
 
     ft = load_facebook_vectors(str(f_ft_model))
@@ -44,8 +44,8 @@ def get_fasttext_usif(
         logging.warn(f"Multi-core for FSE is OFF")
 
     if verbose:
-        info(f"{len(ft.vocab):,.0f} <- Model vocabulary")
-        info(f"{multicore_on} <- True if `fse` is running in parallel..")
+        info(f"  {len(ft.vocab):,.0f} <- Model vocabulary")
+        info(f"  {multicore_on} <- True if `fse` is running in parallel..")
     gc.collect()
 
     fse_usif = uSIF(ft, workers=workers, length=length, lang_freq=lang_freq)
