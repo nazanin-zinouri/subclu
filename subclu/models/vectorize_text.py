@@ -324,17 +324,15 @@ def vectorize_text_to_embeddings(
         if posts_path is not None:
             mlflow.log_metric('df_posts_len', len(df_posts))
 
-            info(f"Running inference on all posts...")
-            t_start_posts_inference = datetime.utcnow()
+            info(f"Running inference on all POSTS...")
             df_vect = vectorize_text_with_fse(
                 model=model,
                 fse_processed_text=indexed_posts,
-                df_to_merge=None,
+                df_to_merge=df_posts,
                 dict_index_to_id=d_ix_to_id,
                 col_id_to_map=col_post_id,
                 cols_index='post_default',
             )
-            elapsed_time(t_start_posts_inference, log_label='Posts inference time', verbose=True)
 
             info(f"Saving inference for comments df")
             f_df_vect_posts = path_this_model / f'df_vectorized_posts-{len(df_vect)}.parquet'
@@ -362,7 +360,7 @@ def vectorize_text_to_embeddings(
             df_vect_comments = vectorize_text_with_fse(
                 model=model,
                 fse_processed_text=indexed_comments,
-                df_to_merge=None,
+                df_to_merge=df_comments,
                 dict_index_to_id=d_ix_to_id_c,
                 col_id_to_map=col_comment_id,
                 cols_index='comment_default',
@@ -376,8 +374,7 @@ def vectorize_text_to_embeddings(
 
         if subreddits_path is not None:
             mlflow.log_metric('df_subs_len', len(df_subs))
-            info(f"Running inference on all subreddits meta...")
-            t_start_subs_inference = datetime.utcnow()
+            info(f"Running inference on all SUBREDDIT description...")
             df_vect_subs = vectorize_text_with_fse(
                 model=model,
                 fse_processed_text=indexed_subs,
@@ -385,8 +382,8 @@ def vectorize_text_to_embeddings(
                 dict_index_to_id=d_ix_to_id,
                 col_id_to_map=col_subreddit_id,
                 cols_index='subreddit_default',
+                verbose=True
             )
-            elapsed_time(t_start_subs_inference, log_label='Subreddits description inference time', verbose=True)
 
             info(f"Saving inference for subreddits description df")
             f_df_vect_subs = path_this_model / f'df_vectorized_subreddits_description-{len(df_vect_subs)}.parquet'
@@ -507,7 +504,7 @@ def vectorize_text_with_fse(
                                columns=['index', col_id_to_map]
                                ).set_index('index')
 
-    info(f"  Setting col_id as index...")
+    info(f"  Setting {col_id_to_map} as index...")
     df_vect = (
         df_vect
         .rename(columns={c: f"{col_embeddings_prefix}_{c}" for c in df_vect.columns})
@@ -532,7 +529,7 @@ def vectorize_text_with_fse(
             )
             .set_index(cols_index)
         )
-        elapsed_time(t_start_vec_to_df, log_label='Merging df_vect with ID columns', verbose=True)
+        elapsed_time(t_start_merging, log_label='Merging df_vect with ID columns', verbose=True)
     if verbose:
         elapsed_time(t_start_vec_to_df, log_label='Converting vectors to df full', verbose=True)
 
