@@ -186,6 +186,7 @@ def vectorize_text_to_embeddings(
         info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
         mlf.set_experiment(mlflow_experiment)
         mlflow.start_run()
+        mlf.add_git_hash_to_active_run()
         mlflow.log_params(d_params_to_log)
 
         if posts_path is not None:
