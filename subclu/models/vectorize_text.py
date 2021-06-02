@@ -494,12 +494,12 @@ def vectorize_text_with_fse(
     # info(f"{vectorized_posts.shape} <- Raw vectorized text shape")
 
     t_start_vec_to_df = datetime.utcnow()
-    info(f"Convert vectors to df...")
+    info(f"  Inference + convert to df...")
     df_vect = pd.DataFrame(model.infer(fse_processed_text))
-    info(f"{df_vect.shape} <- Raw vectorized text shape")
-    elapsed_time(t_start_vec_to_df, log_label='Raw vectorize to df only', verbose=True)
+    elapsed_time(t_start_vec_to_df, log_label='Raw inference+df only', verbose=True)
+    info(f"    {df_vect.shape} <- Raw vectorized text shape")
 
-    info(f"Create new df from dict_index_to_id to make merging easier...")
+    info(f"  Creating df from dict_index_to_id...")
     df_ix_to_id = pd.DataFrame(list(dict_index_to_id.items()),
                                columns=['index', col_id_to_map]
                                ).set_index('index')
@@ -517,7 +517,7 @@ def vectorize_text_with_fse(
     ).set_index(col_id_to_map)
 
     if df_to_merge is not None:
-        info(f"Merge vectors with df...")
+        info(f"  Merging df_vectors with df to get new index columns...")
         t_start_merging = datetime.utcnow()
         df_vect = (
             df_to_merge[cols_index]
@@ -529,9 +529,9 @@ def vectorize_text_with_fse(
             )
             .set_index(cols_index)
         )
-        elapsed_time(t_start_merging, log_label='Merging df_vect with ID columns', verbose=True)
+        elapsed_time(t_start_merging, log_label=' Merging df_vect with ID columns', verbose=True)
     if verbose:
-        elapsed_time(t_start_vec_to_df, log_label='Converting vectors to df full', verbose=True)
+        elapsed_time(t_start_vec_to_df, log_label='Converting vectors to df FULL', verbose=True)
 
     return df_vect
 
