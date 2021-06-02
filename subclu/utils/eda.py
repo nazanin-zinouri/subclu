@@ -124,8 +124,8 @@ def print_lib_versions(
 
 def elapsed_time(
         start_time,
-        measure=None,
         log_label: str = ' ',
+        measure=None,
         verbose: bool = False,
 ) -> float:
     """
