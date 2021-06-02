@@ -286,10 +286,7 @@ def vectorize_text_to_embeddings(
             elapsed_time(t_start_fse_format, log_label='Converting to fse', verbose=True)
             mlflow.log_param('training_data', 'subreddit_description')
 
-        mlflow.log_param('training_docs_count', n_training_docs)
-
-        if posts_path is not None:
-            mlflow.log_param('df_posts_len', len(df_posts))
+        mlflow.log_metric('training_docs_count', n_training_docs)
 
         info(f"Logging training df to mlflow...")
         # We only need to save the ix to ID because the other
@@ -325,6 +322,8 @@ def vectorize_text_to_embeddings(
         # fse_usif.save(str(path_this_ft_model / 'fse_usif_model_trained'))
 
         if posts_path is not None:
+            mlflow.log_metric('df_posts_len', len(df_posts))
+
             info(f"Running inference on all posts...")
             t_start_posts_inference = datetime.utcnow()
             df_vect = vectorize_text_with_fse(
@@ -344,6 +343,7 @@ def vectorize_text_to_embeddings(
             info(f"  Saving inference complete")
 
         if comments_path is not None:
+            mlflow.log_metric('df_comments_len', len(df_comments))
             # TODO(djb): comments are stalling because of df_vect_comments
             #  function runs out or memory
             info(f"Get vectors for comments")
@@ -372,9 +372,10 @@ def vectorize_text_to_embeddings(
             info(f"Save vectors for comments")
             f_df_vect_comments = path_this_model / f'df_vectorized_comments-{len(df_vect_comments)}.parquet'
             df_vect_comments.to_parquet(f_df_vect_comments)
-            mlflow.log_artifact(str(f_df_vect_posts), 'df_vect_comments')
+            mlflow.log_artifact(str(f_df_vect_comments), 'df_vect_comments')
 
         if subreddits_path is not None:
+            mlflow.log_metric('df_subs_len', len(df_subs))
             info(f"Running inference on all subreddits meta...")
             t_start_subs_inference = datetime.utcnow()
             df_vect_subs = vectorize_text_with_fse(
