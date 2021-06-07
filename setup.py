@@ -32,6 +32,8 @@ INSTALL_REQUIRES = [
     "seaborn == 0.11.1",
     "plotly == 4.14.3",
     "kaleido == 0.2.1",
+    "umap-learn == 0.5.1",
+    "multicoreTSNE == 0.1",
 
 ]
 
