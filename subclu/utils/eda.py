@@ -487,7 +487,7 @@ def style_df_numeric(
     native_int_cols = {c for c in df.select_dtypes(include=['int']).columns}
     all_num_cols = {c for c in df.select_dtypes('number').columns} - native_int_cols
 
-    if int_cols == True:
+    if int_cols is True:
         int_cols = set(all_num_cols)
     elif int_cols is None:
         int_cols = native_int_cols | {c for c in all_num_cols if any(lbl in c for lbl in int_labels)}
@@ -548,7 +548,11 @@ def style_df_numeric(
         info(f"Format dictionary:\n  {d_format}")
 
     if l_bar_simple is not None:
-        return df.style.format(d_format, na_rep=na_rep).bar(subset=l_bar_simple, align='mid', color=("#EB9073", "#95cff5"))
+        if rename_cols_for_display:
+            l_bar_simple = [rename_col_fxn(c) for c in l_bar_simple if rename_col_fxn(c) in df.columns]
+        return df.style.format(d_format, na_rep=na_rep).bar(subset=l_bar_simple,
+                                                            align='mid',
+                                                            color=("#EB9073", "#95cff5"))
 
     elif l_bars is not None:
         # apply all bar chart formats before applying other formats
