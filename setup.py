@@ -33,7 +33,7 @@ INSTALL_REQUIRES = [
     "plotly == 4.14.3",
     "kaleido == 0.2.1",
     "umap-learn == 0.5.1",
-    "multicoreTSNE == 0.1",
+    "openTSNE == 0.6.0",
 
 ]
 

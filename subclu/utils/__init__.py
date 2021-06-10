@@ -51,6 +51,15 @@ def get_project_subfolder(
     """
     path_cwd_original = Path.cwd()
 
+    # change cwd if we're under the david.bermejo folder
+    root_check = '/home/david.bermejo/repos/subreddit_clustering_i18n'
+    root_replace = '/home/jupyter/subreddit_clustering_i18n'
+    if str(path_cwd_original).startswith(root_check):
+        path_cwd_original = Path(
+            str(path_cwd_original)
+            .replace(root_check, root_replace)
+        )
+
     # This approach only manually checks 2 levels up from cwd
     p_1_level = path_cwd_original.parents[0]
     p_2_level = path_cwd_original.parents[1]
