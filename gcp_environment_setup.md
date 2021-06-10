@@ -80,6 +80,7 @@ After you've set an ssh connection, you can connect to the same host to sync cha
 - For mappings, make sure to map local repo to remote repo location
   - Local path: `/Users/david.bermejo/repos/subreddit_clustering_i18n`
   - Deployment path: `/home/david.bermejo/repos/subreddit_clustering_i18n`
+  - Deployment path 2: `/home/jupyter/subreddit_clustering_i18n` (this is where jupyter notebooks run)
 - Exclude `/data` subfolder unless needed
   - Exclude path (data folder): `/Users/david.bermejo/repos/subreddit_clustering_i18n/data` 
 
@@ -168,7 +169,7 @@ Run this command in GCP Notebok/VM:
 mlflow server --backend-store-uri sqlite:///mlflow/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
 ```
 
-Need to tunnel into it from local using custom ssh functio:
+Need to tunnel into it from local using custom ssh function:
 ```
 dj_ssh_mlflow cpu
 ```
