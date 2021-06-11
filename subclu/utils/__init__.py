@@ -52,6 +52,7 @@ def get_project_subfolder(
     path_cwd_original = Path.cwd()
 
     # change cwd if we're under the david.bermejo folder
+    #  all the data and notebooks are under the: /jupyter/ profile
     root_check = '/home/david.bermejo/repos/subreddit_clustering_i18n'
     root_replace = '/home/jupyter/subreddit_clustering_i18n'
     if str(path_cwd_original).startswith(root_check):
