@@ -34,21 +34,55 @@ For interactive (ipython) work:
 %autoreload 2
 from subclu.utils.eda import setup_logging
 setup_logging()
+
+from subclu.data.data_loaders import LoadSubreddits
+from subclu.utils.eda import reorder_array
 """
-from typing import Union
+from datetime import datetime
+from logging import info
+from typing import Tuple
 
 import pandas as pd
 
 from .data_loaders import LoadSubreddits
 from ..utils.eda import reorder_array
-# from subclu.data.data_loaders import LoadSubreddits
-# from subclu.utils.eda import reorder_array
+
 
 
 #
 # Load data
 # ===
 
+def get_sql_to_create_table_from_parquet(
+        table_name: str,
+        file_path: str,
+        bucket_name: str = 'i18n-subreddit-clustering',
+        data_format: str = 'PARQUET',
+) -> str:
+    """Standardize creating SQL tables
+
+    CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.post_embeddings_v002_tsne2`
+    OPTIONS (
+      format='PARQUET',
+      uris=["gs://i18n-subreddit-clustering/data/models/fse/manual_merge_2021-06-07_17/df_vectorized_posts_svd_tsne-init_pca-perplexity_30-rand_state_42-ids_index-111669_by_2.parquet"]
+    )
+    ;
+
+    Example for a single file:
+        data/models/fse/manual_merge_2021-06-07_17/df_vectorized_posts_svd_tsne-init_pca-perplexity_30-rand_state_42-ids_index-111669_by_2.parquet
+    Or for a folder: NOTE: ALL FILES IN FOLDER MUST HAVE THE SAME COLUMNS/FORMAT
+        data/models/fse/manual_merge_2021-06-07_17/
+    """
+    return (
+        f"""
+        CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.{table_name}`
+        OPTIONS (
+          format={data_format},
+          uris=["gs://{bucket_name}/{file_path}"]
+        )
+        ;
+        """
+    )
 
 
 def reshape_distances_for_bigquery(
@@ -57,16 +91,22 @@ def reshape_distances_for_bigquery(
         path_subreddit_metadata: str = 'subreddits/2021-06-01',
         bucket_name: str = 'i18n-subreddit-clustering',
         col_manual_labels: str = 'manual_topic_and_rating',
-) -> Union[pd.DataFrame, str, pd.DataFrame, str]:
+        output_table_prefix: str = 'subreddit_distance_model_v002',
+        top_subs_to_keep: int = 20,
+) -> Tuple[dict, pd.DataFrame, pd.DataFrame]:
     """Assumes we're always reading data from GCS
     Output in same location as distance matrix.
-    """
+
+    # Testing values:
     path_distance_matrix = 'data/models/fse/manual_merge_2021-06-07_17/df_subs_similarity-name_index-167_by_167.parquet'
-    path_outputs = 'data/models/fse/manual_merge_2021-06-07_17/'
+    path_outputs = 'data/models/fse/manual_merge_2021-06-07_17'
     path_subreddit_metadata = 'subreddits/2021-06-01'
     bucket_name = 'i18n-subreddit-clustering'
     col_manual_labels = 'manual_topic_and_rating'
-
+    output_table_prefix = 'subreddit_distance_model_v002'
+    top_subs_to_keep = 20
+    """
+    info(f"Load distance matrix...")
     df_dist = pd.read_parquet(f"gs://{bucket_name}/{path_distance_matrix}")
 
     # Reshape distances to pair-wise & rename columns
@@ -83,16 +123,7 @@ def reshape_distances_for_bigquery(
     )
     df_dist_pair = df_dist_pair[df_dist_pair['subreddit_name_a'] != df_dist_pair['subreddit_name_b']]
 
-    # calculate the top only at the end
-    # df_dist_pair_top_only = (
-    #     df_dist_pair
-    #     .sort_values(by=['cosine_distance'], ascending=False)
-    #     .groupby('subreddit_name_a')
-    #     .head(20)
-    #     .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
-    # )
-
-    # load sub-level metadata
+    info(f"Load subreddit metadata...")
     df_subs = LoadSubreddits(
         bucket_name=bucket_name,
         folder_path=path_subreddit_metadata,
@@ -102,6 +133,7 @@ def reshape_distances_for_bigquery(
 
     # Merge meta with similarity dfs
     # ===
+    info(f"Merge distance + metadata...")
     l_meta_basic = [
         'subreddit_name',
         'subreddit_id',
@@ -131,11 +163,58 @@ def reshape_distances_for_bigquery(
         )
     ]
 
+    info(f"Create new df to keep only top {top_subs_to_keep} subs by distance...")
     df_dist_pair_meta_top_only = (
         df_dist_pair_meta
         .sort_values(by=['cosine_distance'], ascending=False)
         .groupby('subreddit_name_a')
-        .head(20)
+        .head(top_subs_to_keep)
         .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
     )
 
+    shape_full = df_dist_pair_meta.shape
+    shape_top = df_dist_pair_meta_top_only.shape
+    table_dt_stamp = datetime.utcnow().strftime('%Y%m%d')
+    d_map_file_meta = {
+        'df_dist_full': {
+            'table_name': f"{output_table_prefix}_full_{table_dt_stamp}",
+            'file_name': f"{path_outputs}/df_distance_pair_meta_full-{table_dt_stamp}-{shape_full[0]}_by_{shape_full[1]}.parquet",
+        },
+        'df_dist_top_only': {
+            'table_name': f"{output_table_prefix}_top_only_{table_dt_stamp}",
+            'file_name': f"{path_outputs}/df_distance_pair_meta_top_only-{table_dt_stamp}-{shape_top[0]}_by_{shape_top[1]}.parquet",
+        },
+    }
+
+    # Bigquery will read the index as a column, so let's set our own rather than getting a weird
+    #  column like `__index_level_0__`
+    df_dist_pair_meta.set_index(['subreddit_id_a', 'subreddit_id_b']).to_parquet(
+        f"gs://{bucket_name}/{d_map_file_meta['df_dist_full']['file_name']}"
+    )
+    df_dist_pair_meta_top_only.set_index(['subreddit_id_a', 'subreddit_id_b']).to_parquet(
+        f"gs://{bucket_name}/{d_map_file_meta['df_dist_top_only']['file_name']}"
+    )
+
+    d_map_file_meta['df_dist_full']['sql'] = get_sql_to_create_table_from_parquet(
+        table_name=d_map_file_meta['df_dist_full']['table_name'],
+        file_path=d_map_file_meta['df_dist_full']['file_name'],
+        bucket_name=bucket_name,
+        data_format='PARQUET',
+    )
+
+    d_map_file_meta['df_dist_top_only']['sql'] = get_sql_to_create_table_from_parquet(
+        table_name=d_map_file_meta['df_dist_top_only']['table_name'],
+        file_path=d_map_file_meta['df_dist_top_only']['file_name'],
+        bucket_name=bucket_name,
+        data_format='PARQUET',
+    )
+
+    [print(d_['sql']) for d_ in d_map_file_meta.values()]
+
+    # TODO(djb) get permission to run sql from VM so I can update SQL from script
+    return d_map_file_meta, df_dist_pair_meta, df_dist_pair_meta_top_only
+
+
+#
+# ~fin
+#
