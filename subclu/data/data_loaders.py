@@ -88,11 +88,65 @@ class LoadSubreddits(LoadPosts):
     def __init__(
             self,
             bucket_name: str = 'i18n-subreddit-clustering',
-            folder_path: str = 'posts/2021-05-19',
+            folder_path: str = 'subreddits/2021-06-01',
+            folder_posts: str = 'posts/2021-05-19',
             columns: iter = None,
             col_new_manual_topic: str = 'manual_topic_and_rating'
     ) -> None:
         super().__init__(bucket_name, folder_path, columns, col_new_manual_topic)
+        self.folder_posts = folder_posts
+
+    def read_apply_transformations_and_merge_post_aggs(
+            self,
+            df_posts: pd.DataFrame = None,
+    ) -> pd.DataFrame:
+        """Besides loading the sub-data, load post-level data & merge aggregates from post-level"""
+        if df_posts is None:
+            info(f"Loading df_posts from: {self.folder_posts}")
+            # limit to only cols absolutely needed to save time & RAM
+            l_cols_post_aggs_only = [
+                'subreddit_name',
+                'subreddit_id',
+                'weighted_language',    # For language aggs
+                'post_type',            # For post aggs
+                'combined_topic_and_rating',    # Needed for new manual label
+                'text_word_count',      # To get median post word count
+            ]
+            df_posts = LoadPosts(
+                bucket_name=self.bucket_name,
+                folder_path=self.folder_posts,
+                columns=l_cols_post_aggs_only,
+            ).read_and_apply_transformations()
+
+        info(f"  reading sub-level data & merging with aggregates...")
+        df_subs = (
+            self.read_and_apply_transformations()
+            .merge(
+                create_sub_level_aggregates(
+                    df_posts,
+                    col_manual_label=self.col_new_manual_topic,
+                    col_subreddit_id='subreddit_id',
+                ),
+                how='outer',
+                left_on=['subreddit_name'],
+                right_index=True,
+                suffixes=('', '_post')
+            )
+        )
+        # fill missing data into single col & drop duplicate cols
+        df_subs['subreddit_id'] = np.where(
+            df_subs['subreddit_id'].isnull(),
+            df_subs['subreddit_id_post'],
+            df_subs['subreddit_id']
+        )
+        df_subs[self.col_new_manual_topic] = np.where(
+            df_subs[self.col_new_manual_topic].isnull(),
+            df_subs[f"{self.col_new_manual_topic}_post"],
+            df_subs[self.col_new_manual_topic]
+        )
+        return df_subs.drop(['subreddit_id_post',
+                             f"{self.col_new_manual_topic}_post"],
+                            axis=1)
 
 
 def create_sub_level_aggregates(
@@ -100,13 +154,24 @@ def create_sub_level_aggregates(
         col_sub_key: str = 'subreddit_name',
         col_language: str = 'weighted_language_top',
         col_post_type: str = 'post_type_agg3',
+        col_word_count: str = 'text_word_count',
         col_total_posts: str = 'total_posts_count',
+        col_manual_label: str = None,
+        col_subreddit_id: str = None,
 ) -> pd.DataFrame:
     """Take a posts df and create some aggregate columns in a wide format
     so that we can merge this with a df_subs (each row = 1 sub).
 
     By default only returns percentages.
     """
+    # use col manual label & sub ID to append in case we want to merge
+    #  with sub metadata that's missing this info
+    l_add_extra_cols = list()
+    if col_manual_label is not None:
+        l_add_extra_cols.append(col_manual_label)
+    if col_subreddit_id is not None:
+        l_add_extra_cols.append(col_subreddit_id)
+
     # create roll ups for "other languages"
     df_lang_sub = get_language_by_sub_wide(
         df_posts,
@@ -134,12 +199,41 @@ def create_sub_level_aggregates(
                  }
     )
     df_post_type_sub = df_post_type_sub[[c for c in df_post_type_sub.columns if c.endswith('_post_type_percent')]]
-    return df_lang_sub.merge(
-        df_post_type_sub,
-        how='outer',
-        left_index=True,
-        right_index=True,
+
+    df_merged = (
+        df_lang_sub
+        .merge(
+            df_post_type_sub,
+            how='outer',
+            left_index=True,
+            right_index=True,
+        )
+        .merge(
+            (
+                df_posts
+                .groupby(col_sub_key)
+                .agg(
+                    **{'post_median_word_count': (col_word_count, 'median')
+                       }
+                )
+            ),
+            left_index=True,
+            right_index=True,
+        )
     )
+    if 0 == len(l_add_extra_cols):
+        return df_merged
+    else:
+        return df_merged.merge(
+            (
+                df_posts[[col_sub_key] + l_add_extra_cols]
+                .drop_duplicates()
+                .set_index(col_sub_key)
+            ),
+            how='left',
+            left_index=True,
+            right_index=True,
+        )
 
 
 def create_new_manual_topic_column(
