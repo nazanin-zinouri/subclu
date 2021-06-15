@@ -116,6 +116,91 @@ def create_stacked_bar(df, ax, cmap):
             bottom = bottom + df[col]
     # ax.legend(handles=plts, labels=df.columns)
 
+
+def get_color_dict(
+        name: str = 'dirl',
+) -> dict:
+    """dict with named colors for easier tweaking, includes plotly colors
+
+    To get plotly colors:
+    - https://plotly.com/python/discrete-color/
+    - px.colors.qualitative.Plotly
+    - px.colors.qualitative.swatches()
+    """
+    d_reddit = {
+        'orange_red': '#ff4500',
+        'mint': '#0dd3bb',
+        'blue': '#24a0ed',
+        'yellow': '#ffca00',
+        'mango': '#ffb000',
+        'orange': '#ff8717',
+        'teal': '#00a6a5',
+        'blue_alien': '#0079d3',
+    }
+
+    d_plotly = {
+        'blue_purple': '#636EFA',
+        'orange': '#EF553B',
+        'mint': '#00CC96',
+        'purple_light': '#AB63FA',
+        'orange_light': '#FFA15A',
+        'blue_sky': '#19D3F3',
+        'magenta': '#FF6692',
+        'green_lime': '#B6E880',
+        'pink': '#FF97FF',
+        'yellow': '#FECB52',
+    }
+
+    if name == 'dirl':
+        return d_reddit
+    elif name == 'plotly':
+        return d_plotly
+    else:
+        raise NotImplementedError
+
+
+def base_colors_for_manual_labels() -> dict:
+    """Base colors to map manual label to a color"""
+    return {
+        'reddit institutions': get_color_dict('dirl')['orange_red'],
+        'internet culture and memes': get_color_dict('dirl')['orange'],
+        'podcasts and streamers': get_color_dict('dirl')['yellow'],
+
+        'place/culture': get_color_dict('plotly')['blue_sky'],
+
+        'business, economics, and finance': get_color_dict('plotly')['purple_light'],
+        'culture, entertainment, music': get_color_dict('dirl')['blue'],
+
+        'world news': get_color_dict('plotly')['pink'],
+        'technology': get_color_dict('dirl')['mango'],
+
+        'gaming': get_color_dict('plotly')['green_lime'],
+        'sports': get_color_dict('dirl')['teal'],
+
+        'culture, race, and ethnicity': get_color_dict('dirl')['mint'],
+        'food and drink': get_color_dict('dirl')['blue_alien'],
+        'home and garden': get_color_dict('plotly')['magenta'],
+
+        'uncategorized': "#e3dbda",  # light-reddish gray (too light: fcf3f2)
+        'over18_nsfw': "#8c8c8c",  # dark gray
+    }
+
+def check_colors_used(
+        d_new: dict,
+        d_reference: dict,
+):
+    """Check which values have been used in one dictionary"""
+    set_new = set(d_new.values())
+    set_ref = set(d_reference.values())
+    unused_vals = set_ref - set_new
+
+    print(f"{len(d_new.keys())}  Total keys in d_new")
+    print(f"{len(set_new)}  Unique values in d_new")
+
+    l_colors_unused = [k for k, v in d_reference.items() if v in unused_vals]
+    print(f"Unused keys from d_ref:\n  {l_colors_unused}")
+
+
 #
 # ~ fin
 #

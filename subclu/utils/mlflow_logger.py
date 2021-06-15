@@ -5,9 +5,11 @@ Currently everything is local, but at some point we might switch to a server
 import os
 import json
 import logging
+
+import pandas as pd
 from pathlib import Path
 import subprocess
-from typing import List
+from typing import List, Union
 
 import mlflow
 from mlflow.utils import mlflow_tags
@@ -65,7 +67,7 @@ class MlflowLogger:
             self,
             name: str,
             artifact_location: str = None,
-    ) -> str:
+    ) -> None:
         """Wrapper around mlflow.create_experiment()/set_experiment
         This one uses the `default_artifact_root` set at the class-init to set
         the experiment location by auto-incrementing based on latest ACTIVE experiment.
@@ -94,7 +96,8 @@ class MlflowLogger:
         if git_commit is None:
             mlflow.set_tag('mlflow.source.git.commit', get_git_hash())
 
-    def reset_sqlalchemy_logging(self) -> None:
+    @staticmethod
+    def reset_sqlalchemy_logging() -> None:
         """
         For some reason my function to set logging info in notebooks can reset
         sqlalchemy and other libraries to "INFO", which can add a lot of noise.
@@ -104,9 +107,13 @@ class MlflowLogger:
         logging.getLogger('sqlalchemy').setLevel(logging.WARN)
         logging.getLogger('alembic').setLevel(logging.WARN)
 
-    def list_experiment_meta(self) -> List[dict]:
+    def list_experiment_meta(self,
+                             output_format=None
+                             ) -> Union[List[dict], pd.DataFrame]:
         """Get experiment meta as list of dictionaries"""
         mlflow_client = mlflow.tracking.MlflowClient()
+        # The first time we call this function, we may see a lot of 'info' logs
+        self.reset_sqlalchemy_logging()
         l_exp = list()
 
         for exp_ in mlflow_client.list_experiments():
@@ -115,9 +122,10 @@ class MlflowLogger:
                     mlflow.utils.proto_json_utils.message_to_json(exp_.to_proto())
                 )
             )
-        # The first time we call this function, we may see a lot of 'info' logs
-        self.reset_sqlalchemy_logging()
-        return l_exp
+        if output_format == 'pandas':
+            return pd.DataFrame(l_exp)
+        else:
+            return l_exp
 
     def get_max_experiment_id(self) -> int:
         """Get the largest experiment ID for ACTIVE experiments
@@ -125,10 +133,51 @@ class MlflowLogger:
         """
         return max([int(e['experiment_id']) for e in self.list_experiment_meta()])
 
+    def search_all_runs(
+            self,
+            experiment_ids: Union[str, int, List[int]] = None,
+    ) -> pd.DataFrame:
+        """
+        Get all runs in pandas format
+        Returns:
+        """
+        if experiment_ids is None:
+            experiment_ids = [d['experiment_id'] for d in self.list_experiment_meta()]
+        return mlflow.search_runs(experiment_ids, output_format='pandas')
+
+    def read_run_artifact(
+            self,
+            run_id: str,
+            artifact_folder: str,
+            experiment_ids: Union[str, int, List[int]] = None,
+            read_function: callable = pd.read_parquet,
+            columns: iter = None,
+    ):
+        """
+        Example:
+        df_v_sub = (
+            pd.read_parquet(f"{artifact_uri}/{folder_vect_subs}")
+        )
+        """
+        # first get a df for all runs
+        # logging.info(f"  Getting all runs...")
+        df_all_runs = self.search_all_runs(experiment_ids=experiment_ids)
+
+        artifact_uri = df_all_runs.loc[
+            df_all_runs['run_id'] == run_id,
+            'artifact_uri'
+        ].values[0]
+        try:
+            return read_function(f"{artifact_uri}/{artifact_folder}",
+                                 columns=columns)
+        except Exception as e:
+            print(e)
+            return read_function(f"{artifact_uri}/{artifact_folder}")
+
 
 def get_git_hash() -> str:
     """
-    Borrowed from soverflow. Use it to get current git hash and add as a tag, IFF
+    Borrowed from s-overflow. Use it to get current git hash and add as a tag, IFF
     mlflow hasn't detected the current git tag.
     https://stackoverflow.com/questions/14989858/
 
