@@ -10,11 +10,8 @@ from typing import Dict, Union
 import numpy as np
 import pandas as pd
 
-from subclu.eda.aggregates import (
-    compare_raw_v_weighted_language,
-    get_language_by_sub_wide,
-    get_language_by_sub_long,
-)
+from ..eda.aggregates import get_language_by_sub_wide
+# from subclu.eda.aggregates import get_language_by_sub_wide
 
 
 class LoadPosts:
@@ -252,6 +249,17 @@ def create_new_manual_topic_column(
     new_place_culture = 'place/culture'
     new_cult_ent_music = 'culture, entertainment, music'
 
+    nsfw_category = 'over18_nsfw'
+    # looks like most of these might've been classified as NSFW AFTER I PULLED
+    # THE TRAINING DATA
+    l_nsfw_subs = [
+        'wixbros', 'germannudes', 'loredana', 'katjakrasavicenudes',
+        'deutschetributes', 'nicoledobrikovof', 'germanonlyfans',
+        'elisaalinenudes', 'julesboringlifehot', 'marialoeffler',
+        'annitheduck', 'emmyruss', 'bibisbeautypalacensfw',
+        'juliabeautx_xxx',
+    ]
+
     if old_labels_to_new_label is None:
         old_labels_to_new_label = {
             'food': 'food and drink',
@@ -277,6 +285,8 @@ def create_new_manual_topic_column(
 
             'fahrrad': 'sports',
         }
+        for s_ in l_nsfw_subs:
+            sub_names_to_new_label[s_] = nsfw_category
 
     return np.where(
         df[col_sub_name].isin(sub_names_to_new_label.keys()),
