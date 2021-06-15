@@ -734,6 +734,9 @@ def create_col_with_sparse_names(
         subreddits_to_ignore: iter = None,
 ) -> Union[np.ndarray, pd.Series]:
     """Only name the subs with the most upvotes for each sub"""
+    if subreddits_to_ignore is None:
+        subreddits_to_ignore = list()
+
     post_ids_to_keep = (
         df[~df[col_subreddit_name].isin(subreddits_to_ignore)]
         .sort_values(by=[col_upvotes], ascending=False)

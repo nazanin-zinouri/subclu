@@ -29,9 +29,12 @@ Steps:
         - CREATE A VIEW so that it's updated dynamically with data from previous day!
 - SQL statement to create talbe from this file
 
-For interactive (ipython) work:
+
+# For interactive (ipython) work:
 %load_ext autoreload
 %autoreload 2
+
+# fix logging in ipython/jupyter
 from subclu.utils.eda import setup_logging
 setup_logging()
 
@@ -48,11 +51,6 @@ from .data_loaders import LoadSubreddits
 from ..utils.eda import reorder_array
 
 
-
-#
-# Load data
-# ===
-
 def get_sql_to_create_table_from_parquet(
         table_name: str,
         file_path: str,
@@ -61,17 +59,19 @@ def get_sql_to_create_table_from_parquet(
 ) -> str:
     """Standardize creating SQL tables
 
+    Example for paths:
+    - single file:
+        data/models/fse/manual_merge_2021-06-07_17/df_one_file.parquet
+    - files matching pattern:
+        data/models/fse/manual_merge_2021-06-07_17/df_*.parquet
+    - folder. NOTE: ALL FILES IN FOLDER MUST HAVE THE SAME COLUMNS/FORMAT
+        data/models/fse/manual_merge_2021-06-07_17/
+
     CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.post_embeddings_v002_tsne2`
     OPTIONS (
       format='PARQUET',
-      uris=["gs://i18n-subreddit-clustering/data/models/fse/manual_merge_2021-06-07_17/df_vectorized_posts_svd_tsne-init_pca-perplexity_30-rand_state_42-ids_index-111669_by_2.parquet"]
+      uris=["gs://i18n-subreddit-clustering/data/models/fse/df_one_file.parquet"]
     )
-    ;
-
-    Example for a single file:
-        data/models/fse/manual_merge_2021-06-07_17/df_vectorized_posts_svd_tsne-init_pca-perplexity_30-rand_state_42-ids_index-111669_by_2.parquet
-    Or for a folder: NOTE: ALL FILES IN FOLDER MUST HAVE THE SAME COLUMNS/FORMAT
-        data/models/fse/manual_merge_2021-06-07_17/
     """
     return (
         f"""
@@ -213,6 +213,9 @@ def reshape_distances_for_bigquery(
 
     # TODO(djb) get permission to run sql from VM so I can update SQL from script
     return d_map_file_meta, df_dist_pair_meta, df_dist_pair_meta_top_only
+
+
+# TODO(djb) make it a script to run from command line?
 
 
 #
