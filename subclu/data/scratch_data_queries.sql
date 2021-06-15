@@ -147,3 +147,105 @@ from (
 ) t
 WHERE row_num=1
 ;
+
+
+-- Get all geo-relevant subs for DE + add flag to check which ones
+-- were used for POC
+-- 2021-06-14
+-- Used in colab notebook:
+-- https://colab.research.google.com/drive/1Fo9UIV1BoQ6EfL42lTdrAYbpb9A3Ueu4#scrollTo=SFM61kb5Gkzn
+DECLARE partition_date DATE DEFAULT '2021-05-18';
+DECLARE start_date DATE DEFAULT '2021-04-01';
+DECLARE end_date DATE DEFAULT '2021-05-19';
+
+WITH all_de_geo_subs_and_training_subs AS
+(
+    SELECT
+        COALESCE(geo.subreddit_name, subs.subreddit_name) AS subreddit_name
+        , geo.geo_country_code
+        , geo.pct_sv_country
+        , geo.rank_no
+        , IF(subs.subreddit_name IS NOT NULL, True, False) AS subreddit_used_for_clustering_poc
+        , subs.subreddit_info_ambassador
+
+    FROM (
+        SELECT *
+        FROM `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021`
+        WHERE geo_country_code = "DE"
+    ) AS geo
+
+    LEFT JOIN (
+        -- Using sub-selection in case there are subs that haven't been registered in asr table
+        SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+        WHERE DATE(pt) = partition_date
+            AND users_l7 >= 100
+    ) AS asr
+        ON geo.subreddit_name = asr.subreddit_name
+
+    FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.subclu_selected_subs_20210519` AS subs
+        ON geo.subreddit_name = subs.subreddit_name
+)
+
+SELECT
+    gs.subreddit_name
+    , gs.subreddit_used_for_clustering_poc
+    , gs.geo_country_code
+
+    , sp.post_id
+    , CASE
+        WHEN rt.rating IN ("x", "nc17") THEN "over18_nsfw"
+        WHEN dst.topic = "Mature Themes and Adult Content" THEN "over18_nsfw"
+        WHEN slo.over_18 = "t" THEN "over18_nsfw"
+        ELSE COALESCE (
+            gs.subreddit_info_ambassador,
+            LOWER(dst.topic),
+            "uncategorized"
+        )
+        END         AS combined_topic_and_rating
+
+FROM all_de_geo_subs_and_training_subs AS gs
+
+# Get posts for subreddit
+LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
+    ON gs.subreddit_name = sp.subreddit_name
+
+LEFT JOIN (
+    SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_ratings`
+    WHERE DATE(pt) = partition_date
+) AS rt
+    ON gs.subreddit_name = rt.subreddit_name
+LEFT JOIN(
+    SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_topics`
+    WHERE DATE(pt) = partition_date
+) AS dst
+    ON gs.subreddit_name = dst.subreddit_name
+
+LEFT JOIN (
+    SELECT *
+    FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+    WHERE dt = end_date
+)AS slo
+    ON gs.subreddit_name = LOWER(slo.name)
+
+WHERE 1=1
+    # AND subreddit_in_cluster_training = True  # check that we get ~111k posts for clustered subs
+        # got 114k, maybe some got dropped because they're too short in last steps?
+    AND sp.dt BETWEEN start_date AND end_date
+    AND sp.removed = 0
+
+;
+
+-- Get screenviews by country
+# Get screen views
+# LEFT JOIN (
+#     SELECT
+#         user_id
+#         , geo_country_code
+#         , subreddit_name
+#         , screenviews
+#     FROM `data-prod-165221.ds_v2_component_tables.user_subreddit_daily_screenviews`
+#     WHERE DATE(_PARTITIONTIME) = partition_date
+#         AND dt BETWEEN start_date AND end_date
+#     # LIMIT 500
+# ) AS dsv
+#     ON gs.subreddit_name = dsv.subreddit_name
