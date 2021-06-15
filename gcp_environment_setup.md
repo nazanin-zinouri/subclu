@@ -141,6 +141,21 @@ In jupyter, you can add this magic at the beginning of a notebook to reload edit
 Follow github's guide to create an SSH key & add it to your agent.
 - https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
 
+tl;dr:
+0. Open a terminal
+   
+1. Generate new key with a passphrase
+```
+ssh-keygen -t ed25519 -C "your_email@example.com"
+
+# if prompted for location, press enter to write to default
+ Enter a file in which to save the key (/home/you/.ssh/id_ed25519): [Press enter]
+ 
+> Enter passphrase (empty for no passphrase): [Type a passphrase]
+> Enter same passphrase again: [Type passphrase again]
+```
+
+
 ## Add SSH key to ssh-agent
 After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
 ```
@@ -151,9 +166,31 @@ ssh-add ~/.ssh/id_ed25519
 
 Note: you'll be prompted for your git passphrase.
 
+## Add key to github
+github's guide:
+- https://docs.github.com/en/github/authenticating-to-github/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+
+tl;dr:
+shortcut for keys:
+- https://github.snooguts.net/settings/keys
+0. Go to reddit's enterprise github
+1. Click on your user-name (top right corner) > settings
+2. Click on `ssh and gpg keys`
+3. Click on `New SSH key` button
+
+On command line of your new VM:
+4. Copy or open the public key for your new key. For example, open it in `nano` to copy it:
+<br>```nano ~/.ssh/id_ed25519.pub```
+
+5. Paste public key into the `Key` field in github
+6. Add a `title` for the key. Example: `gcp TF machine` 
+
+
 ## Clone repo to JupyterLab
 The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:
 `git clone git@github.snooguts.net:david-bermejo/subreddit_clustering_i18n.git`
+
+After you clone, you can cd to the new folder with the repo & use git CLI as usual.
 
 Note: it can be a bit confusing, but the version of the library we install won't be the same one that runs jupyter notebooks
 
