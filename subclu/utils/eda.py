@@ -29,6 +29,24 @@ Array = Union[np.array, pd.Series, pd.DataFrame, List]
 # ===============
 # Logging & Misc
 # ===
+def reorder_array(items_to_front: list,
+                  array):
+    """
+    if the array is a dataframe, re-order the columns
+    if array is list-like, re-order it
+    """
+    try:
+        return items_to_front + array.columns.drop(items_to_front).to_list()
+    except AttributeError:
+        set_found = set(items_to_front) & set(array)
+        set_missing = set(items_to_front) - set_found
+        if len(set_found) != len(items_to_front):
+            logging.warning(f"Values missing {len(set_missing)}:\n{set_missing}")
+            items_to_front = [itm for itm in items_to_front if itm in set_found]
+
+        return items_to_front + [itm for itm in array if itm not in items_to_front]
+
+
 def setup_logging(
         log_format: str = 'basic_with_time',
         console_level=logging.INFO,
@@ -487,7 +505,7 @@ def style_df_numeric(
     native_int_cols = {c for c in df.select_dtypes(include=['int']).columns}
     all_num_cols = {c for c in df.select_dtypes('number').columns} - native_int_cols
 
-    if int_cols == True:
+    if int_cols is True:
         int_cols = set(all_num_cols)
     elif int_cols is None:
         int_cols = native_int_cols | {c for c in all_num_cols if any(lbl in c for lbl in int_labels)}
@@ -548,7 +566,11 @@ def style_df_numeric(
         info(f"Format dictionary:\n  {d_format}")
 
     if l_bar_simple is not None:
-        return df.style.format(d_format, na_rep=na_rep).bar(subset=l_bar_simple, align='mid', color=("#EB9073", "#95cff5"))
+        if rename_cols_for_display:
+            l_bar_simple = [rename_col_fxn(c) for c in l_bar_simple if rename_col_fxn(c) in df.columns]
+        return df.style.format(d_format, na_rep=na_rep).bar(subset=l_bar_simple,
+                                                            align='mid',
+                                                            color=("#EB9073", "#95cff5"))
 
     elif l_bars is not None:
         # apply all bar chart formats before applying other formats
@@ -702,6 +724,45 @@ def counts_describe(
                                 pct_labels=['-percent'],
                                 pct_digits=pct_digits,
                                 )
+
+
+def create_col_with_sparse_names(
+        df,
+        col_post_id: str = 'post_id',
+        col_subreddit_name: str = 'subreddit_name',
+        col_upvotes: str = 'upvotes',
+        subreddits_to_ignore: iter = None,
+) -> Union[np.ndarray, pd.Series]:
+    """Only name the subs with the most upvotes for each sub"""
+    if subreddits_to_ignore is None:
+        subreddits_to_ignore = list()
+
+    post_ids_to_keep = (
+        df[~df[col_subreddit_name].isin(subreddits_to_ignore)]
+        .sort_values(by=[col_upvotes], ascending=False)
+        .drop_duplicates(subset=[col_subreddit_name], keep='first')
+        [col_post_id]
+    )
+    return np.where(
+        df[col_post_id].isin(post_ids_to_keep),
+        df[col_subreddit_name],
+        ''
+    )
+
+def hide_aa_text_in_plotly_legend() -> None:
+    """
+    There's no good way to remove `Aa` from plotly legends besides updating the
+    HTML, so run this before creating a plotly fig in a notebook
+    https://stackoverflow.com/questions/62554007/how-to-remove-aa-from-the-legend-in-plotly-py
+
+    Returns: None
+    """
+    from IPython.core.display import HTML
+    HTML("""
+    <style>
+    g.pointtext {display: none;}
+    </style>
+    """)
 
 
 #
