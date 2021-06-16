@@ -185,13 +185,18 @@ Editable makes it easy to continue editing your module and use the updated code 
 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
 
+NOTE: you might need to install it with a `--user` flag in case some of the installed packages create conflicts with native packages
 ```
 sudo su - david.bermejo
 
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 
 # or if you're installing a superset of requirements add `[<extra_name>]`
-pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[torch]
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[pytorch]
+
+# for tensorflow image I had to add the --user tag because I was getting
+#  access errors.
+pip install -e --user /home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow]
 ```
 
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code:

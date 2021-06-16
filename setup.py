@@ -16,6 +16,7 @@ INSTALL_REQUIRES = [
     "pandas == 1.2.4",
     "scikit-learn == 0.24.1",
     "joblib == 1.0.1",
+    # np version might not be tf2 version
     "numpy == 1.19.5",
     "mlflow == 1.16.0",
 
@@ -46,11 +47,19 @@ EXTRAS_REQUIRE = {
         "ipython == 7.22.0",
         "pyarrow == 3.0.0",
     ],
-    # torch = pytorch GPU machine
-    "torch": [
+
+    "pytorch": [
+        # torch = pytorch GPU machine
         "torch == 1.8.0",
         "torchvision == 0.9.0+cu111",
     ],
+
+    "tensorflow": [
+        # tensorflow = extra libraries needed to run TF models
+        # for some reason there's a numpy conflict with base install that
+        # interferes with tf==2.3.2
+        "tensorflow == 2.3.2",
+    ]
 }
 
 # Don't do a 'complete' because we might have conflicting requirements between
