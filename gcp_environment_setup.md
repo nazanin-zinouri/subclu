@@ -171,7 +171,7 @@ After you've set the remote connection you can use the remote interpreter. The n
 <br>https://www.jetbrains.com/help/pycharm/configuring-remote-interpreters-via-ssh.html#ssh
 - Settings ( `⌘` + `,`) > `Python Interpreter` > `Add...` (gear icon)
 - Python interpreter path:
-<br>`opt/conda/bin/python`
+<br>`/opt/conda/bin/python`
 
 ![PyCharm complete configuration for remote SSH interpreter](images/pycharm_python_interpreter_shh_setup.png)
 
@@ -194,9 +194,10 @@ pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 # or if you're installing a superset of requirements add `[<extra_name>]`
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[pytorch]
 
-# for tensorflow image I had to add the --user tag because I was getting
-#  access errors.
-pip install -e --user /home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow]
+# for tensorflow VM/image I tried the --user tag because I was getting
+#  access errors. But that fails because subclu wouldn't be installed
+#  for the jupyter user that's the default for jupyterlab server
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --user
 ```
 
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
