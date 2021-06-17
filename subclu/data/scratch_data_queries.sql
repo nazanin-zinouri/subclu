@@ -249,3 +249,18 @@ WHERE 1=1
 #     # LIMIT 500
 # ) AS dsv
 #     ON gs.subreddit_name = dsv.subreddit_name
+
+
+-- 2021-06-16
+-- Many of the top US/world subs do not appear to be labeled by the same people/process
+--  that had many labels for German subs. Might need to use something like
+-- `normalized topics`, but these have multiple labels per sub & they're not
+-- normalized
+SELECT *
+FROM `data-prod-165221.community_topic_data_resources.normalized_topics`
+WHERE DATE(pt) = "2021-06-15"
+    AND subreddit_name IN ("nfl", "cosplaygirls", "nba", "amihot", "memes")
+
+ORDER BY subreddit_name ASC, community_topic ASC
+LIMIT 500
+;
