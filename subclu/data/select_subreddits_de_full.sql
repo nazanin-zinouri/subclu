@@ -229,7 +229,7 @@ ORDER BY users_l28 DESC, subscribers DESC
 # 1) URI date folder
 # 2) source table
 # EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/subreddits/2021-06-16/*.parquet',
+#   uri='gs://i18n-subreddit-clustering/subreddits/de/2021-06-16/*.parquet',
 #   format='PARQUET',
 #   overwrite=true
 #   ) AS
