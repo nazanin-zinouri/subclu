@@ -9,15 +9,15 @@ from setuptools import find_packages, setup
 # These libraries get installed always
 INSTALL_REQUIRES = [
     # cookie cutter tools
-    "python-dotenv >= 0.5.1",
-    "click",
+    # "python-dotenv >= 0.5.1",
+    # "click == 8.0.1",
 
     # DS/ML core
-    "pandas == 1.2.4",
-    "scikit-learn == 0.24.1",
-    "joblib == 1.0.1",
+    # "pandas == 1.2.4",
+    # "scikit-learn == 0.24.1",
+    # "joblib == 1.0.1",
     # np version might not be tf2 version
-    "numpy == 1.19.5",
+    # "numpy == 1.19.5",
     "mlflow == 1.16.0",
 
     # Auth
@@ -54,11 +54,23 @@ EXTRAS_REQUIRE = {
         "torchvision == 0.9.0+cu111",
     ],
 
-    "tensorflow": [
-        # tensorflow = extra libraries needed to run TF models
-        # for some reason there's a numpy conflict with base install that
-        # interferes with tf==2.3.2
+    # tensorflow = extra libraries needed to run TF models
+    # for some reason there's a numpy conflict with base install that
+    # interferes with tf==2.3.2
+    "tensorflow_232": [
         "tensorflow == 2.3.2",
+        # "tensorflow-cloud == 0.1.13",
+        # "tensorflow-data-validation == 0.26.1",
+        # "tensorflow-datasets == 3.0.0",
+        # "tensorflow-estimator == 2.3.0",
+        # "tensorflow-hub == 0.9.0",
+        # "tensorflow-io == 0.15.0",
+        # "tensorflow-metadata == 0.26.0",
+        # "tensorflow-model-analysis == 0.26.1",
+        # "tensorflow-probability == 0.11.0",
+        # "tensorflow-serving-api == 2.3.0",
+        # "tensorflow-transform == 0.26.0",
+        "tensorflow-text == 2.3.0",
     ]
 }
 
