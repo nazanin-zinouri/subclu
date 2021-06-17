@@ -8,63 +8,64 @@ DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|redd
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
 DECLARE AT_and_CH_min_num_users_l28 NUMERIC DEFAULT 15000;
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_de_subs_all_20210616`
-AS
+WITH dach_subs AS (
+SELECT
+    geo.subreddit_name
+    , geo.geo_country_code
+    , geo.pct_sv_country
+    , geo.rank_no
 
-WITH selected_subs AS
-(
-(
-    SELECT
-        geo.subreddit_name
-        , geo.geo_country_code
-        , geo.pct_sv_country
-        , geo.rank_no
-        , NULL AS subreddit_info_ambassador
-        , NULL as subreddit_topic_ambassador
+FROM `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
+-- option: "approved"/sfw list: geo_relevant_subreddits_intl_20200818_approved
 
-    FROM `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
-    -- option: "approved"/sfw list: geo_relevant_subreddits_intl_20200818_approved
+LEFT JOIN (
+    -- Using sub-selection in case there are subs that haven't been registered in asr table
+    SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+    WHERE DATE(pt) = partition_date
+        AND users_l7 >= 100
+) AS asr
+    ON geo.subreddit_name = asr.subreddit_name
 
-    LEFT JOIN (
-        -- Using sub-selection in case there are subs that haven't been registered in asr table
-        SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
-        WHERE DATE(pt) = partition_date
-            AND users_l7 >= 100
-    ) AS asr
-        ON geo.subreddit_name = asr.subreddit_name
-
-    -- Besides geo.rank_no, select based on posts + number of users w/ screen views
-    -- D.A.CH = German, Austria, & Switzerland
-    WHERE asr.posts_l28 >= 3
-        AND (
-            (
-                geo.geo_country_code = "DE"
-                AND (geo.rank_no <= 30 OR asr.users_l28 >= min_num_users_l28)
-            )
-            OR (
-                geo.geo_country_code IN ("AT", "CH")
-                AND (geo.rank_no <= 5 OR asr.users_l28 >= AT_and_CH_min_num_users_l28)
-            )
+-- Besides geo.rank_no, select based on posts + number of users w/ screen views
+-- D.A.CH = German, Austria, & Switzerland
+WHERE asr.posts_l28 >= 4
+    AND (
+        geo.geo_country_code = "DE"
+        OR (
+            geo.geo_country_code IN ("AT", "CH")
+            AND (geo.rank_no <= 5 OR asr.users_l28 >= AT_and_CH_min_num_users_l28)
         )
-)
+    )
+),
 
-UNION ALL
+
+ambassador_subs AS (
 -- Wacy's table pulls data from a spreadsheet that Alex updates
-(
-    SELECT
-        LOWER(amb.subreddit_name)
-        , geo.geo_country_code
-        , geo.pct_sv_country
-        , geo.rank_no
-        , TRIM(LOWER(amb.subreddit_info))     AS subreddit_info_ambassador
-        , TRIM(LOWER(amb.topic))              AS subreddit_topic_ambassador
+SELECT
+    LOWER(amb.subreddit_name)           AS subreddit_name
+    , geo.geo_country_code
+    , geo.pct_sv_country
+    , geo.rank_no
+    , TRIM(LOWER(amb.subreddit_info))     AS subreddit_info_ambassador
+    , TRIM(LOWER(amb.topic))              AS subreddit_topic_ambassador
 
-    FROM `reddit-employee-datasets.wacy_su.ambassador_subreddits` AS amb
-    LEFT JOIN `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
-        ON LOWER(amb.subreddit_name) = geo.subreddit_name
-    WHERE amb.subreddit_name IS NOT NULL
-)
+FROM `reddit-employee-datasets.wacy_su.ambassador_subreddits` AS amb
+LEFT JOIN `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
+    ON LOWER(amb.subreddit_name) = geo.subreddit_name
+WHERE amb.subreddit_name IS NOT NULL
+),
 
+selected_subs AS (
+SELECT
+    COALESCE(das.subreddit_name, ams.subreddit_name)  AS subreddit_name
+    , das.geo_country_code
+    , das.pct_sv_country
+    , das.rank_no
+    , ams.subreddit_info_ambassador
+    , ams.subreddit_topic_ambassador
+FROM ambassador_subs AS ams
+FULL OUTER JOIN dach_subs AS das
+    ON ams.subreddit_name = das.subreddit_name
 ),
 
 subreddit_lookup AS (
@@ -178,8 +179,12 @@ LEFT JOIN subreddit_lookup AS slo
 )
 
 
+-- Selection for table creation
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+AS (
 SELECT DISTINCT * FROM final_table
 ORDER BY users_l28 DESC, subscribers DESC
+)
 ;
 
 
@@ -191,25 +196,41 @@ ORDER BY users_l28 DESC, subscribers DESC
 #     , SUM(comments_l28) AS total_comments_l28
 # FROM final_table
 # ;
+-- Counts when limit is asr.posts_l28 >= X (posts)
+# Posts	row_count	unique_subreddits_count	total_posts_l28	total_comments_l28
+# 3	    652         652                     128,262         830,255
+# 4	    629         629                     128,193         830,059
 
--- count posts & comments for last 28 days (l28) AFTER CREATING TABLE
--- Unclear if this includes removed posts & comments
--- Row  row_count   unique_subreddits_count total_posts_l28 total_comments_l28
--- 1    174         174                     88725           808371
+-- Count AFTER creating table
 # SELECT
 #     COUNT(*) AS row_count
 #     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
 #     , SUM(posts_l28)    AS total_posts_l28
 #     , SUM(comments_l28) AS total_comments_l28
-# FROM `reddit-employee-datasets.david_bermejo.subclu_selected_subs_20210519`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+
+-- Inspect data (w/o some text cols)
+# SELECT
+#     * EXCEPT(
+#     subreddit_info_ambassador,
+#     subreddit_topic_ambassador,
+#     subreddit_public_description,
+#     subreddit_description,
+#     subreddit_name_title_and_clean_descriptions
+#     )
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+# ;
 
 
 -- Export data to google cloud storage (GCS)
+-- CHANGE/Update:
+# 1) URI date folder
+# 2) source table
 # EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/subreddits/2021-06-01/*.parquet',
+#   uri='gs://i18n-subreddit-clustering/subreddits/2021-06-16/*.parquet',
 #   format='PARQUET',
 #   overwrite=true
 #   ) AS
 # SELECT *
-# FROM `reddit-employee-datasets.david_bermejo.subclu_selected_subs_20210601`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
 # ;
