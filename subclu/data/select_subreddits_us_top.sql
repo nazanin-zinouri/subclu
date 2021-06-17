@@ -1,75 +1,45 @@
 -- noinspection SqlNoDataSourceInspectionForFile
 
--- Create table with selected subs for German subs with a minimum active threshold
---   Also includes some subs from Austria & Switzerland that might be culturally relevant.
--- Expected output: ~800 subreddits
+-- Create table with selected subs for subs with a active flag &/or an activity threshold
+-- NOTE: we can't use the Geo-relevant table because it doesn't seem like the US is part of these queries
+--    For now, using simply subs with most views/posts & excluding those where over_18 = f
 DECLARE partition_date DATE DEFAULT '2021-06-14';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE AT_and_CH_min_num_users_l28 NUMERIC DEFAULT 15000;
+DECLARE min_users_l7 NUMERIC DEFAULT 800;
+DECLARE min_posts_l28 NUMERIC DEFAULT 70;
 
 
--- Selection for table creation
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
 AS (
-WITH dach_subs AS (
+
+WITH selected_subs AS (
 SELECT
-    geo.subreddit_name
-    , geo.geo_country_code
-    , geo.pct_sv_country
-    , geo.rank_no
+    asr.subreddit_name
+    # , acs.* EXCEPT( subreddit_name)
 
-FROM `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
--- option: "approved"/sfw list: geo_relevant_subreddits_intl_20200818_approved
-
-LEFT JOIN (
-    -- Using sub-selection in case there are subs that haven't been registered in asr table
+FROM (
     SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
     WHERE DATE(pt) = partition_date
-        AND users_l7 >= 100
 ) AS asr
-    ON geo.subreddit_name = asr.subreddit_name
 
--- Besides geo.rank_no, select based on posts + number of users w/ screen views
--- D.A.CH = German, Austria, & Switzerland
-WHERE asr.posts_l28 >= 4
-    AND (
-        geo.geo_country_code = "DE"
-        OR (
-            geo.geo_country_code IN ("AT", "CH")
-            AND (geo.rank_no <= 5 OR asr.users_l28 >= AT_and_CH_min_num_users_l28)
-        )
-    )
-),
+LEFT JOIN (
+    SELECT * FROM `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`
+    WHERE DATE(_PARTITIONTIME) = partition_date
+) AS acs
+    ON asr.subreddit_name = acs.subreddit_name
+LEFT JOIN (
+    SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+    # Look back 2 days because looking back 1-day could be an empty partition
+    WHERE dt = (CURRENT_DATE() - 2)
+) AS slo
+    ON asr.subreddit_name = slo.name
 
-
-ambassador_subs AS (
--- Wacy's table pulls data from a spreadsheet that Alex updates
-SELECT
-    LOWER(amb.subreddit_name)           AS subreddit_name
-    , geo.geo_country_code
-    , geo.pct_sv_country
-    , geo.rank_no
-    , TRIM(LOWER(amb.subreddit_info))     AS subreddit_info_ambassador
-    , TRIM(LOWER(amb.topic))              AS subreddit_topic_ambassador
-
-FROM `reddit-employee-datasets.wacy_su.ambassador_subreddits` AS amb
-LEFT JOIN `reddit-employee-datasets.wacy_su.geo_relevant_subreddits_2021` AS geo
-    ON LOWER(amb.subreddit_name) = geo.subreddit_name
-WHERE amb.subreddit_name IS NOT NULL
-),
-
-selected_subs AS (
-SELECT
-    COALESCE(das.subreddit_name, ams.subreddit_name)  AS subreddit_name
-    , das.geo_country_code
-    , das.pct_sv_country
-    , das.rank_no
-    , ams.subreddit_info_ambassador
-    , ams.subreddit_topic_ambassador
-FROM ambassador_subs AS ams
-FULL OUTER JOIN dach_subs AS das
-    ON ams.subreddit_name = das.subreddit_name
+WHERE 1=1
+    AND asr.users_l7 >= min_users_l7
+    AND asr.posts_l28 >= min_posts_l28
+    AND acs.active = True
+    AND slo.over_18 = "f"
 ),
 
 subreddit_lookup AS (
@@ -103,11 +73,9 @@ subreddit_lookup AS (
 
 final_table AS (
 SELECT
-    slo.subreddit_id
-    , sel.*
+    sel.*
 
     , COALESCE (
-        sel.subreddit_info_ambassador,
         LOWER(dst.topic),
         "uncategorized"
     ) AS combined_topic
@@ -116,7 +84,6 @@ SELECT
         WHEN dst.topic = "Mature Themes and Adult Content" THEN "over18_nsfw"
         WHEN slo.over_18 = "t" THEN "over18_nsfw"
         ELSE COALESCE (
-            sel.subreddit_info_ambassador,
             LOWER(dst.topic),
             "uncategorized"
         )
@@ -183,9 +150,9 @@ LEFT JOIN subreddit_lookup AS slo
 )
 
 
-
+-- Selection for table creation
 SELECT DISTINCT * FROM final_table
-ORDER BY users_l28 DESC, subscribers DESC
+ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 )
 ;
 
@@ -198,10 +165,23 @@ ORDER BY users_l28 DESC, subscribers DESC
 #     , SUM(comments_l28) AS total_comments_l28
 # FROM final_table
 # ;
--- Counts when limit is asr.posts_l28 >= X (posts)
-# Posts	row_count	unique_subreddits_count	total_posts_l28	total_comments_l28
-# 3	    652         652                     128,262         830,255
-# 4	    629         629                     128,193         830,059
+
+-- Counts BEFORE creating table - for selected-subs only
+# SELECT
+#     COUNT(*) AS row_count
+#     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
+#     , SUM(posts_l28)    AS total_posts_l28
+#     , SUM(comments_l28) AS total_comments_l28
+# FROM selected_subs
+# ;
+
+-- Check selected-subs table
+# SELECT
+#     *
+# FROM selected_subs
+# LIMIT 200
+# ;
+
 
 -- Count AFTER creating table
 # SELECT
@@ -209,18 +189,16 @@ ORDER BY users_l28 DESC, subscribers DESC
 #     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
 #     , SUM(posts_l28)    AS total_posts_l28
 #     , SUM(comments_l28) AS total_comments_l28
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
 
 -- Inspect data (w/o some text cols)
 # SELECT
 #     * EXCEPT(
-#     subreddit_info_ambassador,
-#     subreddit_topic_ambassador,
 #     subreddit_public_description,
 #     subreddit_description,
 #     subreddit_name_title_and_clean_descriptions
 #     )
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
 # ;
 
 
@@ -234,5 +212,5 @@ ORDER BY users_l28 DESC, subscribers DESC
 #   overwrite=true
 #   ) AS
 # SELECT *
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
 # ;
