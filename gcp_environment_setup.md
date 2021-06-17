@@ -186,19 +186,42 @@ Editable makes it easy to continue editing your module and use the updated code 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
 
 NOTE: you might need to install it with a `--user` flag in case some of the installed packages create conflicts with native packages
-```
+
+If resolving packages is taking too long, might need to use a flag (in the short term):
+- See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue
+
+`--use-deprecated=legacy-resolver`
+
+
+```bash
 sudo su - david.bermejo
 
+# Install my additional libraries
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 
-# or if you're installing a superset of requirements add `[<extra_name>]`
-pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[pytorch]
+# if resolving takes too long
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --use-deprecated=legacy-resolver
 
-# for tensorflow VM/image I tried the --user tag because I was getting
-#  access errors. But that fails because subclu wouldn't be installed
-#  for the jupyter user that's the default for jupyterlab server
-pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --user
+# install TF or Torch libraries
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --use-deprecated=legacy-resolver
+
+#  For some reason extras don't always work so it's sometimes easier to cd to folder
+cd /home/david.bermejo/repos/subreddit_clustering_i18n
+pip install -e ".[tensorflow232]" --use-deprecated=legacy-resolver
 ```
+
+
+Try --user install if above steps fail (don't sudo su).
+For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library version 
+```bash
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --user --use-deprecated=legacy-resolver
+```
+
+If all else fails, just install tensorflow-text directly:
+```bash
+pip install "tensorflow-text==2.3.0" --user
+```
+
 
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
 ```
@@ -206,6 +229,47 @@ In jupyter, you can add this magic at the beginning of a notebook to reload edit
 %autoreload 2
 ```
 
+
+### Reference / weird conflicts & venv things
+The base installation has some weird numpy conflicts so you may need to install as --user:
+
+I tried creating a conda venv, but the venv for david.bermejo doesn't get shared for the `jupyter` user.
+
+```bash
+# find folder with conda/feedstock_root artifacts
+# 2>/dev/null <- hides "permission denied" errors
+find . -type d -name conda 2>/dev/null
+```
+
+First time set up of conda inside sudo users
+```bash
+sudo su - david.bermejo
+
+# create copy of requirements from base requirements
+#python -m pip freeze > base_requirements.txt
+python -m pip list --format=freeze > base_requirements.txt
+
+# append conda path
+export PATH="/opt/conda/bin:$PATH"
+
+# initialize conda
+conda init bash
+
+# close out of terminal & open again (for changes to go through)
+exit
+
+# create a copy of the base environment
+conda create --name subclu_tf --clone base
+```
+
+```bash
+# activate the new env
+conda activate subclu_tf
+
+# Install base libraries that maybe weren't part of conda
+pip install -r base_requirements.txt --use-deprecated=legacy-resolver
+
+```
 
 
 # Running mlflow server on GCP
