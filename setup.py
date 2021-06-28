@@ -10,7 +10,8 @@ from setuptools import find_packages, setup
 INSTALL_REQUIRES = [
     # cookie cutter tools
     # "python-dotenv >= 0.5.1",
-    # "click == 8.0.1",
+    # For some reason leaving click unpinned creates weird conflicts
+    "click == 8.0.1",
 
     # DS/ML core
     # "pandas == 1.2.4",
@@ -19,6 +20,8 @@ INSTALL_REQUIRES = [
     # np version might not be tf2 version
     # "numpy == 1.19.5",
     "mlflow == 1.16.0",
+    "dask == 2021.6.0",
+    "modin == 0.10.0",
 
     # Auth
     "pydata-google-auth",
