@@ -103,6 +103,14 @@ On command line of your new VM:
 6. Add a `title` for the key. Example: `gcp TF machine` 
 
 
+## Set default identity for git
+If you try to pull & push, git might not know which identity to use, run these commands to set the global user/username anytime you do something with git (replace email & name with your own):
+```
+git config --global user.email "david.bermejo@reddit.com"
+git config --global user.name "David Bermejo" 
+```
+
+
 ## Clone repo to JupyterLab
 The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:
 `git clone git@github.snooguts.net:david-bermejo/subreddit_clustering_i18n.git`
