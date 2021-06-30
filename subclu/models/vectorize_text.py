@@ -5,6 +5,7 @@ For FSE (uSIF & SIF), we might also need to "train" a model, but the focus
 of these models is just to vectorize without fine-tuning or retraining a language
 model. That'll be a separate job/step.
 """
+import logging
 from datetime import datetime, timedelta
 from functools import partial
 from logging import info
@@ -14,24 +15,26 @@ from typing import Union, Tuple, List
 from fse import CSplitCIndexedList
 import mlflow
 import pandas as pd
+import numpy as np
 # from sklearn.pipeline import Pipeline
 
 from .preprocess_text import transform_and_tokenize_text
 from .registry_cpu import D_MODELS_CPU
+from .registry_tf_hub import D_MODELS_TF_HUB
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
 from ..utils.mlflow_logger import MlflowLogger
 
 
 def vectorize_text_to_embeddings(
-        model_name: str = 'fasttext_usif_de',
+        model_name: str = 'use_multilingual_large',
         tokenize_function: Union[str, callable] = 'sklearn',
         tokenize_lowercase: bool = False,
 
         bucket_name: str = 'i18n-subreddit-clustering',
-        subreddits_path: str = None,
-        posts_path: str = 'posts/2021-05-19',
-        comments_path: str = 'comments/2021-05-19',
+        subreddits_path: str = 'subreddits/de/2021-06-16',
+        posts_path: str = 'posts/de/2021-06-16',
+        comments_path: str = 'comments/de/2021-06-16',
         preprocess_text_folder: str = None,
 
         col_text_post: str = 'text',
@@ -129,12 +132,18 @@ def vectorize_text_to_embeddings(
             'verbose': True,
         }
 
-    path_this_model = get_project_subfolder(
-        f"data/models/fse/{datetime.utcnow().strftime('%Y-%m-%d_%H%M')}"
-    )
+    if 'fasttext' in model_name:
+        path_this_model = get_project_subfolder(
+            f"data/models/fse/{datetime.utcnow().strftime('%Y-%m-%d_%H%M')}"
+        )
+    else:
+        path_this_model = get_project_subfolder(
+            f"data/models/{model_name}/{datetime.utcnow().strftime('%Y-%m-%d_%H%M')}"
+        )
     Path(path_this_model).mkdir(exist_ok=True, parents=True)
     info(f"  Local model saving directory: {path_this_model}")
 
+    df_posts, df_comments, df_subs = None, None, None
     if posts_path is not None:
         info(f"Loading df_posts..."
              f"\n  gs://{bucket_name}/{posts_path}")
@@ -178,15 +187,18 @@ def vectorize_text_to_embeddings(
             path=f"gs://{bucket_name}/{subreddits_path}",
             columns=l_cols_subreddits
         )
-        info(f"  {df_subs.shape} <- df_comments shape")
+        info(f"  {df_subs.shape} <- df_subs shape")
         assert len(df_subs) == df_subs[col_subreddit_id].nunique()
 
+    mlf = MlflowLogger()
+    info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
+    mlf.set_experiment(mlflow_experiment)
+    mlflow.start_run()
+    mlf.add_git_hash_to_active_run()
+
+    df_vect, df_vect_comments, df_vect_subs = None, None, None
+
     if 'fasttext' in model_name:
-        mlf = MlflowLogger()
-        info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
-        mlf.set_experiment(mlflow_experiment)
-        mlflow.start_run()
-        mlf.add_git_hash_to_active_run()
         mlflow.log_params(d_params_to_log)
 
         if posts_path is not None:
@@ -322,8 +334,6 @@ def vectorize_text_to_embeddings(
         # fse_usif.save(str(path_this_ft_model / 'fse_usif_model_trained'))
 
         if posts_path is not None:
-            mlflow.log_metric('df_posts_len', len(df_posts))
-
             info(f"Running inference on all POSTS...")
             df_vect = vectorize_text_with_fse(
                 model=model,
@@ -334,14 +344,7 @@ def vectorize_text_to_embeddings(
                 cols_index='post_default',
             )
 
-            info(f"Saving inference for comments df")
-            f_df_vect_posts = path_this_model / f'df_vectorized_posts-{len(df_vect)}.parquet'
-            df_vect.to_parquet(f_df_vect_posts)
-            mlflow.log_artifact(str(f_df_vect_posts), 'df_vect_posts')
-            info(f"  Saving inference complete")
-
         if comments_path is not None:
-            mlflow.log_metric('df_comments_len', len(df_comments))
             # TODO(djb): comments are stalling because of df_vect_comments
             #  function runs out or memory
             info(f"Get vectors for comments")
@@ -366,14 +369,8 @@ def vectorize_text_to_embeddings(
                 cols_index='comment_default',
             )
             elapsed_time(t_start_comment_vec, log_label='Inference time for COMMENTS', verbose=True)
-            # TODO(djb)
-            info(f"Save vectors for comments")
-            f_df_vect_comments = path_this_model / f'df_vectorized_comments-{len(df_vect_comments)}.parquet'
-            df_vect_comments.to_parquet(f_df_vect_comments)
-            mlflow.log_artifact(str(f_df_vect_comments), 'df_vect_comments')
 
         if subreddits_path is not None:
-            mlflow.log_metric('df_subs_len', len(df_subs))
             info(f"Running inference on all SUBREDDIT description...")
             df_vect_subs = vectorize_text_with_fse(
                 model=model,
@@ -385,27 +382,99 @@ def vectorize_text_to_embeddings(
                 verbose=True
             )
 
-            info(f"Saving inference for subreddits description df")
-            f_df_vect_subs = path_this_model / f'df_vectorized_subreddits_description-{len(df_vect_subs)}.parquet'
-            df_vect_subs.to_parquet(f_df_vect_subs)
-            mlflow.log_artifact(str(f_df_vect_subs), 'df_vect_subreddits_description')
-            info(f"  Saving inference complete")
-
-        total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
-        mlflow.log_metric('vectorizing_time_minutes',
-                          total_fxn_time / timedelta(minutes=1)
-                          )
-        mlflow.end_run()
-
-        if posts_path is not None:
-            return model, df_posts, d_ix_to_id
-        else:
-            return model, df_subs, d_ix_to_id
-
     else:
-        # TODO(djb): work on implementing use, bert or other models
-        raise NotImplementedError
+        import tensorflow_hub as hub
+        import tensorflow_text
+        import tensorflow as tf
+        # drop some parameters that aren't used by USE (we don't train models)
+        d_params_to_log = {k: v for k, v in d_params_to_log.items() if not k.startswith('train_')}
+        mlflow.log_params(d_params_to_log)
 
+
+        t_start_hub_load = datetime.utcnow()
+        info(f"Loading model {model_name}..."
+             f"\n  with kwargs: {model_kwargs}")
+        model = hub.load(D_MODELS_TF_HUB[model_name])
+        elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
+
+        # TODO(djb): currently only text preprocessing is lowercase() b/c USE has its own tokenizer
+        logging.warning(f"For TF-HUB models, the only preprocessing applied is lowercase()")
+        if posts_path is not None:
+            df_vect = get_embeddings_as_df(
+                model=model,
+                df=df_posts,
+                col_text=col_text_post,
+                cols_index='post_default_',
+                lowercase_text=tokenize_lowercase,
+            )
+
+    # Log the outputs
+    if posts_path is not None:
+        mlflow.log_metric('df_posts_len', len(df_posts))
+        info(f"Saving inference for comments df")
+        f_df_vect_posts = path_this_model / f'df_vectorized_posts-{len(df_vect)}.parquet'
+        df_vect.to_parquet(f_df_vect_posts)
+        mlflow.log_artifact(str(f_df_vect_posts), 'df_vect_posts')
+
+    if comments_path is not None:
+        mlflow.log_metric('df_comments_len', len(df_comments))
+        info(f"Save vectors for comments")
+        f_df_vect_comments = path_this_model / f'df_vectorized_comments-{len(df_vect_comments)}.parquet'
+        df_vect_comments.to_parquet(f_df_vect_comments)
+        mlflow.log_artifact(str(f_df_vect_comments), 'df_vect_comments')
+
+    if subreddits_path is not None:
+        mlflow.log_metric('df_subs_len', len(df_subs))
+        info(f"Saving inference for subreddits description df")
+        f_df_vect_subs = path_this_model / f'df_vectorized_subreddits_description-{len(df_vect_subs)}.parquet'
+        df_vect_subs.to_parquet(f_df_vect_subs)
+        mlflow.log_artifact(str(f_df_vect_subs), 'df_vect_subreddits_description')
+
+    # finish logging total time + end mlflow run
+    total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
+    mlflow.log_metric('vectorizing_time_minutes',
+                      total_fxn_time / timedelta(minutes=1)
+                      )
+    mlflow.end_run()
+    return model, df_posts, df_vect, df_vect_comments, df_vect_subs
+
+
+def get_embeddings_as_df(
+        model: callable,
+        df: pd.DataFrame,
+        col_text: str = 'text',
+        cols_index: Union[str, List[str]] = None,
+        lowercase_text: bool = False,
+) -> pd.DataFrame:
+    """Get output of TF model as a dataframe
+    When called on a list a TF model runs in parallel, so use that instead of trying to
+    get model output on a dataframe (which would be sequential and slow).
+    For reference, on 5,400 sentences:
+    - ~2 seconds:   on list
+    - ~1 minute:    on text column df['text'].apply(model)
+    """
+    if cols_index == 'post_default_':
+        cols_index = ['subreddit_name', 'subreddit_id', 'post_id']
+    elif cols_index == 'comment_default_':
+        cols_index = ['subreddit_name', 'subreddit_id', 'post_id', 'comment_id']
+    elif cols_index == 'subreddit_default_':
+        cols_index = ['subreddit_name', 'subreddit_id']
+
+    if cols_index is not None:
+        index_output = df[cols_index]
+    else:
+        index_output = None
+
+    if lowercase_text:
+        return pd.DataFrame(
+            np.array([emb.numpy() for emb in model(df[col_text].str.lower().to_list())]),
+            index=index_output
+        )
+    else:
+        return pd.DataFrame(
+            np.array([emb.numpy() for emb in model(df[col_text].to_list())]),
+            index=index_output
+        )
 
 
 def process_text_for_fse(
