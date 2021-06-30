@@ -219,13 +219,13 @@ pip install -e ".[tensorflow232]" --use-deprecated=legacy-resolver
 ```
 
 
-Try --user install if above steps fail (don't sudo su).
+Try `--user` install if above steps fail **(don't sudo su)**.
 For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library version 
 ```bash
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --user --use-deprecated=legacy-resolver
 ```
 
-If all else fails, just install tensorflow-text directly:
+If all else fails, install tensorflow-text directly:
 ```bash
 pip install "tensorflow-text==2.3.0" --user
 ```
@@ -292,3 +292,10 @@ Need to tunnel into it from local using custom ssh function:
 dj_ssh_mlflow cpu
 ```
 
+# Debugging
+
+**Warning** installing tensorflow-text without pinning existing dependencies can make GPUs unusable. So before installing anything, here's what a blank/raw GPU environment looks like:
+      
+```
+
+```
