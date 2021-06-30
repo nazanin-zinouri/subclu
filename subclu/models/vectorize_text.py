@@ -5,6 +5,7 @@ For FSE (uSIF & SIF), we might also need to "train" a model, but the focus
 of these models is just to vectorize without fine-tuning or retraining a language
 model. That'll be a separate job/step.
 """
+import gc
 import logging
 from datetime import datetime, timedelta
 from functools import partial
@@ -17,6 +18,7 @@ import mlflow
 import pandas as pd
 import numpy as np
 # from sklearn.pipeline import Pipeline
+from tqdm.auto import tqdm
 
 from .preprocess_text import transform_and_tokenize_text
 from .registry_cpu import D_MODELS_CPU
@@ -58,6 +60,7 @@ def vectorize_text_to_embeddings(
         mlflow_experiment: str = 'fse_vectorize_v1',
         train_use_comments: bool = False,
 
+        tf_batch_inference_rows: int = 10000,
 ):
     """"""
     """
@@ -406,6 +409,7 @@ def vectorize_text_to_embeddings(
                 col_text=col_text_post,
                 cols_index='post_default_',
                 lowercase_text=tokenize_lowercase,
+                batch_size=tf_batch_inference_rows,
             )
 
     # Log the outputs
@@ -445,6 +449,7 @@ def get_embeddings_as_df(
         col_text: str = 'text',
         cols_index: Union[str, List[str]] = None,
         lowercase_text: bool = False,
+        batch_size: int = None,
 ) -> pd.DataFrame:
     """Get output of TF model as a dataframe
     When called on a list a TF model runs in parallel, so use that instead of trying to
@@ -465,16 +470,42 @@ def get_embeddings_as_df(
     else:
         index_output = None
 
-    if lowercase_text:
-        return pd.DataFrame(
-            np.array([emb.numpy() for emb in model(df[col_text].str.lower().to_list())]),
-            index=index_output
-        )
+    if batch_size is None:
+        iteration_chunks = None
+    elif batch_size >= len(df):
+        iteration_chunks = None
     else:
-        return pd.DataFrame(
-            np.array([emb.numpy() for emb in model(df[col_text].to_list())]),
-            index=index_output
-        )
+        iteration_chunks = range(1 + len(df) // batch_size)
+
+    if iteration_chunks is None:
+        if lowercase_text:
+            return pd.DataFrame(
+                np.array([emb.numpy() for emb in model(df[col_text].str.lower().to_list())]),
+                index=index_output
+            )
+        else:
+            return pd.DataFrame(
+                np.array([emb.numpy() for emb in model(df[col_text].to_list())]),
+                index=index_output
+            )
+    else:
+        # this seems like a good place for recursion(!)
+        info(f"Getting embeddings in batches of size: {batch_size}")
+        l_df_embeddings = list()
+        for i in tqdm(iteration_chunks):
+            slice_start = i * batch_size
+            slice_end = (i + 1) * batch_size
+            l_df_embeddings.append(
+                get_embeddings_as_df(
+                    model=model,
+                    df=df.iloc[slice_start:slice_end],
+                    col_text=col_text,
+                    lowercase_text=lowercase_text,
+                    batch_size=None,
+                )
+            )
+        gc.collect()
+        return pd.concat(l_df_embeddings, axis=0, ignore_index=False)
 
 
 def process_text_for_fse(
