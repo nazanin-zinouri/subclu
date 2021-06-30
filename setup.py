@@ -11,7 +11,12 @@ INSTALL_REQUIRES = [
     # cookie cutter tools
     # "python-dotenv >= 0.5.1",
     # For some reason leaving click unpinned creates weird conflicts
-    "click == 8.0.1",
+    "click <= 7.1.2 ",
+
+    # google VM pins
+    "jinja2 <= 2.11.3",
+    "pydantic <= 1.8.2",
+    "markupsafe <= 1.1.1",
 
     # DS/ML core
     # "pandas == 1.2.4",
@@ -74,7 +79,24 @@ EXTRAS_REQUIRE = {
         # "tensorflow-serving-api == 2.3.0",
         # "tensorflow-transform == 0.26.0",
         "tensorflow-text == 2.3.0",
-    ]
+    ],
+
+    "tensorflow_233": [
+        "tensorflow == 2.3.3",
+        "tensorflow-cloud == 0.1.13",
+        "tensorflow-data-validation == 0.26.1",
+        "tensorflow-datasets == 3.0.0",
+        "tensorflow-estimator == 2.3.0",
+        "tensorflow-hub == 0.9.0",
+        "tensorflow-io == 0.15.0",
+        "tensorflow-metadata == 0.26.0",
+        "tensorflow-model-analysis == 0.26.1",
+        "tensorflow-probability == 0.11.0",
+        "tensorflow-serving-api == 2.3.0",
+        "tensorflow-transform == 0.26.0",
+        "tensorflow-text == 2.3.0",
+    ],
+
 }
 
 # Don't do a 'complete' because we might have conflicting requirements between
