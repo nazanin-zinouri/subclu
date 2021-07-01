@@ -12,5 +12,6 @@ Examples:
 
 D_MODELS_TF_HUB = {
     'use_multilingual_large': "https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3",
+    'use_multilingual': "https://tfhub.dev/google/universal-sentence-encoder-multilingual/3",
 
 }
