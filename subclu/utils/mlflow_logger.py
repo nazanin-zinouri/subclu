@@ -16,6 +16,7 @@ SQLite Studio might be worth trying (as long as I don't have dozens of dbs to me
 """
 import json
 import logging
+import socket
 
 import pandas as pd
 from pathlib import Path
@@ -36,10 +37,6 @@ class MlflowLogger:
     I might go with central mlruns location + central experiments list to keep all
     VMs writing in same experiment names & IDs... might need to merge runs from
     some DBs later, though *SIGH*
-
-    Getting VM hostname, if needed:
-    import socket
-    print(socket.gethostname())
     """
     def __init__(
             self,
@@ -47,6 +44,7 @@ class MlflowLogger:
             default_artifact_root: str = 'gs://i18n-subreddit-clustering/mlflow/mlruns',
     ):
         self.default_artifact_root = default_artifact_root
+        self.host_name = socket.gethostname()
 
         if tracking_uri in [None, 'sqlite']:
             # TODO(djb): update path to config file?
@@ -148,6 +146,16 @@ class MlflowLogger:
         git_commit = active_run.data.tags.get(mlflow_tags.MLFLOW_GIT_COMMIT)
         if git_commit is None:
             mlflow.set_tag('mlflow.source.git.commit', get_git_hash())
+
+    def set_tag_hostname(self, key: str = 'host_name') -> str:
+        """Add host_name as tag so it's easier to track which VM produced model"""
+        mlflow.set_tag(key, self.host_name)
+        return self.host_name
+
+    def log_param_hostname(self, key: str = 'host_name') -> str:
+        """Add host_name as tag so it's easier to track which VM produced model"""
+        mlflow.log_param(key, self.host_name)
+        return self.host_name
 
     @staticmethod
     def reset_sqlalchemy_logging() -> None:
