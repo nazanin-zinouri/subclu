@@ -194,9 +194,12 @@ def vectorize_text_to_embeddings(
         info(f"  {df_comments.shape} <- df_comments shape")
         assert len(df_comments) == df_comments[col_comment_id].nunique()
 
-        info(f"Keep only comments that match posts IDs in df_posts...")
-        df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
-        info(f"  {df_comments.shape} <- updated df_comments shape")
+        try:
+            info(f"Keep only comments that match posts IDs in df_posts...")
+            df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
+            info(f"  {df_comments.shape} <- updated df_comments shape")
+        except TypeError:
+            info(f"df_posts missing, so we can't filter comments...")
 
         if n_sample_comments is not None:
             info(f"  Sampling posts down to: {n_sample_comments:,.0f}")
@@ -419,8 +422,14 @@ def vectorize_text_to_embeddings(
                 cols_index='comment_default',
             )
             elapsed_time(t_start_comment_vec, log_label='Inference time for COMMENTS', verbose=True)
-            # TODO(djb) add back fxn to save & log vectorized df, delete text df
-
+            save_df_and_log_to_mlflow(
+                df=df_vect_comments,
+                local_path=path_this_model,
+                df_filename='df_vectorized_comments',
+                name_for_metric_and_artifact_folder='df_vect_comments',
+            )
+            del df_comments
+            gc.collect()
 
     else:
         import tensorflow_hub as hub
@@ -556,6 +565,9 @@ def get_embeddings_as_df(
     For reference, on 5,400 sentences:
     - ~2 seconds:   on list
     - ~1 minute:    on text column df['text'].apply(model)
+
+    TODO(djb):  For each recursive call, use try/except!!
+      That way if one batch fails, the rest of the batches can proceed!
     """
     if cols_index == 'comment_default_':
         cols_index = ['subreddit_name', 'subreddit_id', 'post_id', 'comment_id']
