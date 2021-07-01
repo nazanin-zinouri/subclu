@@ -59,6 +59,9 @@ class MlflowLogger:
 
         self.tracking_uri = tracking_uri
 
+        # Reset logging to `warn` because sometimes in notebooks this
+        #  gets changed to `info` and overwhelms all other output
+        self.reset_sqlalchemy_logging()
         self.initialize_experiment_names()
 
     def initialize_experiment_names(self):
@@ -220,8 +223,7 @@ class MlflowLogger:
         try:
             return read_function(f"{artifact_uri}/{artifact_folder}",
                                  columns=columns)
-        except Exception as e:
-            print(e)
+        except TypeError:
             return read_function(f"{artifact_uri}/{artifact_folder}")
 
 
