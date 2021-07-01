@@ -1,8 +1,19 @@
 """
 Utils to set up base mlflow setup & config
 Currently everything is local, but at some point we might switch to a server
+
+TODO(djb): add method in mlflowLogger class to upload sqlite file to central GCS
+bucket so that I can merge all experiments/runs together even when they're run in any
+arbitrary VM.
+
+TODO(djb): create init experiments method to try to make sure that all VMs have the same
+experiment names/IDs
+
+TODO(djb): Merge sqlite DBs from multiple VMs:
+SQLite Studio might be worth trying (as long as I don't have dozens of dbs to merge)
+- https://stackoverflow.com/questions/80801/how-can-i-merge-many-sqlite-databases
+- https://sqlitestudio.pl/
 """
-import os
 import json
 import logging
 
@@ -19,6 +30,16 @@ from mlflow.exceptions import MlflowException
 class MlflowLogger:
     """
     This class is a workaround for using mlflow WITHOUT a server.
+
+    When storing artifacts from multiple VMs, I thought about creating a subfolder
+    for each VM (e.g., the vm name) so that we prevent naming conflicts. But
+    I might go with central mlruns location + central experiments list to keep all
+    VMs writing in same experiment names & IDs... might need to merge runs from
+    some DBs later, though *SIGH*
+
+    Getting VM hostname, if needed:
+    import socket
+    print(socket.gethostname())
     """
     def __init__(
             self,
@@ -31,11 +52,40 @@ class MlflowLogger:
             # TODO(djb): update path to config file?
             path_mlruns_db = Path("/home/jupyter/mlflow")
             Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
-            mlflow.set_tracking_uri(f"sqlite:///{path_mlruns_db}/mlruns.db")
+            tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
+            mlflow.set_tracking_uri(tracking_uri)
         else:
             mlflow.set_tracking_uri(tracking_uri)
 
         self.tracking_uri = tracking_uri
+
+        self.initialize_experiment_names()
+
+    def initialize_experiment_names(self):
+        """Set global experiment names to make it easy to merge
+        runs from multiple SQLite files/databases (created by separate VMs).
+
+        EXPERIMENT NAMES NEED TO BE UNIQUE.
+        """
+        l_experiments = [
+            'Default',
+            'fse_v1',
+            'fse_vectorize_v1',
+            'subreddit_description_v1',
+            'fse_vectorize_v1.1',
+
+            # For GPU VMs:
+            'use_multilingual_v0.1_test',
+            'use_multilingual_v1',
+        ]
+        for i, exp in enumerate(l_experiments):
+            try:
+                mlflow.create_experiment(
+                    exp,
+                    artifact_location=f"{self.default_artifact_root}/{i}",
+                )
+            except MlflowException:
+                pass
 
     def create_experiment(
             self,
@@ -48,7 +98,7 @@ class MlflowLogger:
 
         There could be weird results if we delete an experiment with runs & artifacts and
          then we create a new experiment. It's possible that both experiments might share the
-         same artifact location, but the UUIDs for all runs should still be unique.
+         same artifact folder: mlruns/3, but the UUIDs for all runs should still be unique.
         """
         if artifact_location is not None:
             artifact_location = artifact_location
