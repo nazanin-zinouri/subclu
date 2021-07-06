@@ -29,6 +29,10 @@ class AggregateEmbeddings:
     - post-aggregates (e.g., post + comment) and
     - subreddit (e.g., post + comment + subreddit descriptions).
 
+    TODO(djb): open question: do we want to calculate distances in a separate job or do we calculate them here?
+      could do it for subreddits as a demo, but might be better off doing it separately for posts given
+      how many more there are.
+
     """
     def __init__(
             self,
@@ -142,9 +146,11 @@ class AggregateEmbeddings:
         #   - date posted/created
         #   Or if I'm adding weights by upvotes or text length
         # ---
+        logging.warning(f"Currently not loading metadata...")
 
         # TODO(djb): Filter out short comments
         # ---
+        logging.warning(f"Currently not filtering out short comments...")
 
         # ---------------------
         # TODO(djb): Merge all comments at post-level
@@ -249,6 +255,7 @@ class AggregateEmbeddings:
             )
         else:
             info(f"Raw subreddit embeddings pre-loaded")
+        info(f"    {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
 
         if self.df_v_posts is None:
             info(f"Loading POSTS embeddings...")
@@ -259,8 +266,16 @@ class AggregateEmbeddings:
             )
         else:
             info(f"POSTS embeddings pre-loaded")
+        info(f"    {self.df_v_posts.shape} <- Raw POSTS shape")
+        if self.n_sample_posts is not None:
+            info(f"  Sampling posts down to: {self.n_sample_posts:,.0f}")
+            self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
+            info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
 
-        if self.df_v_posts is None:
+        r_post, c_post = self.df_v_posts.shape
+        mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
+
+        if self.df_v_comments is None:
             info(f"Loading COMMENTS embeddings...")
             self.df_v_comments = self.mlf.read_run_artifact(
                 run_id=self.comments_uuid,
@@ -269,6 +284,29 @@ class AggregateEmbeddings:
             )
         else:
             info(f"COMMENTS embeddings pre-loaded")
+        info(f"    {self.df_v_comments.shape} <- Raw COMMENTS shape")
+        info(f"  Keep only comments for posts with embeddings")
+        self.df_v_comments = (
+            self.df_v_comments
+            [self.df_v_comments.index.get_level_values('post_id').isin(
+                self.df_v_posts.index.get_level_values('post_id').unique()
+            )]
+        )
+        info(f"    {self.df_v_comments.shape} <- COMMENTS shape, after keeping only existing posts")
+
+        if self.n_sample_comments is not None:
+            if len(self.df_v_comments) > self.n_sample_comments:
+                info(f"  Sampling posts down to: {self.n_sample_comments:,.0f}")
+                self.df_v_comments = self.df_v_comments.sample(n=self.n_sample_comments)
+                info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER sampling")
+            else:
+                info(f"  No need to sample comments because sample greater than rows in df_comments")
+
+        r_com, c_com = self.df_v_comments.shape
+        mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
+
+
+
 
 
 

@@ -202,9 +202,9 @@ def vectorize_text_to_embeddings(
             info(f"df_posts missing, so we can't filter comments...")
 
         if n_sample_comments is not None:
-            info(f"  Sampling posts down to: {n_sample_comments:,.0f}")
+            info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}")
             df_comments = df_comments.sample(n=n_sample_comments)
-            info(f"  {df_comments.shape} <- df_posts.shape AFTER sampling")
+            info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
 
     if subreddits_path is not None:
         info(f"Load subreddits df...")
