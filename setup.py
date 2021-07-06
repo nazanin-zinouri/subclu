@@ -11,7 +11,7 @@ INSTALL_REQUIRES = [
     # cookie cutter tools
     # "python-dotenv >= 0.5.1",
     # For some reason leaving click unpinned creates weird conflicts
-    "click <= 7.1.2 ",
+    # "click <= 7.1.2 ",
 
     # google VM pins
     "jinja2 <= 2.11.3",
@@ -66,6 +66,8 @@ EXTRAS_REQUIRE = {
     # for some reason there's a numpy conflict with base install that
     # interferes with tf==2.3.2
     "tensorflow_232": [
+        "click <= 8.0.1",
+
         "tensorflow == 2.3.2",
         # "tensorflow-cloud == 0.1.13",
         # "tensorflow-data-validation == 0.26.1",
@@ -79,9 +81,12 @@ EXTRAS_REQUIRE = {
         # "tensorflow-serving-api == 2.3.0",
         # "tensorflow-transform == 0.26.0",
         "tensorflow-text == 2.3.0",
+        "Werkzeug == 2.0.1"
     ],
 
     "tensorflow_233": [
+        "click <= 7.1.2",
+
         "tensorflow == 2.3.3",
         "tensorflow-cloud == 0.1.13",
         "tensorflow-data-validation == 0.26.1",
