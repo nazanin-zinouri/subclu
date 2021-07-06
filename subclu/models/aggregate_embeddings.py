@@ -17,6 +17,8 @@ import mlflow
 import pandas as pd
 import numpy as np
 
+from ..data.data_loaders import LoadSubreddits, LoadPosts, LoadComments
+
 from ..utils.mlflow_logger import MlflowLogger
 from ..utils import mlflow_logger
 from ..utils import get_project_subfolder
@@ -29,9 +31,18 @@ class AggregateEmbeddings:
     - post-aggregates (e.g., post + comment) and
     - subreddit (e.g., post + comment + subreddit descriptions).
 
+    TODO(djb): open question: do we want to calculate distances in a separate job or do we calculate them here?
+      could do it for subreddits as a demo, but might be better off doing it separately for posts given
+      how many more there are.
+
     """
     def __init__(
             self,
+            bucket_name: str = 'i18n-subreddit-clustering',
+            folder_meta_subreddits: str = 'subreddits/de/2021-06-16',
+            folder_meta_comments: str = 'comments/de/2021-06-16',
+            folder_meta_posts: str = 'posts/de/2021-06-16',
+
             posts_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
             posts_folder: str = 'df_vect_posts',
             col_text_post_word_count: str = 'text_word_count',
@@ -58,6 +69,11 @@ class AggregateEmbeddings:
             n_sample_comments: int = None,
     ):
         """"""
+        self.bucket_name = bucket_name
+        self.folder_meta_subreddits = folder_meta_subreddits
+        self.folder_meta_comments = folder_meta_comments
+        self.folder_meta_posts = folder_meta_posts
+
         self.mlflow_experiment = mlflow_experiment
         self.run_name = run_name
         self.mlflow_tracking_uri = mlflow_tracking_uri
@@ -142,9 +158,13 @@ class AggregateEmbeddings:
         #   - date posted/created
         #   Or if I'm adding weights by upvotes or text length
         # ---
+        t_start_read_meta = datetime.utcnow()
+        self._load_metadata()
+        elapsed_time(start_time=t_start_read_meta, log_label='Total metadata loading', verbose=True)
 
         # TODO(djb): Filter out short comments
         # ---
+        logging.warning(f"Currently not filtering out short comments...")
 
         # ---------------------
         # TODO(djb): Merge all comments at post-level
@@ -195,12 +215,18 @@ class AggregateEmbeddings:
         mlflow.end_run()
         return (
             self.df_v_sub, self.df_v_posts, self.df_v_comments,
+            self.df_subs_meta, self.df_posts_meta, self.df_comments_meta,
             df_subs_agg_a, df_subs_agg_b, df_subs_agg_c, df_posts_agg_b, df_posts_agg_c, df_posts_agg_d
         )
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run"""
         self.config_to_log_and_store = {
+            'bucket_name': self.bucket_name,
+            'folder_meta_subreddits': self.folder_meta_subreddits,
+            'folder_meta_comments': self.folder_meta_comments,
+            'folder_meta_posts': self.folder_meta_posts,
+
             'mlflow_experiment': self.mlflow_experiment,
             'run_name': self.run_name,
             'mlflow_tracking_uri': self.mlflow_tracking_uri,
@@ -249,6 +275,7 @@ class AggregateEmbeddings:
             )
         else:
             info(f"Raw subreddit embeddings pre-loaded")
+        info(f"    {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
 
         if self.df_v_posts is None:
             info(f"Loading POSTS embeddings...")
@@ -259,8 +286,16 @@ class AggregateEmbeddings:
             )
         else:
             info(f"POSTS embeddings pre-loaded")
+        info(f"    {self.df_v_posts.shape} <- Raw POSTS shape")
+        if self.n_sample_posts is not None:
+            info(f"  Sampling posts down to: {self.n_sample_posts:,.0f}")
+            self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
+            info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
 
-        if self.df_v_posts is None:
+        r_post, c_post = self.df_v_posts.shape
+        mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
+
+        if self.df_v_comments is None:
             info(f"Loading COMMENTS embeddings...")
             self.df_v_comments = self.mlf.read_run_artifact(
                 run_id=self.comments_uuid,
@@ -269,170 +304,57 @@ class AggregateEmbeddings:
             )
         else:
             info(f"COMMENTS embeddings pre-loaded")
+        info(f"    {self.df_v_comments.shape} <- Raw COMMENTS shape")
+        info(f"  Keep only comments for posts with embeddings")
+        self.df_v_comments = (
+            self.df_v_comments
+            [self.df_v_comments.index.get_level_values('post_id').isin(
+                self.df_v_posts.index.get_level_values('post_id').unique()
+            )]
+        )
+        info(f"    {self.df_v_comments.shape} <- COMMENTS shape, after keeping only existing posts")
+
+        if self.n_sample_comments is not None:
+            if len(self.df_v_comments) > self.n_sample_comments:
+                info(f"  Sampling posts down to: {self.n_sample_comments:,.0f}")
+                self.df_v_comments = self.df_v_comments.sample(n=self.n_sample_comments)
+                info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER sampling")
+            else:
+                info(f"  No need to sample comments because sample greater than rows in df_comments")
+
+        r_com, c_com = self.df_v_comments.shape
+        mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
+
+    def _load_metadata(self):
+        """Load metadata to filter comments or add weights based on metadata"""
+        info(f"Loading subs metadata...")
+        self.df_subs_meta = LoadSubreddits(
+            bucket_name=self.bucket_name,
+            folder_path=self.folder_meta_subreddits,
+            folder_posts=self.folder_meta_posts,
+            columns=None,
+        ).read_raw()
+        info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
+
+        info(f"Loading POSTS metadata...")
+        self.df_posts_meta = LoadPosts(
+            bucket_name=self.bucket_name,
+            folder_path=self.folder_meta_posts,
+            columns='aggregate_embeddings_',
+        ).read_raw()
+        info(f"  {self.df_posts_meta.shape} <- Raw META POSTS shape")
+
+        info(f"Loading COMMENTS metadata...")
+        self.df_comments_meta = LoadComments(
+            bucket_name=self.bucket_name,
+            folder_path=self.folder_meta_comments,
+            columns='aggregate_embeddings_',
+        ).read_raw()
+        info(f"  {self.df_comments_meta.shape} <- Raw META COMMENTS shape")
 
 
 
 
-
-def aggregate_embeddings_mlflow(
-        posts_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
-        posts_folder: str = 'df_vect_posts',
-        col_text_post_word_count: str = 'text_word_count',
-        col_post_id: str = 'post_id',
-
-        comments_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
-        comments_folder: str = 'df_vect_comments',
-        col_comment_id: str = 'comment_id',
-        col_text_comment_word_count: str = 'comment_text_word_count',
-        min_text_len_comment: int = None,
-
-        subreddit_desc_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
-        subreddit_desc_folder: str = 'df_vect_vect_subreddits_description',
-        col_subreddit_id: str = 'subreddit_id',
-
-        mlflow_experiment: str = 'use_multilingual_v1_aggregates',
-        run_name: str = None,
-        mlflow_tracking_uri: str = 'sqlite',
-
-        n_sample_posts: int = None,
-        n_sample_comments: int = None,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Meta function that takes config as input that we can log to replicate aggregate job
-
-    I  like the idea of a config... but will need to get back to it later
-    """
-    t_start_agg_embed = datetime.utcnow()
-    info(f"Start aggregate function")
-
-    config_to_log_and_store = {
-        'mlflow_experiment': mlflow_experiment,
-        'run_name': run_name,
-        'mlflow_tracking_uri': mlflow_tracking_uri,
-
-        'posts_uuid': posts_uuid,
-        'posts_folder': posts_folder,
-        'col_post_id': col_post_id,
-        'col_text_post_word_count': col_text_post_word_count,
-
-        'comments_uuid': comments_uuid,
-        'comments_folder': comments_folder,
-        'col_comment_id': col_comment_id,
-        'col_text_comment_word_count': col_text_comment_word_count,
-
-        'subreddit_desc_uuid': subreddit_desc_uuid,
-        'subreddit_desc_folder': subreddit_desc_folder,
-        'col_subreddit_id': col_subreddit_id,
-
-        # 'train_exclude_duplicated_docs': train_exclude_duplicated_docs,
-        # 'train_min_word_count': train_min_word_count,
-        # 'train_use_comments': train_use_comments,
-        #
-        # 'tf_batch_inference_rows': tf_batch_inference_rows,
-        # 'tf_limit_first_n_chars': tf_limit_first_n_chars,
-
-        'n_sample_posts': n_sample_posts,
-        'n_sample_comments': n_sample_comments,
-    }
-
-    mlf = MlflowLogger(tracking_uri=mlflow_tracking_uri)
-    info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
-    mlf.set_experiment(mlflow_experiment)
-    mlflow.start_run(run_name=run_name)
-    mlf.add_git_hash_to_active_run()
-    mlf.set_tag_hostname(key='host_name')
-    mlf.log_param_hostname(key='host_name')
-
-    mlflow.log_params(config_to_log_and_store)
-    # create local path to store artifacts before logging to mlflow
-    path_local_model = get_project_subfolder(
-        f"data/models/aggregate_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{run_name}"
-    )
-    Path(path_local_model).mkdir(exist_ok=True, parents=True)
-    info(f"  Local model saving directory: {path_local_model}")
-
-    mlflow_logger.save_and_log_config(
-        config_to_log_and_store,
-        local_path=path_local_model,
-        name_for_artifact_folder='config',
-    )
-
-    # ---------------------
-    # Load raw embeddings
-    # ---
-    df_v_sub = mlf.read_run_artifact(
-        run_id=subreddit_desc_uuid,
-        artifact_folder=subreddit_desc_folder,
-        read_function=pd.read_parquet,
-    )
-
-    df_posts_agg = None
-    df_subs_agg = None
-
-    # ---------------------
-    # TODO(djb): Load metadata from files
-    #   Needed if I'm filtering by:
-    #   - text len
-    #   - word count
-    #   - date posted/created
-    #   Or if I'm adding weights by upvotes or text length
-    # ---
-
-
-    # TODO(djb): Filter out short comments
-    # ---
-
-
-    # ---------------------
-    # TODO(djb): Merge all comments at post-level
-    # Weights by:
-    # - text len or word count (how to account for emoji & ASCII art?)
-    #     - Word count regex breaks b/c it doesn't work on non-latin alphabets
-    # - up-votes
-    # ---
-
-
-    # ---------------------
-    # TODO(djb): Merge at post-level basic
-    #  - B) post + comments
-    #  - C) post + comments + subreddit description
-    # TODO(djb): Weights by inputs, e.g., 70% post, 20% comments, 10% subreddit description
-    # ---
-
-
-    # ---------------------
-    # TODO(djb): Merge at post-level with subreddit lag
-    #  - D) post + comments + subreddit aggregate
-    # After we calculate all post-level basic embeddings:
-    # - For each day a subreddit has a post, calculate subreddit embeddings of previous N-days
-    # TODO(djb) For any post-strategy above, also combine previous n-days of posts in a subreddit
-    #  Similar to
-    # ---
-
-
-    # ---------------------
-    # TODO(djb): Merge at subreddit-level
-    #  - A) posts only
-    #  - B) posts + comments only
-    #  - C) posts + comments + subreddit description
-    # Weights by:
-    # - text len or word count (how to account for emoji & ASCII art?)
-    #     - Word count regex breaks b/c it doesn't work on non-latin alphabets
-    # - number of up-votes
-    # - number of comments
-    # - number of days since post was created (more recent posts get more weight)
-    # ---
-
-    # finish logging total time + end mlflow run
-    total_fxn_time = elapsed_time(start_time=t_start_agg_embed, log_label='Total Agg fxn time', verbose=True)
-    mlflow.log_metric('vectorizing_time_minutes',
-                      total_fxn_time / timedelta(minutes=1)
-                      )
-    mlflow.end_run()
-    return df_posts_agg, df_subs_agg
-
-
-
-# def load(
 #
-# ):
-#     """"""
+# ~ fin
+#
