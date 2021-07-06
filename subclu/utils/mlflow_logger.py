@@ -16,8 +16,10 @@ SQLite Studio might be worth trying (as long as I don't have dozens of dbs to me
 """
 import json
 import logging
+from logging import info
 import socket
 
+import joblib
 import pandas as pd
 from pathlib import Path
 import subprocess
@@ -78,6 +80,8 @@ class MlflowLogger:
             # For GPU VMs:
             'use_multilingual_v0.1_test',
             'use_multilingual_v1',
+            'use_multilingual_v1_aggregates_test',
+            'use_multilingual_v1_aggregates',
         ]
         for i, exp in enumerate(l_experiments):
             try:
@@ -253,6 +257,30 @@ def get_git_hash() -> str:
         git_hash = None
 
     return git_hash
+
+
+def save_and_log_config(
+        config: dict,
+        local_path: Union[Path, str],
+        name_for_artifact_folder: str = 'config',
+) -> None:
+    """Take a dictionary config, save it locally, then log as parms & as artifact mlflow"""
+    info(f"  Saving config to local path...")
+    f_joblib = Path(local_path) / f'config.gz'
+    f_json = Path(local_path) / f'config.json'
+
+    joblib.dump(config, f_joblib)
+
+    info(f"  Logging config to mlflow...")
+    mlflow.log_artifact(str(f_joblib), name_for_artifact_folder)
+
+    try:
+        with open(str(f_json), 'w') as f:
+            json.dump(config, f)
+        mlflow.log_artifact(str(f_json), name_for_artifact_folder)
+
+    except Exception as e:
+        logging.warning(f"Could not save config to JSON. \n{e}")
 
 
 #
