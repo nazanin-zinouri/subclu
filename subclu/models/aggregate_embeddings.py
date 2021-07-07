@@ -53,7 +53,7 @@ class AggregateEmbeddings:
             comments_folder: str = 'df_vect_comments',
             col_comment_id: str = 'comment_id',
             col_text_comment_word_count: str = 'comment_text_word_count',
-            min_text_len_comment: int = None,
+            min_text_len_comment: int = 11,
             df_v_comments: pd.DataFrame = None,
 
             subreddit_desc_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
@@ -67,6 +67,10 @@ class AggregateEmbeddings:
 
             n_sample_posts: int = None,
             n_sample_comments: int = None,
+
+            df_subs_meta: pd.DataFrame = None,
+            df_posts_meta: pd.DataFrame = None,
+            df_comments_meta: pd.DataFrame = None,
     ):
         """"""
         self.bucket_name = bucket_name
@@ -78,12 +82,17 @@ class AggregateEmbeddings:
         self.run_name = run_name
         self.mlflow_tracking_uri = mlflow_tracking_uri
 
+        # use pre-loaded metadata if running in interactive mode
+        self.df_subs_meta = df_subs_meta
+        self.df_posts_meta = df_posts_meta
+        self.df_comments_meta = df_comments_meta
 
         self.df_v_posts = df_v_posts
         self.posts_uuid = posts_uuid
         self.posts_folder = posts_folder
         self.col_post_id = col_post_id
         self.col_text_post_word_count = col_text_post_word_count
+        self.min_text_len_comment = min_text_len_comment
 
         self.df_v_comments = df_v_comments
         self.comments_uuid = comments_uuid
@@ -145,10 +154,7 @@ class AggregateEmbeddings:
         # ---------------------
         # Load raw embeddings
         # ---
-        t_start_read_raw_embeds = datetime.utcnow()
         self._load_raw_embeddings()
-        elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
-
 
         # ---------------------
         # TODO(djb): Load metadata from files
@@ -158,9 +164,7 @@ class AggregateEmbeddings:
         #   - date posted/created
         #   Or if I'm adding weights by upvotes or text length
         # ---
-        t_start_read_meta = datetime.utcnow()
         self._load_metadata()
-        elapsed_time(start_time=t_start_read_meta, log_label='Total metadata loading', verbose=True)
 
         # TODO(djb): Filter out short comments
         # ---
@@ -214,8 +218,6 @@ class AggregateEmbeddings:
                           )
         mlflow.end_run()
         return (
-            self.df_v_sub, self.df_v_posts, self.df_v_comments,
-            self.df_subs_meta, self.df_posts_meta, self.df_comments_meta,
             df_subs_agg_a, df_subs_agg_b, df_subs_agg_c, df_posts_agg_b, df_posts_agg_c, df_posts_agg_d
         )
 
@@ -231,6 +233,11 @@ class AggregateEmbeddings:
             'run_name': self.run_name,
             'mlflow_tracking_uri': self.mlflow_tracking_uri,
 
+            # don't log these! they could be dfs that take up gigs of storage
+            # 'df_subs_meta': self.df_subs_meta,
+            # 'df_posts_meta': self.df_posts_meta,
+            # 'df_comments_meta': self.df_comments_meta,
+
             'posts_uuid': self.posts_uuid,
             'posts_folder': self.posts_folder,
             'col_post_id': self.col_post_id,
@@ -240,6 +247,7 @@ class AggregateEmbeddings:
             'comments_folder': self.comments_folder,
             'col_comment_id': self.col_comment_id,
             'col_text_comment_word_count': self.col_text_comment_word_count,
+            'min_text_len_comment': self.min_text_len_comment,
 
             'subreddit_desc_uuid': self.subreddit_desc_uuid,
             'subreddit_desc_folder': self.subreddit_desc_folder,
@@ -266,6 +274,8 @@ class AggregateEmbeddings:
         """Load raw embeddings if we don't receive pre-loaded embeddings
         Only use pre-loaded embeddings for testing!
         """
+        active_run = mlflow.active_run()
+        t_start_read_raw_embeds = datetime.utcnow()
         if self.df_v_sub is None:
             info(f"Loading subreddit description embeddings...")
             self.df_v_sub = self.mlf.read_run_artifact(
@@ -275,6 +285,8 @@ class AggregateEmbeddings:
             )
         else:
             info(f"Raw subreddit embeddings pre-loaded")
+            # copy so that the internal object is different from the pre-loaded object
+            self.df_v_sub = self.df_v_sub.copy()
         info(f"    {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
 
         if self.df_v_posts is None:
@@ -286,14 +298,20 @@ class AggregateEmbeddings:
             )
         else:
             info(f"POSTS embeddings pre-loaded")
+            # copy so that the internal object is different from the pre-loaded object
+            self.df_v_posts = self.df_v_posts.copy()
+
         info(f"    {self.df_v_posts.shape} <- Raw POSTS shape")
         if self.n_sample_posts is not None:
-            info(f"  Sampling posts down to: {self.n_sample_posts:,.0f}")
-            self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
-            info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
-
-        r_post, c_post = self.df_v_posts.shape
-        mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
+            if len(self.df_v_posts) > self.n_sample_posts:
+                info(f"  Sampling posts down to: {self.n_sample_posts:,.0f}")
+                self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
+                info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
+            else:
+                info(f"  No need to sample POSTS because sample greater than rows in df_posts")
+        if active_run is not None:
+            r_post, c_post = self.df_v_posts.shape
+            mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
 
         if self.df_v_comments is None:
             info(f"Loading COMMENTS embeddings...")
@@ -304,6 +322,7 @@ class AggregateEmbeddings:
             )
         else:
             info(f"COMMENTS embeddings pre-loaded")
+            self.df_v_comments = self.df_v_comments.copy()
         info(f"    {self.df_v_comments.shape} <- Raw COMMENTS shape")
         info(f"  Keep only comments for posts with embeddings")
         self.df_v_comments = (
@@ -322,35 +341,50 @@ class AggregateEmbeddings:
             else:
                 info(f"  No need to sample comments because sample greater than rows in df_comments")
 
-        r_com, c_com = self.df_v_comments.shape
-        mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
+        if active_run is not None:
+            r_com, c_com = self.df_v_comments.shape
+            mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
+
+        elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
 
     def _load_metadata(self):
         """Load metadata to filter comments or add weights based on metadata"""
-        info(f"Loading subs metadata...")
-        self.df_subs_meta = LoadSubreddits(
-            bucket_name=self.bucket_name,
-            folder_path=self.folder_meta_subreddits,
-            folder_posts=self.folder_meta_posts,
-            columns=None,
-        ).read_raw()
+        t_start_read_meta = datetime.utcnow()
+        if self.df_subs_meta is None:
+            info(f"Loading subs metadata...")
+            self.df_subs_meta = LoadSubreddits(
+                bucket_name=self.bucket_name,
+                folder_path=self.folder_meta_subreddits,
+                folder_posts=self.folder_meta_posts,
+                columns=None,
+            ).read_raw()
+        else:
+            info(f"  Subreddits META pre-loaded")
         info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
 
-        info(f"Loading POSTS metadata...")
-        self.df_posts_meta = LoadPosts(
-            bucket_name=self.bucket_name,
-            folder_path=self.folder_meta_posts,
-            columns='aggregate_embeddings_',
-        ).read_raw()
+        if self.df_posts_meta is None:
+            info(f"Loading POSTS metadata...")
+            self.df_posts_meta = LoadPosts(
+                bucket_name=self.bucket_name,
+                folder_path=self.folder_meta_posts,
+                columns='aggregate_embeddings_',
+            ).read_raw()
+        else:
+            info(f"  Posts META pre-loaded")
         info(f"  {self.df_posts_meta.shape} <- Raw META POSTS shape")
 
-        info(f"Loading COMMENTS metadata...")
-        self.df_comments_meta = LoadComments(
-            bucket_name=self.bucket_name,
-            folder_path=self.folder_meta_comments,
-            columns='aggregate_embeddings_',
-        ).read_raw()
+        if self.df_comments_meta is None:
+            info(f"Loading COMMENTS metadata...")
+            self.df_comments_meta = LoadComments(
+                bucket_name=self.bucket_name,
+                folder_path=self.folder_meta_comments,
+                columns='aggregate_embeddings_',
+            ).read_raw()
+        else:
+            info(f"  Comments META pre-loaded")
         info(f"  {self.df_comments_meta.shape} <- Raw META COMMENTS shape")
+
+        elapsed_time(start_time=t_start_read_meta, log_label='Total metadata loading', verbose=True)
 
 
 
