@@ -28,10 +28,12 @@ class LoadPosts:
             folder_path: str = 'posts/de/2021-06-16',
             columns: iter = None,
             col_new_manual_topic: str = 'manual_topic_and_rating',
+            col_unique_check: str = 'post_id',
     ):
         self.bucket_name = bucket_name
         self.folder_path = folder_path
         self.col_new_manual_topic = col_new_manual_topic
+        self.col_unique_check = col_unique_check
 
         if columns == 'aggregate_embeddings_':
             self.columns = [
@@ -67,10 +69,12 @@ class LoadPosts:
 
     def read_raw(self) -> pd.DataFrame:
         """Read raw files w/o any transformations"""
-        return pd.read_parquet(
+        df = pd.read_parquet(
             path=f"gs://{self.bucket_name}/{self.folder_path}",
             columns=self.columns
         )
+        assert len(df) == df[self.col_unique_check].nunique()
+        return df
 
     def read_and_apply_transformations(self) -> pd.DataFrame:
         """Read & apply all transformations in a single call"""
@@ -119,9 +123,16 @@ class LoadSubreddits(LoadPosts):
             folder_path: str = 'subreddits/de/2021-06-16',
             folder_posts: str = 'posts/de/2021-06-16',
             columns: iter = None,
-            col_new_manual_topic: str = 'manual_topic_and_rating'
+            col_new_manual_topic: str = 'manual_topic_and_rating',
+            col_unique_check: str = 'subreddit_name',
     ) -> None:
-        super().__init__(bucket_name, folder_path, columns, col_new_manual_topic)
+        super().__init__(
+            bucket_name=bucket_name,
+            folder_path=folder_path,
+            columns=columns,
+            col_new_manual_topic=col_new_manual_topic,
+            col_unique_check=col_unique_check
+        )
         self.folder_posts = folder_posts
         # TODO(djb)
         #  over-ride cols, subs are usually small enough that we
@@ -196,9 +207,16 @@ class LoadComments(LoadPosts):
             folder_path: str = 'comments/de/2021-06-16',
             folder_posts: str = 'posts/de/2021-06-16',
             columns: iter = None,
-            col_new_manual_topic: str = 'manual_topic_and_rating'
+            col_new_manual_topic: str = 'manual_topic_and_rating',
+            col_unique_check: str = 'comment_id',
     ) -> None:
-        super().__init__(bucket_name, folder_path, columns, col_new_manual_topic)
+        super().__init__(
+            bucket_name=bucket_name,
+            folder_path=folder_path,
+            columns=columns,
+            col_new_manual_topic=col_new_manual_topic,
+            col_unique_check=col_unique_check
+        )
         self.folder_posts = folder_posts
 
         #  over-ride cols b/c post cols will be different than comments or subs
