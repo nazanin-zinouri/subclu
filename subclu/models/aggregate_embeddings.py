@@ -142,7 +142,10 @@ class AggregateEmbeddings:
         self.df_subs_agg_b = None
         self.df_subs_agg_c = None
 
-        self.df_subs_similarity = None
+        # dfs with subreddit similarities
+        self.df_subs_agg_a_similarity = None
+        self.df_subs_agg_b_similarity = None
+        self.df_subs_agg_c_similarity = None
 
     def run_aggregation(self) -> Tuple[pd.DataFrame]:
         """Main function to run full aggregation job
@@ -792,6 +795,46 @@ class AggregateEmbeddings:
             raise NotImplementedError(f"Using weighted average (posts) to roll up to subreddits not implemented.")
 
         elapsed_time(start_time=t_start_method, log_label='Total for all subreddit-level agg', verbose=True)
+
+    def _calculate_subreddit_similarities(self):
+        """For each subreddit aggregation, calculate subreddit similarity/distances
+        We want to do it with raw data/full embeddings to get most accurate similarity
+        (instead of doing it after compression)
+        """
+        info(f"-- Start _calculate_subreddit_similarities() method --")
+        t_start_method = datetime.utcnow()
+
+        info(f"A...")
+        ix_a = self.df_subs_agg_a.index.droplevel('subreddit_id')
+        self.df_subs_agg_a_similarity = pd.DataFrame(
+            cosine_similarity(self.df_subs_agg_a.droplevel('subreddit_id', axis='index')),
+            index=ix_a,
+            columns=ix_a,
+        )
+        self.df_subs_agg_a_similarity.columns.name = None
+        info(f"  {self.df_subs_agg_a_similarity.shape} <- df_subs_agg_a_similarity.shape")
+
+        info(f"B...")
+        ix_b = self.df_subs_agg_b.index.droplevel('subreddit_id')
+        self.df_subs_agg_b_similarity = pd.DataFrame(
+            cosine_similarity(self.df_subs_agg_b.droplevel('subreddit_id', axis='index')),
+            index=ix_b,
+            columns=ix_b,
+        )
+        self.df_subs_agg_b_similarity.columns.name = None
+        info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
+
+        info(f"C...")
+        ix_c = self.df_subs_agg_c.index.droplevel('subreddit_id')
+        self.df_subs_agg_c_similarity = pd.DataFrame(
+            cosine_similarity(self.df_subs_agg_c.droplevel('subreddit_id', axis='index')),
+            index=ix_c,
+            columns=ix_c,
+        )
+        self.df_subs_agg_c_similarity.columns.name = None
+        info(f"  {self.df_subs_agg_c_similarity.shape} <- df_subs_agg_c_similarity.shape")
+
+        elapsed_time(start_time=t_start_method, log_label='Total for _calculate_subreddit_similarities()', verbose=True)
 
 
 
