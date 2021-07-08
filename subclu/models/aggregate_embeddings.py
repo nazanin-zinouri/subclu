@@ -118,9 +118,9 @@ class AggregateEmbeddings:
         # set columns & weights for rolling up weights
         # if None, all comments/posts get the same weight
         self.agg_comments_to_post_weight_col = agg_comments_to_post_weight_col
-        self.agg_post_post_weight = agg_post_post_weight,
-        self.agg_post_comment_weight = agg_post_comment_weight,
-        self.agg_post_subreddit_desc_weight = agg_post_subreddit_desc_weight,
+        self.agg_post_post_weight = agg_post_post_weight
+        self.agg_post_comment_weight = agg_post_comment_weight
+        self.agg_post_subreddit_desc_weight = agg_post_subreddit_desc_weight
 
         # Create path to store local run
         self.path_local_model = None
@@ -213,7 +213,8 @@ class AggregateEmbeddings:
         #  - C) post + comments + subreddit description
         # TODO(djb): Weights by inputs, e.g., 70% post, 20% comments, 10% subreddit description
         # ---
-        # self._agg_posts_and_comments_to_post_level()
+        self._agg_posts_and_comments_to_post_level()
+        logging.warning(f"TODO: post-aggregation that includes subreddit description")
         # self._agg_posts_comments_and_sub_descriptions_to_post_level()
 
         # ---------------------
@@ -222,7 +223,11 @@ class AggregateEmbeddings:
         # After we calculate all post-level basic embeddings:
         # - For each day a subreddit has a post, calculate subreddit embeddings of previous N-days
         # TODO(djb) For any post-strategy above, also combine previous n-days of posts in a subreddit
-        #  Similar to
+        #  Similar to what Elliott does in semantic job, but in there it's limited to:
+        #  - past 7-days
+        #  - top 250 posts (by views?) for each subreddit
+        #  Not sure those parameters would work well for subs that are not very active - like the
+        #    ambassador communities or in non-English languages
         # ---
 
         # ---------------------
@@ -249,7 +254,7 @@ class AggregateEmbeddings:
         mlflow.end_run()
         info(f"== COMPLETE run_aggregation() method ==")
         return (
-            df_subs_agg_a, df_subs_agg_b, df_subs_agg_c, df_posts_agg_b, df_posts_agg_c, df_posts_agg_d
+            df_subs_agg_a, df_subs_agg_b, df_subs_agg_c, self.df_posts_agg_b, df_posts_agg_c, df_posts_agg_d
         )
 
     def _create_and_log_config(self):
@@ -516,7 +521,7 @@ class AggregateEmbeddings:
                  ],
                 ignore_index=False,
                 axis=0
-            )
+            ).sort_index()
 
         assert (len(self.df_v_com_agg) == self.df_v_com_agg.index.nunique()), "Index not unique"
         info(f"  {self.df_v_com_agg.shape} <- df_v_com_agg shape after aggregation")
@@ -560,8 +565,92 @@ class AggregateEmbeddings:
                 return_df=True,
              )
             info(f"Comments per post summary:\n{df_counts_summary}")
-            info(f"  {(self.df_comment_count_per_post['comment_count'] >= 1).sum():9,.0f}"
-                 f" <- Posts with 1+ comments (total posts with at least one comment)")
+            info(f"  {(self.df_comment_count_per_post['comment_count'] >= 2).sum():9,.0f}"
+                 f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
+            del df_counts_summary
+            gc.collect()
+
+    def _agg_posts_and_comments_to_post_level(self):
+        """roll up post & comment embeddings to post-level
+
+        Single posts = posts where there's only one comment, so we don't need to calculate weights
+        """
+        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        # temp column to add averaging weights
+        col_weights = '_col_method_weight_'
+
+        t_start_method = datetime.utcnow()
+        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
+        l_embedding_cols = list(self.df_v_posts.columns)
+
+        self._calculate_comment_count_per_post()
+        mask_posts_without_comments = self.df_v_posts.index.get_level_values('post_id').isin(
+            self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 0]['post_id']
+        )
+        info(f"  {(~mask_posts_without_comments).sum():9,.0f} <- Posts that need weighted average")
+
+        # TODO(djb): Create df with:
+        #  - posts with 1+ comments
+        #    - add new col with input weight
+        #  - comments for posts
+        #    - one row per post, these are already aggregated
+        #    - add new col with input weight
+        df_posts_for_weights = pd.concat(
+            [
+                self.df_v_posts[~mask_posts_without_comments].assign(
+                    **{col_weights: self.agg_post_post_weight}
+                ),
+                self.df_v_com_agg.assign(
+                    **{col_weights: self.agg_post_comment_weight}
+                ),
+             ]
+        )
+
+        # iterate to get weighted average for each post_id that has comments
+        d_weighted_mean_agg = dict()
+        for id_, df in tqdm(df_posts_for_weights.groupby('post_id')):
+            d_weighted_mean_agg[id_] = np.average(
+                df[l_embedding_cols],
+                weights=df[col_weights],
+                axis=0,
+            )
+        gc.collect()
+        # Convert dict to df so we can merge it with
+        df_agg_posts_w_comments = pd.DataFrame(d_weighted_mean_agg).T
+        df_agg_posts_w_comments.columns = l_embedding_cols
+        df_agg_posts_w_comments.index.name = 'post_id'
+        info(f"  {df_agg_posts_w_comments.shape} <- df_agg_posts_w_comments.shape (only posts with comments)")
+
+        # Re-append multi-index so it's the same in original and new output
+        df_agg_posts_w_comments = (
+            df_agg_posts_w_comments
+            .merge(
+                self.df_v_posts.index.to_frame(index=False).drop_duplicates(),
+                how='left',
+                on=['post_id'],
+            )
+            .set_index(l_ix_post_level)
+        )
+        assert (len(df_agg_posts_w_comments) == df_agg_posts_w_comments.index.nunique()), "Index not unique"
+
+        # Merge into a a single dataframe:
+        # - posts w/ multiple comments (already averaged out)
+        # - posts with 1 comment (no need for weights)
+        # Sort because we want most posts for a subreddit in one file or
+        #  adjacent files when we save to multiple dfs
+        self.df_posts_agg_b = pd.concat(
+            [
+                df_agg_posts_w_comments,
+                self.df_v_posts[mask_posts_without_comments]
+            ],
+            ignore_index=False,
+            axis=0
+        ).sort_index()
+
+        assert (len(self.df_posts_agg_b) == self.df_posts_agg_b.index.nunique()), "Index not unique"
+        info(f"  {self.df_posts_agg_b.shape} <- df_posts_agg_b shape after aggregation")
+
+        elapsed_time(start_time=t_start_method, log_label='Total posts & comments agg', verbose=True)
 
 
 
