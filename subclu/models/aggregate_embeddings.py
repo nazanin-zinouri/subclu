@@ -133,7 +133,7 @@ class AggregateEmbeddings:
           right?
         """
         t_start_agg_embed = datetime.utcnow()
-        info(f"Start aggregate function")
+        info(f"== Start run_aggregation() method ==")
 
         info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
         self.mlf.set_experiment(self.mlflow_experiment)
@@ -174,11 +174,10 @@ class AggregateEmbeddings:
         # ---
         self._load_metadata()
 
-        # Filter out short comments
+        # Filter out short comments using metadata
         # ---
-        logging.warning(f"Currently not filtering out short comments...")
         if self.min_comment_text_len is not None:
-            info(f"{self.min_comment_text_len} <- Removing comments shorter than N characters.")
+            info(f"{self.min_comment_text_len} <- Removing comments shorter than {self.min_comment_text_len} characters.")
             short_comments_to_remove = self.df_comments_meta[
                 self.df_comments_meta['comment_text_len'] <= self.min_comment_text_len
             ][self.col_comment_id]
@@ -188,6 +187,7 @@ class AggregateEmbeddings:
                 [~(self.df_v_comments.index.get_level_values(self.col_comment_id).isin(short_comments_to_remove))]
             )
             info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER removing short comments")
+            gc.collect()
 
         # ---------------------
         # TODO(djb): Merge all comments at post-level
@@ -295,6 +295,7 @@ class AggregateEmbeddings:
         """Load raw embeddings if we don't receive pre-loaded embeddings
         Only use pre-loaded embeddings for testing!
         """
+        info(f"-- Start _load_raw_embeddings() method --")
         active_run = mlflow.active_run()
         t_start_read_raw_embeds = datetime.utcnow()
         if self.df_v_sub is None:
@@ -308,7 +309,7 @@ class AggregateEmbeddings:
             info(f"Raw subreddit embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_sub = self.df_v_sub.copy()
-        info(f"    {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
+        info(f"  {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
         if active_run is not None:
             r_sub, c_sub = self.df_v_sub.shape
             mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
@@ -329,7 +330,7 @@ class AggregateEmbeddings:
         info(f"    {self.df_v_posts.shape} <- Raw POSTS shape")
         if self.n_sample_posts is not None:
             if len(self.df_v_posts) > self.n_sample_posts:
-                info(f"  Sampling posts down to: {self.n_sample_posts:,.0f}")
+                info(f"  Sampling POSTS down to: {self.n_sample_posts:,.0f}")
                 self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
                 info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
             else:
@@ -349,7 +350,7 @@ class AggregateEmbeddings:
         else:
             info(f"COMMENTS embeddings pre-loaded")
             self.df_v_comments = self.df_v_comments.copy()
-        info(f"    {self.df_v_comments.shape} <- Raw COMMENTS shape")
+        info(f"  {self.df_v_comments.shape} <- Raw COMMENTS shape")
         info(f"  Keep only comments for posts with embeddings")
         self.df_v_comments = (
             self.df_v_comments
@@ -357,11 +358,11 @@ class AggregateEmbeddings:
                 self.df_v_posts.index.get_level_values('post_id').unique()
              )]
         )
-        info(f"    {self.df_v_comments.shape} <- COMMENTS shape, after keeping only existing posts")
+        info(f"  {self.df_v_comments.shape} <- COMMENTS shape, after keeping only existing posts")
 
         if self.n_sample_comments is not None:
             if len(self.df_v_comments) > self.n_sample_comments:
-                info(f"  Sampling posts down to: {self.n_sample_comments:,.0f}")
+                info(f"  Sampling COMMENTS down to: {self.n_sample_comments:,.0f}")
                 self.df_v_comments = self.df_v_comments.sample(n=self.n_sample_comments)
                 info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER sampling")
             else:
@@ -373,9 +374,11 @@ class AggregateEmbeddings:
         assert (len(self.df_v_comments) == self.df_v_comments.index.nunique()), f"** Index not unique. Check duplicates df_v_comments **"
 
         elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
+        gc.collect()
 
     def _load_metadata(self):
         """Load metadata to filter comments or add weights based on metadata"""
+        info(f"-- Start _load_metadata() method --")
         t_start_read_meta = datetime.utcnow()
         if self.df_subs_meta is None:
             info(f"Loading subs metadata...")
@@ -386,7 +389,7 @@ class AggregateEmbeddings:
                 columns=None,
             ).read_raw()
         else:
-            info(f"  Subreddits META pre-loaded")
+            info(f"Subreddits META pre-loaded")
         info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
 
         if self.df_posts_meta is None:
@@ -397,7 +400,7 @@ class AggregateEmbeddings:
                 columns='aggregate_embeddings_',
             ).read_raw()
         else:
-            info(f"  Posts META pre-loaded")
+            info(f"Posts META pre-loaded")
         info(f"  {self.df_posts_meta.shape} <- Raw META POSTS shape")
 
         if self.df_comments_meta is None:
@@ -408,16 +411,20 @@ class AggregateEmbeddings:
                 columns='aggregate_embeddings_',
             ).read_raw()
         else:
-            info(f"  Comments META pre-loaded")
+            info(f"Comments META pre-loaded")
         info(f"  {self.df_comments_meta.shape} <- Raw META COMMENTS shape")
 
         elapsed_time(start_time=t_start_read_meta, log_label='Total metadata loading', verbose=True)
+        gc.collect()
 
     def _agg_comments_at_post_level(self):
         """We'll roll all comments to a post-level
         so we might have 4 comments (4 rows) to a post and at the end of this function we'll
         only have 1 row (1 post) that aggregates all comments for that row
         """
+        info(f"-- Start _agg_comments_at_post_level() method --")
+        gc.collect()
+        t_start_agg_comments = datetime.utcnow()
         l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
         if self.agg_comments_to_post_weight_col is None:
             info(f"No column to weight comments, simple mean for comments at post level")
@@ -429,23 +436,32 @@ class AggregateEmbeddings:
             )
 
         else:
-            # Check which posts have more than 1 comment, doesn't make sense to loop through posts w/ 1 comment
-            l_ix_comments = l_ix_post_level + ['comment_id']
-            l_embedding_cols = self.df_v_comments.columns
+            # Check which posts have more than 1 comment.
+            # Single comments = comments to posts where there's only one comment, so we don't need to weight
+            #  or loop for posts with a single comment
+            l_embedding_cols = list(self.df_v_comments.columns)
+
+            info(f"Getting count of comments per post...")
+            # We should be able to use 'count' (which is faster) instead of 'nunique' because
+            #  we checked for unique index after loading the dfs
             df_comment_count_per_post = (
                 self.df_v_comments.index.to_frame(index=False)
                     .groupby(['post_id'], as_index=False)
                     .agg(
-                    comment_count=('comment_id', 'nunique')
+                    comment_count=('comment_id', 'count')
                 )
             )
-            mask_posts_only_1_comment = self.df_v_comments.index.get_level_values(self.col_comment_id).isin(
-                df_comment_count_per_post[df_comment_count_per_post['comment_count'] == 1]
+            mask_single_comments = self.df_v_comments.index.get_level_values('post_id').isin(
+                df_comment_count_per_post[df_comment_count_per_post['comment_count'] == 1]['post_id']
             )
+            info(f"  {(df_comment_count_per_post['comment_count'] == 1).sum():9,.0f} <- Posts with only one comment (no weighted avg needed)")
+            info(f"  {(df_comment_count_per_post['comment_count'] >= 2).sum():9,.0f} <- Posts with 2+ comments (need weighted avg)")
+            info(f"  {len(df_comment_count_per_post):9,.0f} <- Total posts with 1+ comments")
+            info(f"  {(~mask_single_comments).sum():9,.0f} <- Comments to use for weighted average")
 
             # TODO(djb): aggregate posts with multiple comments
             df_comms_with_weights = (
-                self.df_v_comments[~mask_posts_only_1_comment]
+                self.df_v_comments[~mask_single_comments]
                 .reset_index()
                 .merge(
                     self.df_comments_meta[['post_id', self.agg_comments_to_post_weight_col]],
@@ -453,25 +469,57 @@ class AggregateEmbeddings:
                     on=['post_id']
                 )
             )
+
             d_weighted_mean_agg = dict()
-            for name, df in tqdm(df_comms_with_weights.groupby('post_id')):
-                d_weighted_mean_agg[name] = np.average(
+            for id_, df in tqdm(df_comms_with_weights.groupby('post_id')):
+                d_weighted_mean_agg[id_] = np.average(
                     df[l_embedding_cols],
                     weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
                     axis=0,
                 )
-            df_agg_multi_comments = None
+            gc.collect()
+            # TODO(djb) remove df_agg_multi_comments from self, we don't need to keep it around
+            df_agg_multi_comments = pd.DataFrame(d_weighted_mean_agg).T
+            df_agg_multi_comments.columns = l_embedding_cols
+            df_agg_multi_comments.index.name = 'post_id'
+            info(f"  {df_agg_multi_comments.shape} <- df_agg_multi_comments shape, weighted avg only")
 
-            # TODO(djb): merge posts with 1 comment + posts w/ multiple comments
+            info(f"  {self.df_v_comments[mask_single_comments].shape}"
+                 f" <- df_v_comments shape for comments that DO NOT need to be aggregated")
+
+            # TODO(djb) merge back so we have the same multi-index cols in original and output
+            df_agg_multi_comments = (
+                df_agg_multi_comments
+                .merge(
+                    self.df_v_comments.index.to_frame(index=False)[l_ix_post_level].drop_duplicates(),
+                    how='left',
+                    on=['post_id'],
+                )
+                .set_index(l_ix_post_level)
+            )
+            assert (len(df_agg_multi_comments) == df_agg_multi_comments.index.nunique()), "Index not unique"
+
+
+            # Merge into a a single dataframe:
+            # - posts w/ multiple comments (already averaged out)
+            # - posts with 1 comment (no need for weights)
             self.df_v_com_agg = pd.concat(
-                [self.df_v_comments[mask_posts_only_1_comment],
-                 df_agg_multi_comments
+                [
+                    df_agg_multi_comments,
+                    (
+                        self.df_v_comments[mask_single_comments]
+                        .reset_index()
+                        [l_ix_post_level + l_embedding_cols]
+                        .set_index(l_ix_post_level)
+                    )
                  ],
                 ignore_index=False,
                 axis=0
             )
 
+        assert (len(self.df_v_com_agg) == self.df_v_com_agg.index.nunique()), "Index not unique"
         info(f"  {self.df_v_com_agg.shape} <- df_v_com_agg shape after aggregation")
+        elapsed_time(start_time=t_start_agg_comments, log_label='Total comments to post agg loading', verbose=True)
 
 
 
