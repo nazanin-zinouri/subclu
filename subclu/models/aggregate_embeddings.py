@@ -18,8 +18,9 @@ import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
 
-from ..data.data_loaders import LoadSubreddits, LoadPosts, LoadComments
+from sklearn.metrics.pairwise import cosine_similarity
 
+from ..data.data_loaders import LoadSubreddits, LoadPosts, LoadComments
 from ..utils.mlflow_logger import MlflowLogger
 from ..utils import mlflow_logger
 from ..utils import get_project_subfolder
@@ -133,6 +134,16 @@ class AggregateEmbeddings:
         # Keep track of comments per post here
         self.df_comment_count_per_post = None
 
+        # dfs with output of aggregates
+        self.df_posts_agg_b = None
+        self.df_posts_agg_c = None
+
+        self.df_subs_agg_a = None
+        self.df_subs_agg_b = None
+        self.df_subs_agg_c = None
+
+        self.df_subs_similarity = None
+
     def run_aggregation(self) -> Tuple[pd.DataFrame]:
         """Main function to run full aggregation job
 
@@ -163,12 +174,6 @@ class AggregateEmbeddings:
         # Log configuration so we can replicate run
         self._create_and_log_config()
         mlflow.log_params(self.config_to_log_and_store)
-
-        # Initialize values to output
-        # TODO(djb): delete these initial values, only keep them while testing
-        (df_subs_agg_a, df_subs_agg_b, df_subs_agg_c,
-         df_posts_agg_b, df_posts_agg_c, df_posts_agg_d
-         ) = None, None, None, None, None, None,
 
         # ---------------------
         # Load raw embeddings
@@ -210,13 +215,12 @@ class AggregateEmbeddings:
         self._agg_comments_to_post_level()
 
         # ---------------------
-        # TODO(djb): Merge at post-level basic
+        # Merge at post-level basic
         #  - B) post + comments
         #  - C) post + comments + subreddit description
-        # TODO(djb): Weights by inputs, e.g., 70% post, 20% comments, 10% subreddit description
+        # Weights by inputs, e.g., 70% post, 20% comments, 10% subreddit description
         # ---
         self._agg_posts_and_comments_to_post_level()
-        logging.warning(f"TODO: post-aggregation that includes subreddit description")
         self._agg_posts_comments_and_sub_descriptions_to_post_level()
 
         # ---------------------
@@ -237,16 +241,28 @@ class AggregateEmbeddings:
         #  - A) posts only
         #  - B) posts + comments only
         #  - C) posts + comments + subreddit description
-        # Weights by:
+        # TODO(djb): Weights by:
         # - text len or word count (how to account for emoji & ASCII art?)
         #     - Word count regex breaks b/c it doesn't work on non-latin alphabets
         # - number of up-votes
         # - number of comments
         # - number of days since post was created (more recent posts get more weight)
         # ---
+        self._agg_post_aggregates_to_subreddit_level()
 
-        # TODO(djb): when saving a df to parquet, save in multiple files, otherwise
-        #  reading from a single file can take over 1 minute for ~1.2 million rows
+        # ---------------------
+        # TODO(djb): Calculate subreddit similarity/distance
+        # ---
+        self._calculate_subreddit_similarities()
+
+        # TODO create dataframes subfolder for local model path
+        # TODO: for each df type, create a subfolder & save it using dask (so we can save to multiple files)
+        #  TODO(djb): when saving a df to parquet, save in multiple files, otherwise
+        #   reading from a single file can take over 1 minute for ~1.2 million rows
+        #   maybe use dask to save dfs?
+
+        # TODO log dataframes subfolder to mlflow (one call) to preserve subfolder structure
+        #   i.e., Call mlflow log artifacts on whole subfolder
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_agg_embed, log_label='Total Agg fxn time', verbose=True)
@@ -256,7 +272,8 @@ class AggregateEmbeddings:
         mlflow.end_run()
         info(f"== COMPLETE run_aggregation() method ==")
         return (
-            df_subs_agg_a, df_subs_agg_b, df_subs_agg_c, self.df_posts_agg_b, self.df_posts_agg_c, df_posts_agg_d
+            self.df_subs_agg_a, self.df_subs_agg_b, self.df_subs_agg_c,
+            self.df_posts_agg_b, self.df_posts_agg_c, None
         )
 
     def _create_and_log_config(self):
@@ -653,9 +670,9 @@ class AggregateEmbeddings:
         Single posts = posts where there's only one comment, so we don't need to calculate weights
         """
         info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
-        t_start_method = datetime.utcnow()
         l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
         l_embedding_cols = list(self.df_v_posts.columns)
 
@@ -725,7 +742,56 @@ class AggregateEmbeddings:
 
         elapsed_time(start_time=t_start_method, log_label='Total posts+comments+subs agg', verbose=True)
 
+    def _agg_post_aggregates_to_subreddit_level(self):
+        """Roll up post-level aggregations to subreddit-level"""
+        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        t_start_method = datetime.utcnow()
+        # temp column to add averaging weights
+        col_weights = '_col_method_weight_'
+        # l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
+        l_ix_sub_level = ['subreddit_name', 'subreddit_id', ]
+        l_embedding_cols = list(self.df_v_posts.columns)
 
+        if self.agg_post_to_subreddit_weight_col is None:
+            info(f"No column to weight comments, simple mean to roll up posts to subreddit-level...")
+
+            # A - posts only
+            info(f"A - posts only")
+            self.df_subs_agg_a = (
+                self.df_v_posts
+                .reset_index()
+                [l_ix_sub_level + l_embedding_cols]
+                .groupby(l_ix_sub_level)
+                .mean()
+            ).sort_index()
+            info(f"  {self.df_subs_agg_a.shape} <- df_subs_agg_a.shape (only posts)")
+
+            # B - posts + comments
+            info(f"B - posts + comments")
+            self.df_subs_agg_b = (
+                self.df_posts_agg_b
+                .reset_index()
+                [l_ix_sub_level + l_embedding_cols]
+                .groupby(l_ix_sub_level)
+                .mean()
+            ).sort_index()
+            info(f"  {self.df_subs_agg_b.shape} <- df_subs_agg_b.shape (posts + comments)")
+
+            # C - posts + comments + sub descriptions
+            info(f"C - posts + comments + sub descriptions")
+            self.df_subs_agg_c = (
+                self.df_posts_agg_c
+                .reset_index()
+                [l_ix_sub_level + l_embedding_cols]
+                .groupby(l_ix_sub_level)
+                .mean()
+            ).sort_index()
+            info(f"  {self.df_subs_agg_c.shape} <- df_subs_agg_c.shape (posts + comments + sub description)")
+
+        else:
+            raise NotImplementedError(f"Using weighted average (posts) to roll up to subreddits not implemented.")
+
+        elapsed_time(start_time=t_start_method, log_label='Total for all subreddit-level agg', verbose=True)
 
 
 
