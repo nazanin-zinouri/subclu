@@ -48,8 +48,8 @@ class LoadPosts:
                 'upvotes',
                 # 'successful',
                 # 'app_name',
-                'combined_topic_and_rating',
-                # 'post_type',
+                'combined_topic_and_rating',  # Needed for new manual label
+                'post_type',  # For post aggs
                 # 'post_nsfw',
                 # 'geolocation_country_code',
 
@@ -57,12 +57,13 @@ class LoadPosts:
                 # 'post_url',
                 # 'language',
                 # 'probability',
-                # 'weighted_language',
+                'weighted_language', # For language aggs
                 # 'weighted_language_probability',
                 'text_len',
                 'text_word_count',
                 # 'post_url_for_embeddings',
                 # 'text'
+
             ]
         else:
             self.columns = columns
