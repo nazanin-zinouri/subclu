@@ -4,11 +4,12 @@
 --    so I have to create an intermediary table to remove duplicates
 -- Select POSTS + detected language for topic modeling
 -- Ambassador program only started around 05-01 so try to get data that includes posts after that date
-DECLARE start_date DATE DEFAULT '2021-04-01';
+DECLARE start_date DATE DEFAULT '2021-06-01';
 DECLARE end_date DATE DEFAULT '2021-07-07';
+DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1000;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_posts_top_20210709`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210709`
 PARTITION BY submit_date
 AS (
 
@@ -28,6 +29,8 @@ SELECT
     , sp.noun
     , sp.removed
     , sp.upvotes
+    , sp.comments
+    # , (sp.upvotes - sp.downvotes) AS net_upvotes
     , sp.successful
     , sp.app_name
     , sp.post_type
@@ -35,13 +38,12 @@ SELECT
     , sp.post_nsfw
 
     -- Meta about subreddit
-    , gs.geo_country_code AS subreddit_geo_country_code
     , gs.combined_topic
     , gs.combined_topic_and_rating
     , gs.rating
     , gs.rating_version
 
-FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_de_all_20210616` AS gs
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210709` AS gs
 LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
     ON gs.subreddit_name = sp.subreddit_name
 
@@ -68,6 +70,8 @@ SELECT
     , geo.submit_date
     , geo.removed
     , geo.upvotes
+    , geo.comments
+    # , geo.net_upvotes
     , geo.successful
     , geo.app_name
     , geo.post_type
@@ -76,7 +80,6 @@ SELECT
     , tl.geolocation_country_code
 
     -- Meta about subreddit
-    , geo.subreddit_geo_country_code
     , geo.combined_topic
     , geo.combined_topic_and_rating
     , geo.rating
@@ -127,8 +130,61 @@ FROM (
 
 WHERE row_num = 1
 
-ORDER BY post_id
+),
+
+tl_unique_with_meta_top_posts AS (
+SELECT
+    tl.* EXCEPT(rank_post_in_sub)
+
+FROM (
+    SELECT
+        *
+        , ROW_NUMBER() OVER(PARTITION BY subreddit_name ORDER BY upvotes DESC, comments DESC) AS rank_post_in_sub
+    FROM tl_unique_with_meta
+) AS tl
+
+WHERE
+    tl.rank_post_in_sub <= MAX_POSTS_PER_SUB
 )
+-- post_screenviews AS (
+--     SELECT
+--       pdr.post_id
+--       , pdr.screenviews
+--       , pdr.upvotes
+--       , sp.upvotes AS sp_upvotes
+--       , pdr.downvotes
+--       -- , sp.downvotes
+--       , pdr.net_upvotes
+--       , LOWER(pdr.subreddit_name) AS subreddit_name
+--       , pdr.pt
+--       , pdr.rank_post_date
+--       , ROW_NUMBER() OVER(PARTITION BY sp.subreddit_name ORDER BY pdr.net_upvotes DESC, pdr.screenviews DESC) AS rank_post_in_sub
+--
+--     -- Use sub-selection to keep only the latest update for a given post...
+--     -- HOWEVER, it looks like each day is independent of each other, so to get totals, we might need to SUM() screenviews?
+--     FROM (
+--       SELECT
+--         *
+--         , _PARTITIONTIME AS pt
+--         , (upvotes - downvotes) AS net_upvotes
+--         , ROW_NUMBER() OVER(PARTITION BY post_id ORDER BY _PARTITIONTIME ASC) AS rank_post_date
+--       FROM `data-prod-165221.ds_v2_aggregate_tables.post_daily_reporting`
+--       WHERE _PARTITIONTIME BETWEEN TIMESTAMP(start_date) AND TIMESTAMP(end_date)
+--     ) AS pdr
+--
+--     LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
+--         ON LOWER(pdr.subreddit_name) = sp.subreddit_name
+--             AND pdr.post_id = sp.post_id
+--
+--     WHERE 1=1
+--       AND rank_post_date = 1
+--       AND sp.dt BETWEEN start_date AND end_date
+--       AND sp.removed = 0
+--
+--       # test using only some subs
+--         AND LOWER(sp.subreddit_name) IN ("de", "ich_iel", "bundesliga", "adidasgirls")
+-- )
+
 
 
 -- This is the de-duped table used for modeling
@@ -139,19 +195,19 @@ SELECT
 
 FROM (
     SELECT *
-        -- Create a new column that cleans up the post_url col for embeddings
-        -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
-        , CHAR_LENGTH(text) AS text_len
-        , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
-        , CASE
-            WHEN REGEXP_INSTR(
-                post_url,
-                ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
-                ) > 0 THEN NULL
-            ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, "https://|www.|/r/|.html", ""), r"/|-|_|\?", " "))
-            END AS post_url_for_embeddings
+    -- Create a new column that cleans up the post_url col for embeddings
+    -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
+    , CHAR_LENGTH(text) AS text_len
+    , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
+    , CASE
+        WHEN REGEXP_INSTR(
+            post_url,
+            ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
+            ) > 0 THEN NULL
+        ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, "https://|www.|/r/|.html", ""), r"/|-|_|\?", " "))
+        END AS post_url_for_embeddings
 
-    FROM tl_unique_with_meta
+    FROM tl_unique_with_meta_top_posts
 )
 
 )  -- close create table parens
@@ -168,15 +224,24 @@ FROM (
 # ;
 -- # Expected counts for 04/01 to 06/14: ~262k posts
 
+-- Count totals v. unique BEFORE CREATING TABLE, and AFTER joining with language-detection page
+# SELECT
+#     COUNT(*)                AS total_rows
+#     , COUNT(DISTINCT post_id)  AS post_id_unique
+#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
+#     , COUNT(DISTINCT user_id)  AS user_id_unique
+# FROM tl_unique_with_meta_top_posts
+# ;
+
 
 -- Export data to google cloud storage (GCS)
 # EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/posts/de/2021-06-16/*.parquet',
+#   uri='gs://i18n-subreddit-clustering/posts/top/2021-07-09/*.parquet',
 #   format='PARQUET',
 #   overwrite=true
 #   ) AS
 # SELECT * EXCEPT (created_timestamp)
-# FROM `reddit-employee-datasets.david_bermejo.subclu_posts_de_all_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210709`
 # ;
 
 
