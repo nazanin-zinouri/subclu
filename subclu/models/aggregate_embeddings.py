@@ -21,6 +21,7 @@ from tqdm.auto import tqdm
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ..data.data_loaders import LoadSubreddits, LoadPosts, LoadComments
+from ..data.transform_distance_data_for_bq import reshape_distances_to_pairwise_bq
 from ..utils.mlflow_logger import MlflowLogger
 from ..utils import mlflow_logger
 from ..utils import get_project_subfolder
@@ -412,20 +413,12 @@ class AggregateEmbeddings:
         gc.collect()
 
     def _load_metadata(self):
-        """Load metadata to filter comments or add weights based on metadata"""
+        """Load metadata to filter comments or add weights based on metadata
+
+        Read subs meta AFTER posts so that we can use post data to create aggregates.
+        """
         info(f"-- Start _load_metadata() method --")
         t_start_read_meta = datetime.utcnow()
-        if self.df_subs_meta is None:
-            info(f"Loading subs metadata...")
-            self.df_subs_meta = LoadSubreddits(
-                bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_subreddits,
-                folder_posts=self.folder_meta_posts,
-                columns=None,
-            ).read_raw()
-        else:
-            info(f"Subreddits META pre-loaded")
-        info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
 
         if self.df_posts_meta is None:
             info(f"Loading POSTS metadata...")
@@ -433,10 +426,22 @@ class AggregateEmbeddings:
                 bucket_name=self.bucket_name,
                 folder_path=self.folder_meta_posts,
                 columns='aggregate_embeddings_',
-            ).read_raw()
+            ).read_and_apply_transformations()
         else:
             info(f"Posts META pre-loaded")
         info(f"  {self.df_posts_meta.shape} <- Raw META POSTS shape")
+
+        if self.df_subs_meta is None:
+            info(f"Loading subs metadata...")
+            self.df_subs_meta = LoadSubreddits(
+                bucket_name=self.bucket_name,
+                folder_path=self.folder_meta_subreddits,
+                folder_posts=self.folder_meta_posts,
+                columns=None,
+            ).read_apply_transformations_and_merge_post_aggs(df_posts=self.df_posts_meta)
+        else:
+            info(f"Subreddits META pre-loaded")
+        info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
 
         if self.df_comments_meta is None:
             info(f"Loading COMMENTS metadata...")
@@ -814,6 +819,14 @@ class AggregateEmbeddings:
         self.df_subs_agg_a_similarity.columns.name = None
         info(f"  {self.df_subs_agg_a_similarity.shape} <- df_subs_agg_a_similarity.shape")
 
+        _, self.df_subs_agg_a_similarity_pair = reshape_distances_to_pairwise_bq(
+            df_distance_matrix=self.df_subs_agg_a_similarity,
+            df_sub_metadata=self.df_subs_meta,
+            top_subs_to_keep=20,
+        )
+        del _
+        gc.collect()
+
         info(f"B...")
         ix_b = self.df_subs_agg_b.index.droplevel('subreddit_id')
         self.df_subs_agg_b_similarity = pd.DataFrame(
@@ -823,6 +836,13 @@ class AggregateEmbeddings:
         )
         self.df_subs_agg_b_similarity.columns.name = None
         info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
+        _, self.df_subs_agg_b_similarity_pair = reshape_distances_to_pairwise_bq(
+            df_distance_matrix=self.df_subs_agg_b_similarity,
+            df_sub_metadata=self.df_subs_meta,
+            top_subs_to_keep=20,
+        )
+        del _
+        gc.collect()
 
         info(f"C...")
         ix_c = self.df_subs_agg_c.index.droplevel('subreddit_id')
@@ -833,6 +853,13 @@ class AggregateEmbeddings:
         )
         self.df_subs_agg_c_similarity.columns.name = None
         info(f"  {self.df_subs_agg_c_similarity.shape} <- df_subs_agg_c_similarity.shape")
+        _, self.df_subs_agg_c_similarity_pair = reshape_distances_to_pairwise_bq(
+            df_distance_matrix=self.df_subs_agg_c_similarity,
+            df_sub_metadata=self.df_subs_meta,
+            top_subs_to_keep=20,
+        )
+        del _
+        gc.collect()
 
         elapsed_time(start_time=t_start_method, log_label='Total for _calculate_subreddit_similarities()', verbose=True)
 
