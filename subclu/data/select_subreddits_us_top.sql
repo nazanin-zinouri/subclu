@@ -3,20 +3,24 @@
 -- Create table with selected subs for subs with a active flag &/or an activity threshold
 -- NOTE: we can't use the Geo-relevant table because it doesn't seem like the US is part of these queries
 --    For now, using simply subs with most views/posts & excluding those where over_18 = f
-DECLARE partition_date DATE DEFAULT '2021-06-14';
+DECLARE partition_date DATE DEFAULT '2021-07-07';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE min_users_l7 NUMERIC DEFAULT 800;
-DECLARE min_posts_l28 NUMERIC DEFAULT 70;
+DECLARE min_users_l7 NUMERIC DEFAULT 100;
+DECLARE min_posts_l28 NUMERIC DEFAULT 40;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210709`
 AS (
 
 WITH selected_subs AS (
 SELECT
     asr.subreddit_name
+
+    # Use for checks but drop for prod to reduce name conflicts
     # , acs.* EXCEPT( subreddit_name)
+    # , asr.posts_l28
+    # , asr.comments_l28
 
 FROM (
     SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
@@ -38,8 +42,11 @@ LEFT JOIN (
 WHERE 1=1
     AND asr.users_l7 >= min_users_l7
     AND asr.posts_l28 >= min_posts_l28
-    AND acs.active = True
     AND slo.over_18 = "f"
+
+    # Exclude active flag for now... it kills off a lot of subs that might be interesting
+    # AND acs.active = True
+
 ),
 
 subreddit_lookup AS (
@@ -189,7 +196,7 @@ ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 #     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
 #     , SUM(posts_l28)    AS total_posts_l28
 #     , SUM(comments_l28) AS total_comments_l28
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210709`
 
 -- Inspect data (w/o some text cols)
 # SELECT
@@ -198,7 +205,7 @@ ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 #     subreddit_description,
 #     subreddit_name_title_and_clean_descriptions
 #     )
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210709`
 # ;
 
 
@@ -207,10 +214,10 @@ ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 # 1) URI date folder
 # 2) source table
 # EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/subreddits/2021-06-16/*.parquet',
+#   uri='gs://i18n-subreddit-clustering/subreddits/top/2021-07-09/*.parquet',
 #   format='PARQUET',
 #   overwrite=true
 #   ) AS
 # SELECT *
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210616`
+# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210709`
 # ;
