@@ -3,11 +3,12 @@
 
 -- Turns out that the language_detect_v2 table doesn't have unique posts/comments
 --    so we have to create an intermediary table to remove duplicates
--- Select POSTS + detected language for topic modeling
--- Ambassador program only started around 05-01 so try to get data that includes posts after that date
+-- Select COMMENTS + detected language for topic modeling
 DECLARE start_date DATE DEFAULT '2021-06-01';
 DECLARE end_date DATE DEFAULT '2021-07-07';
-DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 20;
+DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 10;
+DECLARE MAX_COMMENTS_PER_POST NUMERIC DEFAULT 11;
+
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210709`
 PARTITION BY submit_date
@@ -37,7 +38,6 @@ SELECT
     , sp.post_nsfw
 
     -- Meta about subreddit
-    , gs.subreddit_geo_country_code
     # , gs.combined_topic
     , gs.combined_topic_and_rating
     # , gs.rating
@@ -47,7 +47,7 @@ SELECT
     , sp.comment_body_text
 
 -- Start with selected posts to reduce orphan comments
-FROM `reddit-employee-datasets.david_bermejo.subclu_posts_de_all_20210616` AS gs
+FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210709` AS gs
 
 LEFT JOIN `data-prod-165221.cnc.successful_comments` AS sp
     ON gs.subreddit_name = sp.subreddit_name
@@ -85,7 +85,6 @@ SELECT
     , tl.geolocation_country_code
 
     -- Meta about subreddit
-    , geo.subreddit_geo_country_code
     , geo.combined_topic_and_rating
 
     # Language predictions
@@ -133,12 +132,28 @@ FROM (
         ) row_num
     FROM tl_with_meta
 )
-
 WHERE row_num = 1
+),
+
+-- Instead of picking all comments, limit to N comments per post
+tl_unique_with_meta_top_comments AS (
+SELECT
+    tl.* EXCEPT(rank_comment_in_post)
+
+FROM (
+    SELECT
+        *
+        , CHAR_LENGTH(comment_body_text) AS comment_text_len
+        , ROW_NUMBER() OVER(PARTITION BY post_id ORDER BY upvotes DESC) AS rank_comment_in_post
+    FROM tl_unique_with_meta
+) AS tl
+
+WHERE 1=1
+    AND tl.rank_comment_in_post <= MAX_COMMENTS_PER_POST
+    AND tl.comment_text_len >= MIN_COMMENT_LEN
 
 ORDER BY post_id
 )
-
 
 
 -- This is the de-duped table used for modeling
@@ -149,16 +164,30 @@ SELECT
 
 FROM (
     SELECT *
-        , CHAR_LENGTH(comment_body_text) AS comment_text_len
         , array_length(regexp_extract_all(comment_body_text, r"\b\w+\b")) comment_text_word_count
 
     FROM tl_unique_with_meta
 )
 
-WHERE comment_text_len >= MIN_COMMENT_LEN
-
 ) -- close create table parens
 ;
+
+
+# SELECT
+#     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+#     , COUNT(DISTINCT post_id) AS post_id_unique_count
+#     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
+#     , COUNT(*)        AS total_rows
+# FROM tl_unique_with_meta
+# ;
+
+# SELECT
+#     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+#     , COUNT(DISTINCT post_id) AS post_id_unique_count
+#     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
+#     , COUNT(*)        AS total_rows
+# FROM tl_unique_with_meta_top_comments
+# ;
 
 
 -- Export data to google cloud storage (GCS)
@@ -184,15 +213,6 @@ WHERE comment_text_len >= MIN_COMMENT_LEN
 # FROM geo
 # ;
 
-
--- Count checks
-# SELECT
-#     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
-#     , COUNT(DISTINCT post_id) AS post_id_unique_count
-#     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
-#     , COUNT(*)        AS total_rows
-# FROM tl_unique_with_meta
-# ;
 
 
 -- Find users with lots of posts, as proxy to investigate bots
