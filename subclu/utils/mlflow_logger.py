@@ -283,6 +283,35 @@ def save_and_log_config(
         logging.warning(f"Could not save config to JSON. \n{e}")
 
 
+def save_df_to_parquet_in_chunks(
+        df: pd.DataFrame,
+        path: Union[str, Path],
+        target_MB_size: int = 40,
+) -> None:
+    """
+    TODO(djb)
+
+    Something similar to what I did in vectorize_text might be the way to go.
+    Tried using dask, but it doesn't support multi-index dataframes...
+    Maybe it's ok to reset_index and I can set it again on read?
+
+    TODO: Might need to create a data-loader class that can read & reset index for embeddings dfs
+
+    For reference, BigQuery dumped 75 files for ~1 million comments, each file is ~4MB
+    """
+    # if memory is < 2 * target_MB_size, save as a single file
+    # else, create dask df with partition count based on target MB size
+    #   then save dask DF, expected that dask will save using partitions
+    if batch_size is None:
+        iteration_chunks = None
+    elif batch_size >= len(df):
+        iteration_chunks = None
+    else:
+        iteration_chunks = range(1 + len(df) // batch_size)
+
+    for i in tqdm(iteration_chunks):
+        print(df.iloc[i * batch_size:(i + 1) * batch_size])
+
 #
 # ~ fin
 #
