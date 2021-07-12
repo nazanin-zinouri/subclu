@@ -25,6 +25,7 @@ from pathlib import Path
 import subprocess
 from typing import List, Union
 
+from dask import dataframe as dd
 import mlflow
 from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
@@ -283,34 +284,50 @@ def save_and_log_config(
         logging.warning(f"Could not save config to JSON. \n{e}")
 
 
-def save_df_to_parquet_in_chunks(
+def save_pd_df_to_parquet_in_chunks(
         df: pd.DataFrame,
         path: Union[str, Path],
-        target_MB_size: int = 40,
+        target_mb_size: int = None,
+        write_index: bool = True,
 ) -> None:
     """
     TODO(djb)
 
-    Something similar to what I did in vectorize_text might be the way to go.
-    Tried using dask, but it doesn't support multi-index dataframes...
+    Dask doesn't support multi-index dataframes, so you need to reset_index()
+    before calling this function.
     Maybe it's ok to reset_index and I can set it again on read?
 
     TODO: Might need to create a data-loader class that can read & reset index for embeddings dfs
 
     For reference, BigQuery dumped 75 files for ~1 million comments, each file is ~4MB
     """
-    # if memory is < 2 * target_MB_size, save as a single file
-    # else, create dask df with partition count based on target MB size
-    #   then save dask DF, expected that dask will save using partitions
-    if batch_size is None:
-        iteration_chunks = None
-    elif batch_size >= len(df):
-        iteration_chunks = None
-    else:
-        iteration_chunks = range(1 + len(df) // batch_size)
+    mem_usage_mb = df.memory_usage(deep=True).sum() / 1048576
 
-    for i in tqdm(iteration_chunks):
-        print(df.iloc[i * batch_size:(i + 1) * batch_size])
+    info(f"{mem_usage_mb:4,.1f} MB <- Memory usage")
+
+    if target_mb_size is None:
+        if mem_usage_mb < 100:
+            target_mb_size = 30
+        elif 100 <= mem_usage_mb < 1000:
+            target_mb_size = 40
+        elif 1000 <= mem_usage_mb < 3000:
+            target_mb_size = 60
+        else:
+            target_mb_size = 75
+
+    n_dask_partitions = int(mem_usage_mb // target_mb_size)
+
+    info(f"{target_mb_size} <- target MB partition size"
+         f"\n{n_dask_partitions} <- target Dask partitions"
+         )
+
+    info(f"Saving parquet files to: {path}...")
+    (
+        dd.from_pandas(df, npartitions=n_dask_partitions)
+        .to_parquet(path, write_index=write_index)
+    )
+
+
 
 #
 # ~ fin
