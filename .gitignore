@@ -142,6 +142,7 @@ dmypy.json
 
 # exclude testing/scratch notebooks
 *djb*-IGNORE.*py*
+*djb*ignore/
 
 # mlflow experiments (parameters, metrics, &/or data)
 *mlruns/
