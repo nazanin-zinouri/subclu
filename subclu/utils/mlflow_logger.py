@@ -25,6 +25,7 @@ from pathlib import Path
 import subprocess
 from typing import List, Union
 
+from google.cloud import storage
 from dask import dataframe as dd
 import mlflow
 from mlflow.utils import mlflow_tags
@@ -216,7 +217,7 @@ class MlflowLogger:
             run_id: str,
             artifact_folder: str,
             experiment_ids: Union[str, int, List[int]] = None,
-            read_function: callable = pd.read_parquet,
+            read_function: Union[callable, str] = 'pd_parquet',
             columns: iter = None,
     ):
         """
@@ -225,6 +226,20 @@ class MlflowLogger:
             pd.read_parquet(f"{artifact_uri}/{folder_vect_subs}")
         )
         """
+        # set some defaults for common file types so we don't have to load
+        if isinstance(read_function, str):
+            if 'pd_parquet' == read_function:
+                read_function = pd.read_parquet
+            elif 'pd_csv' == read_function:
+                read_function = pd.read_csv
+            elif 'dask_parquet' == read_function:
+                read_function = dd.read_parquet
+            elif 'json' == read_function:
+                read_function = json.loads
+
+            else:
+                raise NotImplementedError(f"{read_function} Not implemented...")
+
         # first get a df for all runs
         # logging.info(f"  Getting all runs...")
         df_all_runs = self.search_all_runs(experiment_ids=experiment_ids)
@@ -233,11 +248,25 @@ class MlflowLogger:
             df_all_runs['run_id'] == run_id,
             'artifact_uri'
         ].values[0]
-        try:
-            return read_function(f"{artifact_uri}/{artifact_folder}",
-                                 columns=columns)
-        except TypeError:
-            return read_function(f"{artifact_uri}/{artifact_folder}")
+        if json.loads != read_function:
+            try:
+                return read_function(f"{artifact_uri}/{artifact_folder}",
+                                     columns=columns)
+            except TypeError:
+                return read_function(f"{artifact_uri}/{artifact_folder}")
+        else:
+            # load JSON file might be able to use it with other functions, but might
+            #  take a long time depending on file size.
+            # A single JSON file with ~11 rows can take 2+ seconds to load
+            storage_client = storage.Client()
+            parsed_uri = artifact_uri.replace('gs://', '').split('/')
+            artifact_prefix = '/'.join(parsed_uri[1:])
+
+            bucket = storage_client.get_bucket(parsed_uri[0])
+            blob = bucket.blob(f"{artifact_prefix}/{artifact_folder}")
+
+            # Download the contents of the blob as a string and parse it using json.loads() method
+            return read_function(blob.download_as_string(client=None))
 
 
 def get_git_hash() -> str:
@@ -267,8 +296,8 @@ def save_and_log_config(
 ) -> None:
     """Take a dictionary config, save it locally, then log as parms & as artifact mlflow"""
     info(f"  Saving config to local path...")
-    f_joblib = Path(local_path) / f'config.gz'
-    f_json = Path(local_path) / f'config.json'
+    f_joblib = Path(local_path) / f'{name_for_artifact_folder}.gz'
+    f_json = Path(local_path) / f'{name_for_artifact_folder}.json'
 
     joblib.dump(config, f_joblib)
 
@@ -303,7 +332,7 @@ def save_pd_df_to_parquet_in_chunks(
     """
     mem_usage_mb = df.memory_usage(deep=True).sum() / 1048576
 
-    info(f"{mem_usage_mb:4,.1f} MB <- Memory usage")
+    info(f"  {mem_usage_mb:6,.1f} MB <- Memory usage")
 
     if target_mb_size is None:
         if mem_usage_mb < 100:
@@ -315,13 +344,13 @@ def save_pd_df_to_parquet_in_chunks(
         else:
             target_mb_size = 75
 
-    n_dask_partitions = int(mem_usage_mb // target_mb_size)
+    n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
 
-    info(f"{target_mb_size} <- target MB partition size"
-         f"\n{n_dask_partitions} <- target Dask partitions"
+    info(f"  {n_dask_partitions:6,.1f} <- target Dask partitions"
+         f"\t {target_mb_size:6,.1f} <- target MB partition size"
          )
 
-    info(f"Saving parquet files to: {path}...")
+    # info(f"Saving parquet files to:\n  {path}...")
     (
         dd.from_pandas(df, npartitions=n_dask_partitions)
         .to_parquet(path, write_index=write_index)
