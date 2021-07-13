@@ -22,7 +22,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from ..data.data_loaders import LoadSubreddits, LoadPosts, LoadComments
 from ..data.transform_distance_data_for_bq import reshape_distances_to_pairwise_bq
-from ..utils.mlflow_logger import MlflowLogger
+from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
 from ..utils import mlflow_logger
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time, value_counts_and_pcts
@@ -210,7 +210,7 @@ class AggregateEmbeddings:
             gc.collect()
 
         # ---------------------
-        # TODO(djb): Merge all comments at post-level
+        # Merge all comments at post-level
         # Weights by:
         # - text len or word count (how to account for emoji & ASCII art?)
         #     - Word count regex breaks b/c it doesn't work on non-latin alphabets
@@ -241,11 +241,11 @@ class AggregateEmbeddings:
         # ---
 
         # ---------------------
-        # TODO(djb): Merge at subreddit-level
+        # Merge at subreddit-level
         #  - A) posts only
         #  - B) posts + comments only
         #  - C) posts + comments + subreddit description
-        # TODO(djb): Weights by:
+        # TODO(djb): Create weighted embeddings - Weights by:
         # - text len or word count (how to account for emoji & ASCII art?)
         #     - Word count regex breaks b/c it doesn't work on non-latin alphabets
         # - number of up-votes
@@ -255,7 +255,7 @@ class AggregateEmbeddings:
         self._agg_post_aggregates_to_subreddit_level()
 
         # ---------------------
-        # TODO(djb): Calculate subreddit similarity/distance
+        # Calculate subreddit similarity/distance
         # ---
         self._calculate_subreddit_similarities()
 
@@ -264,9 +264,9 @@ class AggregateEmbeddings:
         #  TODO(djb): when saving a df to parquet, save in multiple files, otherwise
         #   reading from a single file can take over 1 minute for ~1.2 million rows
         #   maybe use dask to save dfs?
-
-        # TODO log dataframes subfolder to mlflow (one call) to preserve subfolder structure
+        # TODO log dataframes subfolder to mlflow (one call) to preserve subfolder structure?
         #   i.e., Call mlflow log artifacts on whole subfolder
+        self._save_and_log_aggregate_and_similarity_dfs()
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_agg_embed, log_label='Total Agg fxn time', verbose=True)
@@ -817,6 +817,7 @@ class AggregateEmbeddings:
             columns=ix_a,
         )
         self.df_subs_agg_a_similarity.columns.name = None
+        self.df_subs_agg_a_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_a_similarity.shape} <- df_subs_agg_a_similarity.shape")
 
         _, self.df_subs_agg_a_similarity_pair = reshape_distances_to_pairwise_bq(
@@ -835,6 +836,7 @@ class AggregateEmbeddings:
             columns=ix_b,
         )
         self.df_subs_agg_b_similarity.columns.name = None
+        self.df_subs_agg_b_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
         _, self.df_subs_agg_b_similarity_pair = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_b_similarity,
@@ -852,16 +854,96 @@ class AggregateEmbeddings:
             columns=ix_c,
         )
         self.df_subs_agg_c_similarity.columns.name = None
+        self.df_subs_agg_c_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_c_similarity.shape} <- df_subs_agg_c_similarity.shape")
         _, self.df_subs_agg_c_similarity_pair = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_c_similarity,
             df_sub_metadata=self.df_subs_meta,
+            index_name='subreddit_name',
             top_subs_to_keep=20,
         )
         del _
         gc.collect()
 
         elapsed_time(start_time=t_start_method, log_label='Total for _calculate_subreddit_similarities()', verbose=True)
+
+    def _save_and_log_aggregate_and_similarity_dfs(self):
+        """use custom function to save dfs in multiple files & log them to mlflow"""
+        info(f"-- Start _save_and_log_aggregate_and_similarity_dfs() method --")
+        t_start_method = datetime.utcnow()
+        # Merged at post-level
+        #  - B) post + comments
+        #  - C) post + comments + subreddit description
+
+        # Merged at subreddit-level
+        #  - A) posts only
+        #  - B) posts + comments only
+        #  - C) posts + comments + subreddit description
+
+        # Subreddit-similarities AND pairs (same as subreddit-level)
+        #  - A) posts only
+        #  - B) posts + comments only
+        #  - C) posts + comments + subreddit description
+
+        d_dfs_to_save = {
+            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
+            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
+
+            'df_sub_level_agg_a_post_only': self.df_subs_agg_a,
+            'df_sub_level_agg_a_post_only_similarity': self.df_subs_agg_a_similarity,
+            'df_sub_level_agg_a_post_only_similarity_pair': self.df_subs_agg_a_similarity_pair,
+
+            'df_sub_level_agg_b_post_and_comments': self.df_subs_agg_b,
+            'df_sub_level_agg_b_post_and_comments_similarity': self.df_subs_agg_b_similarity,
+            'df_sub_level_agg_b_post_and_comments_similarity_pair': self.df_subs_agg_b_similarity_pair,
+
+            'df_sub_level_agg_c_post_comments_and_sub_desc': self.df_subs_agg_c,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity': self.df_subs_agg_c_similarity,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair': self.df_subs_agg_c_similarity_pair,
+        }
+
+        # create dict to make it easier to reload dataframes logged as artifacts
+        # e.g., we should be able to get a list of the expected df subfolders even if we change the name of a folder
+        d_dfs_folders_to_log = {k: k for k in d_dfs_to_save.keys()}
+        mlflow_logger.save_and_log_config(
+            config=d_dfs_folders_to_log,
+            local_path=self.path_local_model,
+            name_for_artifact_folder='d_logged_dfs_subfolders',
+        )
+
+        for folder_, df_ in tqdm(d_dfs_to_save.items()):
+            info(f"** {folder_} **")
+
+            info(f"Saving locally...")
+            path_sub_local = self.path_local_model / folder_
+
+            if folder_.endswith('_similarity'):
+                info(f"Keeping index intact...")
+                rows_, cols_ = df_.shape
+                save_pd_df_to_parquet_in_chunks(
+                    df=df_,
+                    path=path_sub_local,
+                    write_index=True,
+                )
+            else:
+                rows_, cols_ = df_.reset_index().shape
+                save_pd_df_to_parquet_in_chunks(
+                    df=df_.reset_index(),
+                    path=path_sub_local,
+                    write_index=False,
+                )
+
+            mlflow.log_metrics(
+                {f"{folder_}-rows": rows_,
+                 f"{folder_}-cols": cols_,
+                 }
+            )
+
+            info(f"Logging artifact to mlflow...")
+            mlflow.log_artifacts(path_sub_local, artifact_path=folder_)
+
+        elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()', verbose=True)
+
 
 
 
