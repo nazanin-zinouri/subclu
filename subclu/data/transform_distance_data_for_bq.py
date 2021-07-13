@@ -219,6 +219,7 @@ def reshape_distances_to_pairwise_bq(
         df_distance_matrix: pd.DataFrame,
         df_sub_metadata: pd.DataFrame,
         col_new_manual_topic: str = 'manual_topic_and_rating',
+        index_name: str = 'subreddit_name',
         top_subs_to_keep: int = 20,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -231,67 +232,79 @@ def reshape_distances_to_pairwise_bq(
     # Bigquery will read the index as a column, so let's set our own rather than getting a weird
     #  column like `__index_level_0__`
     """
+    # Rename index & column names, BEFORE .unstack() to prevent name collisions
+    #  i.e., if they both have the same name, we'll get a ValueError
+
     # Reshape distances to pair-wise & rename columns
     df_dist_pair = (
-        df_distance_matrix.unstack()
+        df_distance_matrix
+        .rename_axis(f'{index_name}_a', axis='columns')
+        .rename_axis(f'{index_name}_b', axis='index')
+        .unstack()
         .reset_index()
         .rename(
-            columns={'level_0': 'subreddit_name_a',
-                     'level_1': 'subreddit_name_b',
-                     0: 'cosine_distance',
-                     }
+            columns={
+                # 'level_0': 'subreddit_name_a',
+                # 'level_1': 'subreddit_name_b',
+                0: 'cosine_distance',
+            }
         )
         .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
     )
     df_dist_pair = df_dist_pair[df_dist_pair['subreddit_name_a'] != df_dist_pair['subreddit_name_b']]
 
-    # Merge meta with similarity dfs
-    # ===
-    info(f"Merge distance + metadata...")
-    l_meta_basic = [
-        'subreddit_name',
-        'subreddit_id',
-        col_new_manual_topic,
-        'German_posts_percent',
-        'post_median_word_count',
-    ]
-    df_dist_pair_meta = (
-        df_dist_pair
-        .merge(
-            df_sub_metadata[l_meta_basic].set_index('subreddit_name'),
-            left_on=['subreddit_name_a'],
-            right_index=True,
+    if df_sub_metadata is not None:
+        # Merge meta with similarity dfs
+        # ===
+        info(f"Merge distance + metadata...")
+        l_meta_basic = [
+            'subreddit_name',
+            'subreddit_id',
+            col_new_manual_topic,
+            'German_posts_percent',
+            'post_median_word_count',
+        ]
+        df_dist_pair = (
+            df_dist_pair
+            .merge(
+                df_sub_metadata[l_meta_basic].set_index('subreddit_name'),
+                left_on=['subreddit_name_a'],
+                right_index=True,
+            )
+            .merge(
+                df_sub_metadata[l_meta_basic].set_index('subreddit_name'),
+                left_on=['subreddit_name_b'],
+                right_index=True,
+                suffixes=('_a', '_b')
+            )
+            .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
         )
-        .merge(
-            df_sub_metadata[l_meta_basic].set_index('subreddit_name'),
-            left_on=['subreddit_name_b'],
-            right_index=True,
-            suffixes=('_a', '_b')
-        )
-        .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
-    )
-    df_dist_pair_meta = df_dist_pair_meta[
+
+    df_dist_pair = df_dist_pair[
         reorder_array(
             ['cosine_distance', 'subreddit_name_a', 'subreddit_name_b'],
-            sorted(df_dist_pair_meta.columns)
+            sorted(df_dist_pair.columns)
         )
     ]
 
     info(f"Create new df to keep only top {top_subs_to_keep} subs by distance...")
-    df_dist_pair_meta_top_only = (
-        df_dist_pair_meta
+    df_dist_pair_top_only = (
+        df_dist_pair
         .sort_values(by=['cosine_distance'], ascending=False)
         .groupby('subreddit_name_a')
         .head(top_subs_to_keep)
         .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
     )
-    info(f"  {df_dist_pair_meta.shape} <- df_dist_pair_meta.shape (before setting index)")
-    info(f"  {df_dist_pair_meta_top_only.shape} <- df_dist_pair_meta_top_only.shape (before setting index)")
+    info(f"  {df_dist_pair.shape} <- df_dist_pair_meta.shape (before setting index)")
+    info(f"  {df_dist_pair.shape} <- df_dist_pair_meta_top_only.shape (before setting index)")
 
-    return (
-        df_dist_pair_meta.set_index(['subreddit_id_a', 'subreddit_id_b']),
-        df_dist_pair_meta_top_only.set_index(['subreddit_id_a', 'subreddit_id_b'])
-    )
+    try:
+        return (
+            df_dist_pair.set_index(['subreddit_id_a', 'subreddit_id_b']),
+            df_dist_pair_top_only.set_index(['subreddit_id_a', 'subreddit_id_b'])
+        )
+    except KeyError:
+        return df_dist_pair, df_dist_pair_top_only
 
 
 # TODO(djb) make it a script to run from command line?

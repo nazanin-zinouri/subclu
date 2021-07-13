@@ -346,7 +346,7 @@ def save_pd_df_to_parquet_in_chunks(
 
     n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
 
-    info(f"  {n_dask_partitions:6,.1f} <- target Dask partitions"
+    info(f"  {n_dask_partitions:6,.0f}\t<- target Dask partitions"
          f"\t {target_mb_size:6,.1f} <- target MB partition size"
          )
 
