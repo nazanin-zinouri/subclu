@@ -520,19 +520,25 @@ class AggregateEmbeddings:
                         axis=0,
                     )
                 gc.collect()
-            except MemoryError:
-                df_with_error_ids = (
-                    df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
-                    .drop_duplicates()
-                )
-                logging.error(
-                    f"MemoryError!"
-                    f"\n  {id_} -> Post ID"
-                    f"\n  {df.shape} -> df_.shape"
-                    f"\n  {df_with_error_ids} -> df_ IDs"
-                )
-                del df
-                gc.collect()
+            except MemoryError as me_:
+                try:
+
+                    df_with_error_ids = (
+                        df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
+                        .drop_duplicates()
+                    )
+                    logging.error(
+                        f"MemoryError!"
+                        f"\n  {id_} -> Post ID"
+                        f"\n  {df.shape} -> df_.shape"
+                        f"\n  {df_with_error_ids} -> df_ IDs"
+                    )
+                    del df
+                    gc.collect()
+                except UnboundLocalError:
+                    logging.error(f"Memory error when calculating aggregate weighted mean"
+                                  f"\n{me_}")
+                    raise MemoryError
 
             df_agg_multi_comments = pd.DataFrame(d_weighted_mean_agg).T
             df_agg_multi_comments.columns = l_embedding_cols
