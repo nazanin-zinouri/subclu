@@ -7,7 +7,7 @@ Vectorize text > Aggregate embeddings > Compress embeddings | Cluster posts | Cl
 """
 from datetime import datetime, timedelta
 import gc
-# import logging
+import logging
 from logging import info
 # import os
 from pathlib import Path
@@ -493,44 +493,11 @@ class AggregateEmbeddings:
             )
             info(f"  {(~mask_single_comments).sum():9,.0f} <- Comments to use for weighted average")
 
-            # WIP: code from notebook that crashed
-            # mem_usage_mb = job_agg2.df_v_comments.memory_usage(deep=True).sum() / 1048576
-            # info(f"  {mem_usage_mb:6,.1f} MB <- Memory usage")
-            #
-            # if mem_usage_mb < 50:
-            #     target_mb_size = 30
-            # elif 100 <= mem_usage_mb < 500:
-            #     target_mb_size = 40
-            # elif 1000 <= mem_usage_mb < 1000:
-            #     target_mb_size = 60
-            # else:
-            #     target_mb_size = 75
-            #
-            # n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
-            #
-            # info(f"  {n_dask_partitions:6,.0f}\t<- target Dask partitions"
-            #      f"\t {target_mb_size:6,.1f} <- target MB partition size"
-            #      )
-            # l_posts_for_weighted_average = (
-            #     job_agg2.df_v_comments[~mask_single_comments].index.get_level_values('post_id').unique().to_list()
-            # )
-            # ddf_comms_with_weights = (
-            #     dd.from_pandas(
-            #         job_agg2.df_v_comments[~mask_single_comments].reset_index(),
-            #         npartitions=n_dask_partitions,
-            #     )
-            #         .merge(
-            #         dd.from_pandas(
-            #             job_agg2.df_comments_meta[['post_id', job_agg2.agg_comments_to_post_weight_col]],
-            #             npartitions=n_dask_partitions,
-            #         ),
-            #         how='left',
-            #         on=['post_id']
-            #     )
-            # )
-
             # TODO(djb)/debug: This merge function fails (runs out of memory) when I run on all
             #  comments (around 1.2 million)
+
+            # Merge the comments that need to be averaged with the column that has the weights
+            #  to average out
             df_comms_with_weights = (
                 self.df_v_comments[~mask_single_comments]
                 .reset_index()
@@ -545,26 +512,27 @@ class AggregateEmbeddings:
             #  ~100k comments
             #  maybe instead of aggregating all comments at once only batch comments for one subreddit at a time
             d_weighted_mean_agg = dict()
-            # ddf_groups = ddf_comms_with_weights.groupby(['post_id'])
-            # __iter__ is not implemented in dask... so we need to explicitly call each group ourselves
-            #  *sigh*...
-            # see: https://github.com/dask/dask/issues/5124#issuecomment-524384571
-            # for id_ in tqdm(l_posts_for_weighted_average):
-            #     df_ = ddf_groups.get_group(id_).compute()
-            #
-            #     d_weighted_mean_agg[id_] = np.average(
-            #         df_[l_embedding_cols],
-            #         weights=np.log(2 + df_[job_agg2.agg_comments_to_post_weight_col]),
-            #         axis=0,
-            #     )
-
-            for id_, df in tqdm(df_comms_with_weights.groupby('post_id')):
-                d_weighted_mean_agg[id_] = np.average(
-                    df[l_embedding_cols],
-                    weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
-                    axis=0,
+            try:
+                for id_, df in tqdm(df_comms_with_weights.groupby('post_id')):
+                    d_weighted_mean_agg[id_] = np.average(
+                        df[l_embedding_cols],
+                        weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
+                        axis=0,
+                    )
+                gc.collect()
+            except MemoryError:
+                df_with_error_ids = (
+                    df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
+                    .drop_duplicates()
                 )
-            gc.collect()
+                logging.error(
+                    f"MemoryError!"
+                    f"\n  {id_} -> Post ID"
+                    f"\n  {df.shape} -> df_.shape"
+                    f"\n  {df_with_error_ids} -> df_ IDs"
+                )
+                del df
+                gc.collect()
 
             df_agg_multi_comments = pd.DataFrame(d_weighted_mean_agg).T
             df_agg_multi_comments.columns = l_embedding_cols
@@ -1007,7 +975,59 @@ class AggregateEmbeddings:
 
 
 
+"""
+Out of memory testing using dask
 
+            # WIP: code from notebook that crashed
+            # mem_usage_mb = job_agg2.df_v_comments.memory_usage(deep=True).sum() / 1048576
+            # info(f"  {mem_usage_mb:6,.1f} MB <- Memory usage")
+            #
+            # if mem_usage_mb < 50:
+            #     target_mb_size = 30
+            # elif 100 <= mem_usage_mb < 500:
+            #     target_mb_size = 40
+            # elif 1000 <= mem_usage_mb < 1000:
+            #     target_mb_size = 60
+            # else:
+            #     target_mb_size = 75
+            #
+            # n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
+            #
+            # info(f"  {n_dask_partitions:6,.0f}\t<- target Dask partitions"
+            #      f"\t {target_mb_size:6,.1f} <- target MB partition size"
+            #      )
+            # l_posts_for_weighted_average = (
+            #     job_agg2.df_v_comments[~mask_single_comments].index.get_level_values('post_id').unique().to_list()
+            # )
+            # ddf_comms_with_weights = (
+            #     dd.from_pandas(
+            #         job_agg2.df_v_comments[~mask_single_comments].reset_index(),
+            #         npartitions=n_dask_partitions,
+            #     )
+            #         .merge(
+            #         dd.from_pandas(
+            #             job_agg2.df_comments_meta[['post_id', job_agg2.agg_comments_to_post_weight_col]],
+            #             npartitions=n_dask_partitions,
+            #         ),
+            #         how='left',
+            #         on=['post_id']
+            #     )
+            # )
+            
+            # ddf_groups = ddf_comms_with_weights.groupby(['post_id'])
+            # __iter__ is not implemented in dask... so we need to explicitly call each group ourselves
+            #  *sigh*...
+            # see: https://github.com/dask/dask/issues/5124#issuecomment-524384571
+            # for id_ in tqdm(l_posts_for_weighted_average):
+            #     df_ = ddf_groups.get_group(id_).compute()
+            #
+            #     d_weighted_mean_agg[id_] = np.average(
+            #         df_[l_embedding_cols],
+            #         weights=np.log(2 + df_[job_agg2.agg_comments_to_post_weight_col]),
+            #         axis=0,
+            #     )
+
+"""
 
 
 # def get_groupby_weighted_average(
