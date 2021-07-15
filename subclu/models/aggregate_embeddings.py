@@ -508,15 +508,26 @@ class AggregateEmbeddings:
                 )
             )
 
-            # TODO(djb)/debug: This iter fxn fails (runs out of memory) when I run on
-            #  ~100k comments
-            #  maybe instead of aggregating all comments at once only batch comments for one subreddit at a time
+            # TODO(djb)/refactor?: This loop used to fail (runs out of memory) with 300k+ comments
+            #  temp fix: so instead all comments at once only batch comments for one subreddit at a time
+            #    however, that's not very efficient because some subs only have 10 posts and others have 1k+
+            #  Next fixes
+            #    - create batches of 750 posts at a time
+            #    - limit number of comments per post (e.g., only keep "top" 20 comments?)
+            #  Example:
+            #  - create df: post count per subreddit
+            #  - sort df descending by post count
+            #  - subreddits with more than 500 posts to aggregate, process by themselves
+            #  - for subreddits with fewer than 500 posts:
+            #    - iteratively (recursively?) do a cumulative sum until we reach 500 posts & process
+            #      that group of subreddits at the same time
             d_weighted_mean_agg = dict()
-            # TODO(djb): create loop to calculate aggregates for each subreddit
             for sub_ in tqdm(df_comms_with_weights['subreddit_name'].unique()):
                 mask_sub = df_comms_with_weights['subreddit_name'] == sub_
                 try:
                     for id_, df in tqdm(df_comms_with_weights[mask_sub].groupby('post_id')):
+                        # TODO(djb): add limit of comments per post
+                        #   sort by upvotes (desc) & text len (descending) -> keep only top 20 comments
                         d_weighted_mean_agg[id_] = np.average(
                             df[l_embedding_cols],
                             weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
@@ -526,7 +537,6 @@ class AggregateEmbeddings:
                     gc.collect()
                 except MemoryError as me_:
                     try:
-
                         df_with_error_ids = (
                             df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
                             .drop_duplicates()
