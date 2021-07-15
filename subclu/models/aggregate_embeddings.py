@@ -512,35 +512,41 @@ class AggregateEmbeddings:
             #  ~100k comments
             #  maybe instead of aggregating all comments at once only batch comments for one subreddit at a time
             d_weighted_mean_agg = dict()
-            try:
-                for id_, df in tqdm(df_comms_with_weights.groupby('post_id')):
-                    d_weighted_mean_agg[id_] = np.average(
-                        df[l_embedding_cols],
-                        weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
-                        axis=0,
-                    )
-                gc.collect()
-            except MemoryError as me_:
+            # TODO(djb): create loop to calculate aggregates for each subreddit
+            for sub_ in tqdm(df_comms_with_weights['subreddit_name'].unique()):
+                mask_sub = df_comms_with_weights['subreddit_name'] == sub_
                 try:
-
-                    df_with_error_ids = (
-                        df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
-                        .drop_duplicates()
-                    )
-                    logging.error(
-                        f"MemoryError!"
-                        f"\n  {id_} -> Post ID"
-                        f"\n  {df.shape} -> df_.shape"
-                        f"\n  {df_with_error_ids} -> df_ IDs"
-                    )
+                    for id_, df in tqdm(df_comms_with_weights[mask_sub].groupby('post_id')):
+                        d_weighted_mean_agg[id_] = np.average(
+                            df[l_embedding_cols],
+                            weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
+                            axis=0,
+                        )
                     del df
                     gc.collect()
-                except UnboundLocalError:
-                    logging.error(f"Memory error when calculating aggregate weighted mean"
-                                  f"\n{me_}")
-                    raise MemoryError
+                except MemoryError as me_:
+                    try:
+
+                        df_with_error_ids = (
+                            df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
+                            .drop_duplicates()
+                        )
+                        logging.error(
+                            f"MemoryError!"
+                            f"\n  {id_} -> Post ID"
+                            f"\n  {df.shape} -> df_.shape"
+                            f"\n  {df_with_error_ids} -> df_ IDs"
+                        )
+                        del df, df_with_error_ids
+                        gc.collect()
+                    except UnboundLocalError:
+                        logging.error(f"Memory error when calculating aggregate weighted mean"
+                                      f"\n{me_}")
+                        raise MemoryError
 
             df_agg_multi_comments = pd.DataFrame(d_weighted_mean_agg).T
+            del d_weighted_mean_agg
+            gc.collect()
             df_agg_multi_comments.columns = l_embedding_cols
             df_agg_multi_comments.index.name = 'post_id'
             info(f"  {df_agg_multi_comments.shape} <- df_agg_multi_comments shape, weighted avg only")
