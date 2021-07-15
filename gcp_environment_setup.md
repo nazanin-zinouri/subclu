@@ -210,8 +210,15 @@ pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 # if resolving takes too long
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --use-deprecated=legacy-resolver
 
+# Each VM might have slightly different uses & requirements, so it's best
+#  to install the specific VM's requirements using [extras]
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]"
+
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]" --use-deprecated=legacy-resolver
+
 # install TF or Torch libraries
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --use-deprecated=legacy-resolver
+
 
 #  For some reason extras don't always work so it's sometimes easier to cd to folder
 cd /home/david.bermejo/repos/subreddit_clustering_i18n
