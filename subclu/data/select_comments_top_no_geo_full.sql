@@ -4,18 +4,26 @@
 -- Turns out that the language_detect_v2 table doesn't have unique posts/comments
 --    so we have to create an intermediary table to remove duplicates
 -- Select COMMENTS + detected language for topic modeling
+
+-- Update checklist:
+-- * start date
+-- * end date
+-- * max posts per sub
+-- * name of new created table (update date)
+-- * table with latest selected subreddits (e.g., subclu_subreddits_top_no_geo_20210709)
+-- * name of newly created table for exporting
+-- * new GCS folder for new table
 DECLARE start_date DATE DEFAULT '2021-06-01';
-DECLARE end_date DATE DEFAULT '2021-07-07';
-DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 10;
-DECLARE MAX_COMMENTS_PER_POST NUMERIC DEFAULT 11;
+DECLARE end_date DATE DEFAULT '2021-07-13';
+DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 11;
+DECLARE MAX_COMMENTS_PER_POST NUMERIC DEFAULT 8;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210709`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210716`
 PARTITION BY submit_date
 AS (
 
-WITH geo AS
-(
+WITH geo AS (
 SELECT
     # Keys & IDS
     gs.subreddit_name
@@ -47,7 +55,12 @@ SELECT
     , sp.comment_body_text
 
 -- Start with selected posts to reduce orphan comments
-FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210709` AS gs
+FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716` AS gs
+-- FROM (
+--     SELECT *
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
+--     LIMIT 20
+-- ) AS gs
 
 LEFT JOIN `data-prod-165221.cnc.successful_comments` AS sp
     ON gs.subreddit_name = sp.subreddit_name
@@ -122,7 +135,9 @@ WHERE geo.user_id NOT IN ("t2_4kh8rj3k")
 
 tl_unique_with_meta AS
 (
-SELECT * EXCEPT (row_num)
+SELECT
+    * EXCEPT (row_num)
+    , CHAR_LENGTH(comment_body_text) AS comment_text_len
 FROM (
     SELECT
         *
@@ -135,24 +150,21 @@ FROM (
 WHERE row_num = 1
 ),
 
--- Instead of picking all comments, limit to N comments per post
 tl_unique_with_meta_top_comments AS (
+-- Instead of picking all comments, limit to top N comments per post
 SELECT
-    tl.* EXCEPT(rank_comment_in_post)
+    tl.*
 
 FROM (
     SELECT
-        *
-        , CHAR_LENGTH(comment_body_text) AS comment_text_len
-        , ROW_NUMBER() OVER(PARTITION BY post_id ORDER BY upvotes DESC) AS rank_comment_in_post
+        ROW_NUMBER() OVER(PARTITION BY post_id ORDER BY upvotes DESC) AS rank_comment_in_post
+        , *
     FROM tl_unique_with_meta
+    WHERE comment_text_len >= MIN_COMMENT_LEN
 ) AS tl
 
-WHERE 1=1
-    AND tl.rank_comment_in_post <= MAX_COMMENTS_PER_POST
-    AND tl.comment_text_len >= MIN_COMMENT_LEN
+WHERE tl.rank_comment_in_post <= MAX_COMMENTS_PER_POST
 
-ORDER BY post_id
 )
 
 
@@ -168,11 +180,10 @@ FROM (
 
     FROM tl_unique_with_meta
 )
-
 ) -- close create table parens
 ;
 
-
+-- Counts for AFTER dropping dupes from language detection table
 # SELECT
 #     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
 #     , COUNT(DISTINCT post_id) AS post_id_unique_count
@@ -181,6 +192,7 @@ FROM (
 # FROM tl_unique_with_meta
 # ;
 
+-- Counts AFTER selecting only top comments
 # SELECT
 #     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
 #     , COUNT(DISTINCT post_id) AS post_id_unique_count
@@ -188,17 +200,13 @@ FROM (
 #     , COUNT(*)        AS total_rows
 # FROM tl_unique_with_meta_top_comments
 # ;
+-- when 20 posts, 10 char min, 10 comments / post:
+-- subreddit_id_unique_count	post_id_unique_count	comment_id_unique_count total_rows
+-- 12 	                        14 	                    70 	                    70
 
-
--- Export data to google cloud storage (GCS)
-# EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/comments/top/2021-07-09/*.parquet',
-#   format='PARQUET',
-#   overwrite=true
-#   ) AS
-# SELECT * EXCEPT (created_timestamp)
-# FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210709`
-# ;
+-- when 20 posts, 11 char min, 9 comments / post:
+-- subreddit_id_unique_count	post_id_unique_count	comment_id_unique_count total_rows
+-- 12 	                        14 	                    41 	                    41
 
 
 -- Check counts in cnc post table
@@ -207,10 +215,32 @@ FROM (
 # SELECT
 #     COUNT(*)                AS total_rows
 #     , COUNT(DISTINCT uuid)  AS uuid_unique
+#     , COUNT(DISTINCT comment_id)  AS comment_id_unique
 #     , COUNT(DISTINCT post_id)  AS post_id_unique
 #     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
 #     , COUNT(DISTINCT user_id)  AS user_id_unique
 # FROM geo
+# ;
+
+
+-- check counts AFTER creating the table
+# SELECT
+#     COUNT(*)                AS total_rows
+#     , COUNT(DISTINCT post_id)  AS post_id_unique
+#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
+#     , COUNT(DISTINCT user_id)  AS user_id_unique
+# FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210716`
+# ;
+
+
+-- Export data to google cloud storage (GCS)
+# EXPORT DATA OPTIONS(
+#   uri='gs://i18n-subreddit-clustering/comments/top/2021-07-16/*.parquet',
+#   format='PARQUET',
+#   overwrite=true
+#   ) AS
+# SELECT * EXCEPT (created_timestamp)
+# FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210716`
 # ;
 
 
