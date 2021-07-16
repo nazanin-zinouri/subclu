@@ -53,6 +53,77 @@ In my case, it is:
 NOTE: When you are logged in via the JupyterLab GUI (HTTPS server), your home directory for JupyterLab will be:
 <br>`/home/jupyter`
 
+
+# Clone repo to JupyterLab. Use: create & edit notebooks
+## Create new SSH key
+Follow github's guide to create an SSH key & add it to your agent.
+- https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
+
+tl;dr:
+0. Open a terminal
+   
+1. Generate new key with a passphrase
+```
+ssh-keygen -t ed25519 -C "your_email@example.com"
+
+# if prompted for location, press enter to write to default
+ Enter a file in which to save the key (/home/you/.ssh/id_ed25519): [Press enter]
+ 
+> Enter passphrase (empty for no passphrase): [Type a passphrase]
+> Enter same passphrase again: [Type passphrase again]
+```
+
+## Add SSH key to ssh-agent
+After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
+```
+eval "$(ssh-agent -s)"
+
+ssh-add ~/.ssh/id_ed25519
+```
+
+Note: you'll be prompted for your git passphrase.
+
+## Add key to github
+github's guide:
+- https://docs.github.com/en/github/authenticating-to-github/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+
+tl;dr:
+shortcut for keys:
+- https://github.snooguts.net/settings/keys
+0. Go to reddit's enterprise github
+1. Click on your user-name (top right corner) > settings
+2. Click on `ssh and gpg keys`
+3. Click on `New SSH key` button
+
+On command line of your new VM:
+4. Copy or open the public key for your new key. For example, open it in `nano` to copy it:
+<br>```nano ~/.ssh/id_ed25519.pub```
+
+5. Paste public key into the `Key` field in github
+6. Add a `title` for the key. Example: `gcp TF machine` 
+
+
+## Set default identity for git
+If you try to pull & push, git might not know which identity to use, run these commands to set the global user/username anytime you do something with git (replace email & name with your own):
+```
+git config --global user.email "david.bermejo@reddit.com"
+git config --global user.name "David Bermejo" 
+```
+
+
+## Clone repo to JupyterLab
+The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:
+`git clone git@github.snooguts.net:david-bermejo/subreddit_clustering_i18n.git`
+
+After you clone, you can cd to the new folder with the repo & use git CLI as usual.
+
+Note: it can be a bit confusing, but the version of the library we install won't be the same one that runs jupyter notebooks
+
+Here's what the JupyterLab file explorer should look like after cloning the repo
+
+![GCP notebook dashboard with available notebooks](images/jupyterlab_folders_after_cloning.png)
+
+
 # PyCharm Setup
 ## Add SSH connection to PyCharm
 The notes below are a summary of Pycharm's detailed guides here:
@@ -108,11 +179,12 @@ After you've set the remote connection you can use the remote interpreter. The n
 <br>https://www.jetbrains.com/help/pycharm/configuring-remote-interpreters-via-ssh.html#ssh
 - Settings ( `⌘` + `,`) > `Python Interpreter` > `Add...` (gear icon)
 - Python interpreter path:
-<br>`opt/conda/bin/python`
+<br>`/opt/conda/bin/python`
 
 ![PyCharm complete configuration for remote SSH interpreter](images/pycharm_python_interpreter_shh_setup.png)
 
 ![PyCharm complete configuration for remote SSH interpreter](images/pycharm_python_interpreter_ssh_complete.png)
+
 
 # Install our module in `editable` mode
 After you have the code for this project on your remote, you can install it as a module.
@@ -121,14 +193,50 @@ Editable makes it easy to continue editing your module and use the updated code 
 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
 
-```
+NOTE: you might need to install it with a `--user` flag in case some of the installed packages create conflicts with native packages
+
+If resolving packages is taking too long, might need to use a flag (in the short term):
+- See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue
+
+`--use-deprecated=legacy-resolver`
+
+
+```bash
 sudo su - david.bermejo
 
+# Install my additional libraries
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 
-# or if you're installing a superset of requirements add `[<extra_name>]`
-pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[torch]
+# if resolving takes too long
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --use-deprecated=legacy-resolver
+
+# Each VM might have slightly different uses & requirements, so it's best
+#  to install the specific VM's requirements using [extras]
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]"
+
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]" --use-deprecated=legacy-resolver
+
+# install TF or Torch libraries
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --use-deprecated=legacy-resolver
+
+
+#  For some reason extras don't always work so it's sometimes easier to cd to folder
+cd /home/david.bermejo/repos/subreddit_clustering_i18n
+pip install -e ".[tensorflow232]" --use-deprecated=legacy-resolver
 ```
+
+
+Try `--user` install if above steps fail **(don't sudo su)**.
+For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library version 
+```bash
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --user --use-deprecated=legacy-resolver
+```
+
+If all else fails, install tensorflow-text directly:
+```bash
+pip install "tensorflow-text==2.3.0" --user
+```
+
 
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
 ```
@@ -136,67 +244,47 @@ In jupyter, you can add this magic at the beginning of a notebook to reload edit
 %autoreload 2
 ```
 
-# Clone repo to JupyterLab. Use: create & edit notebooks
-## Create new SSH key
-Follow github's guide to create an SSH key & add it to your agent.
-- https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
 
-tl;dr:
-0. Open a terminal
-   
-1. Generate new key with a passphrase
-```
-ssh-keygen -t ed25519 -C "your_email@example.com"
+### Reference / weird conflicts & venv things
+The base installation has some weird numpy conflicts so you may need to install as --user:
 
-# if prompted for location, press enter to write to default
- Enter a file in which to save the key (/home/you/.ssh/id_ed25519): [Press enter]
- 
-> Enter passphrase (empty for no passphrase): [Type a passphrase]
-> Enter same passphrase again: [Type passphrase again]
+I tried creating a conda venv, but the venv for david.bermejo doesn't get shared for the `jupyter` user.
+
+```bash
+# find folder with conda/feedstock_root artifacts
+# 2>/dev/null <- hides "permission denied" errors
+find . -type d -name conda 2>/dev/null
 ```
 
+First time set up of conda inside sudo users
+```bash
+sudo su - david.bermejo
 
-## Add SSH key to ssh-agent
-After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
+# create copy of requirements from base requirements
+#python -m pip freeze > base_requirements.txt
+python -m pip list --format=freeze > base_requirements.txt
+
+# append conda path
+export PATH="/opt/conda/bin:$PATH"
+
+# initialize conda
+conda init bash
+
+# close out of terminal & open again (for changes to go through)
+exit
+
+# create a copy of the base environment
+conda create --name subclu_tf --clone base
 ```
-eval "$(ssh-agent -s)"
 
-ssh-add ~/.ssh/id_ed25519
+```bash
+# activate the new env
+conda activate subclu_tf
+
+# Install base libraries that maybe weren't part of conda
+pip install -r base_requirements.txt --use-deprecated=legacy-resolver
+
 ```
-
-Note: you'll be prompted for your git passphrase.
-
-## Add key to github
-github's guide:
-- https://docs.github.com/en/github/authenticating-to-github/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
-
-tl;dr:
-shortcut for keys:
-- https://github.snooguts.net/settings/keys
-0. Go to reddit's enterprise github
-1. Click on your user-name (top right corner) > settings
-2. Click on `ssh and gpg keys`
-3. Click on `New SSH key` button
-
-On command line of your new VM:
-4. Copy or open the public key for your new key. For example, open it in `nano` to copy it:
-<br>```nano ~/.ssh/id_ed25519.pub```
-
-5. Paste public key into the `Key` field in github
-6. Add a `title` for the key. Example: `gcp TF machine` 
-
-
-## Clone repo to JupyterLab
-The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:
-`git clone git@github.snooguts.net:david-bermejo/subreddit_clustering_i18n.git`
-
-After you clone, you can cd to the new folder with the repo & use git CLI as usual.
-
-Note: it can be a bit confusing, but the version of the library we install won't be the same one that runs jupyter notebooks
-
-Here's what the JupyterLab file explorer should look like after cloning the repo
-
-![GCP notebook dashboard with available notebooks](images/jupyterlab_folders_after_cloning.png)
 
 
 # Running mlflow server on GCP
@@ -211,3 +299,10 @@ Need to tunnel into it from local using custom ssh function:
 dj_ssh_mlflow cpu
 ```
 
+# Debugging
+
+**Warning** installing tensorflow-text without pinning existing dependencies can make GPUs unusable. So before installing anything, here's what a blank/raw GPU environment looks like:
+      
+```
+
+```

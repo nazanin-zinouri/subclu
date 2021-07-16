@@ -25,21 +25,57 @@ class LoadPosts:
     def __init__(
             self,
             bucket_name: str = 'i18n-subreddit-clustering',
-            folder_path: str = 'posts/2021-05-19',
+            folder_path: str = 'posts/de/2021-06-16',
             columns: iter = None,
             col_new_manual_topic: str = 'manual_topic_and_rating',
+            col_unique_check: str = 'post_id',
     ):
         self.bucket_name = bucket_name
         self.folder_path = folder_path
-        self.columns = columns
         self.col_new_manual_topic = col_new_manual_topic
+        self.col_unique_check = col_unique_check
+
+        if columns == 'aggregate_embeddings_':
+            self.columns = [
+                # IDs
+                'subreddit_name',
+                'subreddit_id',
+                'post_id',
+
+                # Meta
+                'submit_date',
+                # 'removed',
+                'upvotes',
+                # 'successful',
+                # 'app_name',
+                'combined_topic_and_rating',  # Needed for new manual label
+                'post_type',  # For post aggs
+                # 'post_nsfw',
+                # 'geolocation_country_code',
+
+                # Language & text content
+                # 'post_url',
+                # 'language',
+                # 'probability',
+                'weighted_language', # For language aggs
+                # 'weighted_language_probability',
+                'text_len',
+                'text_word_count',
+                # 'post_url_for_embeddings',
+                # 'text'
+
+            ]
+        else:
+            self.columns = columns
 
     def read_raw(self) -> pd.DataFrame:
         """Read raw files w/o any transformations"""
-        return pd.read_parquet(
+        df = pd.read_parquet(
             path=f"gs://{self.bucket_name}/{self.folder_path}",
             columns=self.columns
         )
+        assert len(df) == df[self.col_unique_check].nunique()
+        return df
 
     def read_and_apply_transformations(self) -> pd.DataFrame:
         """Read & apply all transformations in a single call"""
@@ -85,13 +121,27 @@ class LoadSubreddits(LoadPosts):
     def __init__(
             self,
             bucket_name: str = 'i18n-subreddit-clustering',
-            folder_path: str = 'subreddits/2021-06-01',
-            folder_posts: str = 'posts/2021-05-19',
+            folder_path: str = 'subreddits/de/2021-06-16',
+            folder_posts: str = 'posts/de/2021-06-16',
             columns: iter = None,
-            col_new_manual_topic: str = 'manual_topic_and_rating'
+            col_new_manual_topic: str = 'manual_topic_and_rating',
+            col_unique_check: str = 'subreddit_name',
     ) -> None:
-        super().__init__(bucket_name, folder_path, columns, col_new_manual_topic)
+        super().__init__(
+            bucket_name=bucket_name,
+            folder_path=folder_path,
+            columns=columns,
+            col_new_manual_topic=col_new_manual_topic,
+            col_unique_check=col_unique_check
+        )
         self.folder_posts = folder_posts
+        # TODO(djb)
+        #  over-ride cols, subs are usually small enough that we
+        #  don't have to worry about loading only some cols, but keep in mind for later
+        if columns == 'aggregate_embeddings_':
+            self.columns = columns
+        else:
+            self.columns = columns
 
     def read_apply_transformations_and_merge_post_aggs(
             self,
@@ -144,6 +194,69 @@ class LoadSubreddits(LoadPosts):
         return df_subs.drop(['subreddit_id_post',
                              f"{self.col_new_manual_topic}_post"],
                             axis=1)
+
+
+class LoadComments(LoadPosts):
+    """Build on top of Load Posts to standardize loading subreddit metadata
+
+    No need to over-ride LoadPost function until/unless we want to append
+    post-level aggregates, but that's better handled as a separate function.
+    """
+    def __init__(
+            self,
+            bucket_name: str = 'i18n-subreddit-clustering',
+            folder_path: str = 'comments/de/2021-06-16',
+            folder_posts: str = 'posts/de/2021-06-16',
+            columns: iter = None,
+            col_new_manual_topic: str = 'manual_topic_and_rating',
+            col_unique_check: str = 'comment_id',
+    ) -> None:
+        super().__init__(
+            bucket_name=bucket_name,
+            folder_path=folder_path,
+            columns=columns,
+            col_new_manual_topic=col_new_manual_topic,
+            col_unique_check=col_unique_check
+        )
+        self.folder_posts = folder_posts
+
+        #  over-ride cols b/c post cols will be different than comments or subs
+        if columns == 'aggregate_embeddings_':
+            self.columns = [
+                # IDs
+                'subreddit_name',
+                'subreddit_id',
+                'post_id',
+                'comment_id',
+                # 'user_id',
+
+                # Comment & user meta
+                # 'thing_type',
+                'submit_date',
+                # 'removed',
+                'upvotes',
+                # 'successful',
+                # 'app_name',
+                # 'post_type',
+                # 'post_nsfw',
+                # 'geolocation_country_code',
+                # 'subreddit_geo_country_code',
+                # 'combined_topic',
+                # 'combined_topic_and_rating',
+                # 'rating',
+                # 'rating_version',
+
+                # Text & language meta
+                # 'language',
+                # 'probability',
+                # 'weighted_language',
+                # 'weighted_language_probability',
+                'comment_text_len',
+                'comment_text_word_count',
+                # 'comment_body_text',
+            ]
+        else:
+            self.columns = columns
 
 
 def create_sub_level_aggregates(
