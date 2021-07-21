@@ -26,9 +26,20 @@ OPTIONS (
 )
 ;
 
-CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta`
+CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta_external`
 OPTIONS (
     format='PARQUET',
     uris=["gs://i18n-subreddit-clustering/mlflow/mlruns/8/cf3c6dfb599b414a812085659e62ec85/artifacts/df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair/*.parquet"]
 )
 ;
+
+-- Create internal table so that we remove permission errors when reading from a bucket
+--  UPDATE: THIS QUERY FAILS. BQ error message says you can't create an internal table from an External source :sad-panda:
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta`
+AS (
+SELECT
+    * EXCEPT(subreddit_id_a, subreddit_id_b)
+    , subreddit_id_a
+    , subreddit_id_b
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta_external`
+)
