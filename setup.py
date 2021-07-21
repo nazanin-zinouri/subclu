@@ -69,6 +69,12 @@ EXTRAS_REQUIRE = {
         "umap-learn == 0.5.1",
         "openTSNE == 0.6.0",
 
+        # clustering
+        # hdbscan needs to be installed separately, because it needs to be
+        #  re-compiled with the right version of numpy
+        #  pip install hdbscan --no-build-isolation --no-binary :all:
+        # "hdbscan",
+
     ],
 
     "pytorch": [
@@ -131,7 +137,7 @@ EXTRAS_REQUIRE = {
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.3.1',
+    version='0.3.2',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',
