@@ -264,3 +264,24 @@ WHERE DATE(pt) = "2021-06-15"
 ORDER BY subreddit_name ASC, community_topic ASC
 LIMIT 500
 ;
+
+-- Get count of posts with flair text
+-- Could use flair text for training OR for validation
+--  Need to figure out a better approach to integrating with existing weights...
+SELECT
+    pl.flair_text
+    # , COUNT(*)    AS total_rows
+    , COUNT(DISTINCT (pl.post_id))          AS post_ids_unique_count
+
+FROM `reddit-employee-datasets.david_bermejo.posts_for_germany_topic_clustering_20210519` AS sp
+
+LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.post_lookup` AS pl
+    ON sp.post_id = pl.post_id
+
+WHERE DATE(pl._PARTITIONTIME) = "2021-05-30"
+    AND sp.submit_date BETWEEN "2021-04-01" AND "2021-05-19"
+    AND sp.subreddit_name = 'de'
+
+GROUP BY 1
+ORDER BY 2 DESC
+;
