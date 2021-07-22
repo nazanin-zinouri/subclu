@@ -12,6 +12,11 @@
 --     - folder. NOTE: ALL FILES IN FOLDER MUST HAVE THE SAME COLUMNS/FORMAT
 --         data/models/fse/manual_merge_2021-06-07_17/
 
+-- To use these tables in Mode/Andrelytics, we need to grant access to the user groups listed in this wiki:
+--  https://reddit.atlassian.net/wiki/spaces/DataScience/pages/2089844753/Creating+BigQuery+External+Tables+Using+them+in+Mode+Dashboards
+--  https://reddit.atlassian.net/wiki/spaces/DE/pages/753991694/How+to+grant+access+to+a+Google+Sheet-backed+BigQuery+table
+
+
 CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_a_posts_only`
 OPTIONS (
     format='PARQUET',
@@ -26,20 +31,10 @@ OPTIONS (
 )
 ;
 
-CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta_external`
+CREATE OR REPLACE EXTERNAL TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta`
 OPTIONS (
     format='PARQUET',
     uris=["gs://i18n-subreddit-clustering/mlflow/mlruns/8/cf3c6dfb599b414a812085659e62ec85/artifacts/df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair/*.parquet"]
 )
 ;
 
--- Create internal table so that we remove permission errors when reading from a bucket
---  UPDATE: THIS QUERY FAILS. BQ error message says you can't create an internal table from an External source :sad-panda:
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta`
-AS (
-SELECT
-    * EXCEPT(subreddit_id_a, subreddit_id_b)
-    , subreddit_id_a
-    , subreddit_id_b
-FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0031_german_c_posts_and_comments_and_meta_external`
-)
