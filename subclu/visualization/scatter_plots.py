@@ -17,6 +17,11 @@ def px_scatter_3d_subreddits(
     """display subreddits, primary use case closest subreddits to an input sub
 
     If more than 20 subs, the text title will be too noisy.
+    TODO: maybe create a filter to only display subreddit name for:
+      - input sub
+      - 3 largest subreddits (by views (users_l28), or comments, or posts)
+      - 3 closest subreddits to input sub
+      - 2 furthest subreddits to input sub
     """
     if l_custom_data_subs is None:
         l_custom_data_subs = [
