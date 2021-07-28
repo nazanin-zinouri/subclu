@@ -749,6 +749,7 @@ def create_col_with_sparse_names(
         ''
     )
 
+
 def hide_aa_text_in_plotly_legend() -> None:
     """
     There's no good way to remove `Aa` from plotly legends besides updating the
@@ -764,6 +765,75 @@ def hide_aa_text_in_plotly_legend() -> None:
     </style>
     """)
 
+
+def display_items_for_cluster_id(
+        df_subs_meta_plot,
+        id_,
+        cols_to_display: list = None,
+        col_manual_labels: str = 'manual_topic_and_rating',
+        col_clustering: str = 'cluster_id_agg_ward_cosine_35',
+        n_subs_to_show: int = 15,
+) -> None:
+    """
+    """
+    from IPython.core.display import display
+
+    if cols_to_display is None:
+        cols_to_display = [
+            'subreddit_name',
+            'manual_topic_and_rating',
+            'subreddit_title',
+
+            # 'subreddit_name_title_and_clean_descriptions_word_count',
+            'users_l28',
+            'posts_l28',
+            'comments_l28',
+
+            'post_median_word_count',
+
+            'German_posts_percent',
+            'English_posts_percent',
+            # 'other_language_posts_percent',
+
+            'image_post_type_percent',
+            'text_post_type_percent',
+            # 'link_post_type_percent',
+            # 'other_post_type_percent',
+
+            'rating',
+            'rating_version',
+            'over_18',
+        ]
+        cols_to_display = [c for c in cols_to_display if c in df_subs_meta_plot.columns]
+
+    mask_ = df_subs_meta_plot[col_clustering] == id_
+    print(f"\nCluster ID: {id_}\n  {mask_.sum()} Subreddit count in group")
+
+    # noinspection PyTypeChecker
+    display(
+        value_counts_and_pcts(
+            df_subs_meta_plot[mask_][col_manual_labels],
+            add_col_prefix=False,
+            reset_index=True,
+            cumsum=False,
+        ).hide_index()
+    )
+
+    # noinspection PyTypeChecker
+    display(
+        style_df_numeric(
+            df_subs_meta_plot[mask_][cols_to_display]
+            .sort_values(by=['users_l28'], ascending=False)
+            .head(n_subs_to_show)
+            ,
+            rename_cols_for_display=True,
+            l_bar_simple=[
+                'German_posts_percent', 'English_posts_percent',
+                'image_post_type_percent', 'text_post_type_percent',
+                'users_l28',
+            ]
+        ).set_properties(subset=['subreddit title'], **{'width': '300px'}).hide_index()
+    )
 
 #
 # ~ fin
