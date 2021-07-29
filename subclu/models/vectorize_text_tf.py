@@ -246,6 +246,9 @@ def vectorize_text_to_embeddings(
 
     if comments_path is not None:
         if batch_comment_files:
+            # TODO(djb): when doing a batch of files, would it be faster if I download the files to local?
+            #  Simon & others said that it was faster to download all files first and read
+            #  them from local. Not sure if the diff is big enough
             from google.cloud import storage
 
             info(f"** Procesing Comments files one at a time ***")
@@ -270,6 +273,7 @@ def vectorize_text_to_embeddings(
             except (TypeError, UnboundLocalError) as e:
                 logging.warning(f"df_posts missing, so we can't filter comments without a post...\n{e}")
             for blob in tqdm(l_comment_files_to_process):
+                gc.collect()
                 # Use this name to map old files to new files
                 f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
                 info(f"Processing: {blob.name}")
@@ -342,12 +346,17 @@ def vectorize_text_to_embeddings(
                 f_.write(f"Original dataframe info\n==="
                          f"\n{total_comments_count:9,.0f}\t | rows (comments)\n{c:9,.0f} | columns of LAST FILE\n")
                 f_.write(f"\nColumn list:\n{list(df_vect_comments.columns)}")
+
+            info(f"Logging COMMENT files as mlflow artifact (to GCS)...")
             mlflow.log_artifacts(str(local_comms_subfolder_full), local_comms_subfolder_relative)
 
             del df_vect_comments
             gc.collect()
 
         else:
+            # In this branch we read all comments files into memory
+            #  This process breaks down with 15+ million posts/commments
+            #  TODO(djb): more work to figure out what's the threshold/limit
             info(f"Load comments df...")
             df_comments = pd.read_parquet(
                 path=f"gs://{bucket_name}/{comments_path}",
@@ -384,13 +393,13 @@ def vectorize_text_to_embeddings(
             mlflow.log_metric('vectorizing_time_minutes_comments',
                               total_time_comms_vect / timedelta(minutes=1)
                               )
+            del df_comments
+            gc.collect()
             save_df_and_log_to_mlflow(
                 df=df_vect_comments.reset_index(),
                 local_path=path_this_model,
                 name_for_metric_and_artifact_folder='df_vect_comments',
             )
-            del df_comments
-            gc.collect()
 
     # finish logging total time + end mlflow run
     total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
