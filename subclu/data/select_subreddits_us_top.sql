@@ -135,7 +135,9 @@ subreddit_lookup AS (
 
 final_table AS (
 SELECT
-    sel.*
+    -- Subreddit_id was missing from original query, adding it back here for the future
+    slo.subreddit_id
+    , sel.*
 
     , COALESCE (
         LOWER(dst.topic),
@@ -281,11 +283,19 @@ ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 -- CHANGE/Update:
 --  1) URI date folder
 --  2) source table
-# EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/subreddits/top/2021-07-16/*.parquet',
-#   format='PARQUET',
-#   overwrite=true
-#   ) AS
-# SELECT *
-# FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210716`
-# ;
+-- EXPORT DATA OPTIONS(
+--   uri='gs://i18n-subreddit-clustering/subreddits/top/2021-07-16/*.parquet',
+--   format='PARQUET',
+--   overwrite=true
+--   ) AS
+--
+-- SELECT
+--     -- Subreddit_id was missing from original query, adding it back here for the future
+--     slo.subreddit_id
+--     , sel.*
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210716` AS sel
+-- LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup` AS slo
+--     ON sel.subreddit_name = LOWER(slo.name)
+--
+--  WHERE slo.dt = (CURRENT_DATE() - 2)
+-- ;
