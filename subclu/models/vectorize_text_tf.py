@@ -268,3 +268,137 @@ def vectorize_text_to_embeddings(
                       )
     mlflow.end_run()
     return model, df_vect, df_vect_comments, df_vect_subs
+
+def get_embeddings_as_df(
+        model: callable,
+        df: pd.DataFrame,
+        col_text: str = 'text',
+        cols_index: Union[str, List[str]] = None,
+        col_embeddings_prefix: Optional[str] = 'embeddings',
+        lowercase_text: bool = False,
+        batch_size: int = None,
+        limit_first_n_chars: int = 1500,
+) -> pd.DataFrame:
+    """Get output of TF model as a dataframe.
+    Besides batching we can get OOM (out of memory) errors if the text is too long,
+    so we'll be adding a limit to only embed the first N-characters in a column.
+
+    When called on a list a TF model runs in parallel, so use that instead of trying to
+    get model output on a dataframe (which would be sequential and slow).
+    For reference, on 5,400 sentences:
+    - ~2 seconds:   on list
+    - ~1 minute:    on text column df['text'].apply(model)
+
+    TODO(djb):  For each recursive call, use try/except!!
+      That way if one batch fails, the rest of the batches can proceed!
+    """
+    if cols_index == 'comment_default_':
+        cols_index = ['subreddit_name', 'subreddit_id', 'post_id', 'comment_id']
+    elif cols_index == 'post_default_':
+        cols_index = ['subreddit_name', 'subreddit_id', 'post_id']
+    elif cols_index == 'subreddit_default_':
+        cols_index = ['subreddit_name', 'subreddit_id']
+    else:
+        pass
+
+    if cols_index is not None:
+        index_output = df[cols_index]
+    else:
+        index_output = None
+
+    if batch_size is None:
+        iteration_chunks = None
+    elif batch_size >= len(df):
+        iteration_chunks = None
+    else:
+        iteration_chunks = range(1 + len(df) // batch_size)
+
+    if iteration_chunks is None:
+        if lowercase_text:
+            series_text = df[col_text].str.lower().str[:limit_first_n_chars]
+        else:
+            series_text = df[col_text].str[:limit_first_n_chars]
+
+        df_vect = pd.DataFrame(
+            np.array([emb.numpy() for emb in model(series_text.to_list())])
+        )
+        if index_output is not None:
+            # Remember to reset the index of the output!
+            #   Because pandas will do an inner join based on index
+            df_vect = pd.concat(
+                [df_vect, index_output.reset_index(drop=True)],
+                axis=1,
+            ).set_index(cols_index)
+
+        if col_embeddings_prefix is not None:
+            # renaming can be expensive when we're calling the function recursively
+            # so only rename after all individual dfs are created
+            return df_vect.rename(
+                columns={c: f"{col_embeddings_prefix}_{c}" for c in df_vect.columns}
+            )
+        else:
+            return df_vect
+
+    else:
+        # This seems like a good place for recursion(!)
+        # Renaming can be expensive when we're calling the function recursively
+        #   so only rename after all individual dfs are created
+        info(f"Getting embeddings in batches of size: {batch_size}")
+        l_df_embeddings = list()
+        for i in tqdm(iteration_chunks):
+            l_df_embeddings.append(
+                get_embeddings_as_df(
+                    model=model,
+                    df=df.iloc[i * batch_size:(i + 1) * batch_size],
+                    col_text=col_text,
+                    cols_index=cols_index,
+                    col_embeddings_prefix=None,
+                    lowercase_text=lowercase_text,
+                    batch_size=None,
+                    limit_first_n_chars=limit_first_n_chars,
+                )
+            )
+        gc.collect()
+        if col_embeddings_prefix is not None:
+            df_vect = pd.concat(l_df_embeddings, axis=0, ignore_index=False)
+            return df_vect.rename(
+                columns={c: f"{col_embeddings_prefix}_{c}" for c in df_vect.columns}
+            )
+        else:
+            return pd.concat(l_df_embeddings, axis=0, ignore_index=False)
+
+
+def save_df_and_log_to_mlflow(
+        df: pd.DataFrame,
+        local_path: Union[Path, str],
+        df_filename: str,
+        name_for_metric_and_artifact_folder: str,
+) -> None:
+    """
+    Convenience function for vectorized dfs: save & log them to mlflow.
+    Args:
+        df:
+            df to save & log
+        local_path:
+            path for local folder to save df
+        df_filename:
+            filename prefix, by default function will add shape of df & .parquet filetype
+        name_for_metric_and_artifact_folder:
+            e.g., df_vect_posts, df_vect_comments, df_vect_sub_meta
+
+    Returns: None
+    """
+    r, c = df.shape
+    mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_rows', r)
+    mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_cols', c)
+
+    info(f"  Saving to local... {name_for_metric_and_artifact_folder}...")
+    f_df_vect_posts = Path(local_path) / f'{df_filename}-{r}_by_{c}.parquet'
+    df.to_parquet(f_df_vect_posts)
+    info(f"  Logging to mlflow...")
+    mlflow.log_artifact(str(f_df_vect_posts), name_for_metric_and_artifact_folder)
+
+
+#
+# ~ fin
+#
