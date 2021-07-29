@@ -297,5 +297,7 @@ ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 -- LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup` AS slo
 --     ON sel.subreddit_name = LOWER(slo.name)
 --
---  WHERE slo.dt = (CURRENT_DATE() - 2)
+-- WHERE slo.dt = (CURRENT_DATE() - 2)
+-- # For some reason, adding the order by clause makes BigQuery export in fewer and larger files
+-- ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 -- ;
