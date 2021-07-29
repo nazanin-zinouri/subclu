@@ -292,8 +292,15 @@ pip install -r base_requirements.txt --use-deprecated=legacy-resolver
 
 Run this command in GCP Notebok/VM:
 ```
+# Deprecated
 mlflow server --backend-store-uri sqlite:///mlflow/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
 ```
+
+New pattern is to call the mlflow DB for the current client:
+```
+mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
+```
+
 
 Need to tunnel into it from local using custom ssh function:
 ```
