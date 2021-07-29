@@ -13,15 +13,12 @@ from logging import info
 from pathlib import Path
 from typing import Union, Tuple, List, Optional
 
-from fse import CSplitCIndexedList
 import mlflow
 import pandas as pd
 import numpy as np
 # from sklearn.pipeline import Pipeline
 from tqdm.auto import tqdm
 
-from .preprocess_text import transform_and_tokenize_text
-from .registry_cpu import D_MODELS_CPU
 from .registry_tf_hub import D_MODELS_TF_HUB
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
@@ -226,6 +223,13 @@ def vectorize_text_to_embeddings(
     df_vect, df_vect_comments, df_vect_subs = None, None, None
 
     if 'fasttext' in model_name:
+        # import fastText modules here (instead of top level) because
+        #  we only want to install fse & fastText in CPU VMs. There might be something
+        #  with these libraries that breaks GPU VMs
+        # TODO(djb): split GPU & CPU models into two different files/modules?
+        from .preprocess_text import transform_and_tokenize_text
+        from .registry_cpu import D_MODELS_CPU
+
         mlflow.log_params(d_params_to_log)
 
         if posts_path is not None:
@@ -650,8 +654,9 @@ def process_text_for_fse(
         col_text: str,
         col_id_to_map: str,
         custom_split_fxn: callable = None,
-) -> Tuple[CSplitCIndexedList, dict, dict]:
+):  # -> Tuple[CSplitCIndexedList, dict, dict]:
     """"""
+    from fse import CSplitCIndexedList
     # streamline converting df in text column into array needed for fse train & inference
     # The ID could be any ID that we could use to aggregate fse embeddings for:
     #   e.g., subreddit ID, post ID, comment ID; post_id might be the most common
