@@ -269,6 +269,7 @@ def vectorize_text_to_embeddings(
             info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
 
         info(f"Vectorizing COMMENTS...")
+        t_start_comms_vect = datetime.utcnow()
         df_vect_comments = get_embeddings_as_df(
             model=model,
             df=df_comments,
@@ -278,6 +279,10 @@ def vectorize_text_to_embeddings(
             batch_size=tf_batch_inference_rows,
             limit_first_n_chars=tf_limit_first_n_chars,
         )
+        total_time_comms_vect = elapsed_time(t_start_comms_vect, log_label='df_posts vectorizing', verbose=True)
+        mlflow.log_metric('vectorizing_time_minutes_comments',
+                          total_time_comms_vect / timedelta(minutes=1)
+                          )
         save_df_and_log_to_mlflow(
             df=df_vect_comments.reset_index(),
             local_path=path_this_model,
@@ -288,7 +293,7 @@ def vectorize_text_to_embeddings(
 
     # finish logging total time + end mlflow run
     total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
-    mlflow.log_metric('vectorizing_time_minutes_all',
+    mlflow.log_metric('vectorizing_time_minutes_full_function',
                       total_fxn_time / timedelta(minutes=1)
                       )
     mlflow.end_run()
@@ -339,6 +344,7 @@ def get_embeddings_as_df(
     else:
         iteration_chunks = range(1 + len(df) // batch_size)
 
+    gc.collect()
     if iteration_chunks is None:
         if lowercase_text:
             series_text = df[col_text].str.lower().str[:limit_first_n_chars]
@@ -366,6 +372,7 @@ def get_embeddings_as_df(
             return df_vect
 
     else:
+        gc.collect()
         # This seems like a good place for recursion(!)
         # Renaming can be expensive when we're calling the function recursively
         #   so only rename after all individual dfs are created
@@ -384,13 +391,14 @@ def get_embeddings_as_df(
                     limit_first_n_chars=limit_first_n_chars,
                 )
             )
-        gc.collect()
+            gc.collect()
         if col_embeddings_prefix is not None:
             df_vect = pd.concat(l_df_embeddings, axis=0, ignore_index=False)
             return df_vect.rename(
                 columns={c: f"{col_embeddings_prefix}_{c}" for c in df_vect.columns}
             )
         else:
+            gc.collect()
             return pd.concat(l_df_embeddings, axis=0, ignore_index=False)
 
 
