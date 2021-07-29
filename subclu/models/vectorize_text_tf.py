@@ -61,6 +61,7 @@ def vectorize_text_to_embeddings(
         n_sample_post_files: int = None,
         n_sample_comment_files: int = None,
 
+        batch_comment_files: bool = True,
         n_sample_posts: int = None,
         n_sample_comments: int = None,
 ) -> None:
@@ -100,6 +101,7 @@ def vectorize_text_to_embeddings(
         'n_sample_post_files': n_sample_post_files,
         'n_sample_comment_files': n_sample_comment_files,
 
+        'batch_comment_files': batch_comment_files,
         'n_sample_posts': n_sample_posts,
         'n_sample_comments': n_sample_comments,
     }
@@ -159,11 +161,7 @@ def vectorize_text_to_embeddings(
     info(f"Loading model {model_name}...")
     model = hub.load(D_MODELS_TF_HUB[model_name])
     elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
-
     logging.warning(f"For TF-HUB models, the only preprocessing applied is lowercase()")
-
-    # Even if the outputs are null (not processed), these dfs are expected as output
-    df_vect, df_vect_comments, df_vect_subs = None, None, None
 
     if subreddits_path is not None:
         # Even if we have to process thousands of subs, these should be ok
@@ -247,48 +245,144 @@ def vectorize_text_to_embeddings(
         gc.collect()
 
     if comments_path is not None:
-        info(f"Load comments df...")
-        df_comments = pd.read_parquet(
-            path=f"gs://{bucket_name}/{comments_path}",
-            columns=l_cols_comments
-        )
-        info(f"  {df_comments.shape} <- df_comments shape")
-        assert len(df_comments) == df_comments[col_comment_id].nunique()
-        gc.collect()
+        if batch_comment_files:
+            from google.cloud import storage
 
-        try:
-            info(f"Keep only comments that match posts IDs in df_posts...")
-            df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
-            info(f"  {df_comments.shape} <- updated df_comments shape")
-        except (TypeError, UnboundLocalError) as e:
-            logging.warning(f"df_posts missing, so we can't filter comments...\n{e}")
+            info(f"** Procesing Comments files one at a time ***")
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
 
-        if n_sample_comments is not None:
-            info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}")
-            df_comments = df_comments.sample(n=n_sample_comments)
-            info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
+            # Use this var to track how many comments we've processed
+            total_comments_count = 0
+            total_time_comms_vect = 0
+            local_comms_subfolder_relative = 'df_vect_comments'
+            local_comms_subfolder_full = Path(path_this_model) / local_comms_subfolder_relative
 
-        info(f"Vectorizing COMMENTS...")
-        df_vect_comments = get_embeddings_as_df(
-            model=model,
-            df=df_comments,
-            col_text=col_text_comment,
-            cols_index='comment_default_',
-            lowercase_text=tokenize_lowercase,
-            batch_size=tf_batch_inference_rows,
-            limit_first_n_chars=tf_limit_first_n_chars,
-        )
-        save_df_and_log_to_mlflow(
-            df=df_vect_comments.reset_index(),
-            local_path=path_this_model,
-            name_for_metric_and_artifact_folder='df_vect_comments',
-        )
-        del df_comments
-        gc.collect()
+            l_comment_files_to_process = list(bucket.list_blobs(prefix=posts_path))[:n_sample_comment_files]
+            total_comms_file_count = len(l_comment_files_to_process)
+
+            for blob in tqdm(l_comment_files_to_process):
+                # Use this name to map old files to new files
+                f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
+
+                info(f"Loading df...")
+                df_comments = pd.read_parquet(
+                    path=f"gs://{bucket_name}/{blob.name}",
+                    columns=l_cols_comments
+                )
+                info(f"  {df_comments.shape} <- df_comments shape")
+                assert len(df_comments) == df_comments[col_comment_id].nunique()
+                gc.collect()
+
+                try:
+                    info(f"Keep only comments that match posts IDs in df_posts...")
+                    df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
+                    info(f"  {df_comments.shape} <- updated df_comments shape")
+                except (TypeError, UnboundLocalError) as e:
+                    logging.warning(f"df_posts missing, so we can't filter comments...\n{e}")
+
+                if n_sample_comments is not None:
+                    info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}")
+                    df_comments = df_comments.sample(n=n_sample_comments)
+                    info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
+
+                # only add the comment len AFTER sampling, otherwise we can get the wrong values
+                total_comments_count += len(df_comments)
+
+                info(f"Vectorizing COMMENTS...")
+                t_start_comms_vect = datetime.utcnow()
+                df_vect_comments = get_embeddings_as_df(
+                    model=model,
+                    df=df_comments,
+                    col_text=col_text_comment,
+                    cols_index='comment_default_',
+                    lowercase_text=tokenize_lowercase,
+                    batch_size=tf_batch_inference_rows,
+                    limit_first_n_chars=tf_limit_first_n_chars,
+                )
+                total_time_comms_vect += (
+                    elapsed_time(t_start_comms_vect, log_label='df_posts vectorizing', verbose=True) /
+                    timedelta(minutes=1)
+                )
+
+                # Save single file locally, but wait until all files are done to log to mlflow
+                save_df_and_log_to_mlflow(
+                    df=df_vect_comments.reset_index(),
+                    local_path=path_this_model,
+                    name_for_metric_and_artifact_folder=local_comms_subfolder_relative,
+                    log_to_mlflow=False,
+                    save_in_chunks=False,
+                    df_single_file_name=f_comment_name_root,
+                )
+                del df_comments
+                gc.collect()
+
+            mlflow.log_metrics(
+                {local_comms_subfolder_relative: total_comments_count,
+                 'vectorizing_time_minutes_comments': total_time_comms_vect,
+                 'total_comment_files_processed': total_comms_file_count
+                 }
+            )
+            # add manual meta file for comms
+            _, c = df_vect_comments.shape
+            f_meta = f"manual_meta-{total_comments_count}_by_{c}.txt"
+            with open(Path(local_comms_subfolder_full) / f_meta, 'w') as f_:
+                f_.write(f"Original dataframe info\n==="
+                         f"\n{total_comments_count:9,.0f}\t | rows (comments)\n{c:9,.0f} | columns of LAST FILE\n")
+                f_.write(f"\nColumn list:\n{list(df_vect_comments.columns)}")
+            mlflow.log_artifacts(str(local_comms_subfolder_full), local_comms_subfolder_relative)
+
+            del df_vect_comments
+            gc.collect()
+
+        else:
+            info(f"Load comments df...")
+            df_comments = pd.read_parquet(
+                path=f"gs://{bucket_name}/{comments_path}",
+                columns=l_cols_comments
+            )
+            info(f"  {df_comments.shape} <- df_comments shape")
+            assert len(df_comments) == df_comments[col_comment_id].nunique()
+            gc.collect()
+
+            try:
+                info(f"Keep only comments that match posts IDs in df_posts...")
+                df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
+                info(f"  {df_comments.shape} <- updated df_comments shape")
+            except (TypeError, UnboundLocalError) as e:
+                logging.warning(f"df_posts missing, so we can't filter comments...\n{e}")
+
+            if n_sample_comments is not None:
+                info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}")
+                df_comments = df_comments.sample(n=n_sample_comments)
+                info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
+
+            info(f"Vectorizing COMMENTS...")
+            t_start_comms_vect = datetime.utcnow()
+            df_vect_comments = get_embeddings_as_df(
+                model=model,
+                df=df_comments,
+                col_text=col_text_comment,
+                cols_index='comment_default_',
+                lowercase_text=tokenize_lowercase,
+                batch_size=tf_batch_inference_rows,
+                limit_first_n_chars=tf_limit_first_n_chars,
+            )
+            total_time_comms_vect = elapsed_time(t_start_comms_vect, log_label='df_posts vectorizing', verbose=True)
+            mlflow.log_metric('vectorizing_time_minutes_comments',
+                              total_time_comms_vect / timedelta(minutes=1)
+                              )
+            save_df_and_log_to_mlflow(
+                df=df_vect_comments.reset_index(),
+                local_path=path_this_model,
+                name_for_metric_and_artifact_folder='df_vect_comments',
+            )
+            del df_comments
+            gc.collect()
 
     # finish logging total time + end mlflow run
     total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
-    mlflow.log_metric('vectorizing_time_minutes_all',
+    mlflow.log_metric('vectorizing_time_minutes_full_function',
                       total_fxn_time / timedelta(minutes=1)
                       )
     mlflow.end_run()
@@ -304,6 +398,7 @@ def get_embeddings_as_df(
         lowercase_text: bool = False,
         batch_size: int = None,
         limit_first_n_chars: int = 1500,
+        verbose: bool = True,
 ) -> pd.DataFrame:
     """Get output of TF model as a dataframe.
     Besides batching we can get OOM (out of memory) errors if the text is too long,
@@ -339,6 +434,7 @@ def get_embeddings_as_df(
     else:
         iteration_chunks = range(1 + len(df) // batch_size)
 
+    gc.collect()
     if iteration_chunks is None:
         if lowercase_text:
             series_text = df[col_text].str.lower().str[:limit_first_n_chars]
@@ -366,10 +462,12 @@ def get_embeddings_as_df(
             return df_vect
 
     else:
+        gc.collect()
         # This seems like a good place for recursion(!)
         # Renaming can be expensive when we're calling the function recursively
         #   so only rename after all individual dfs are created
-        info(f"Getting embeddings in batches of size: {batch_size}")
+        if verbose:
+            info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
         for i in tqdm(iteration_chunks):
             l_df_embeddings.append(
@@ -384,13 +482,14 @@ def get_embeddings_as_df(
                     limit_first_n_chars=limit_first_n_chars,
                 )
             )
-        gc.collect()
+            gc.collect()
         if col_embeddings_prefix is not None:
             df_vect = pd.concat(l_df_embeddings, axis=0, ignore_index=False)
             return df_vect.rename(
                 columns={c: f"{col_embeddings_prefix}_{c}" for c in df_vect.columns}
             )
         else:
+            gc.collect()
             return pd.concat(l_df_embeddings, axis=0, ignore_index=False)
 
 
@@ -400,6 +499,9 @@ def save_df_and_log_to_mlflow(
         name_for_metric_and_artifact_folder: str,
         target_mb_size: int = None,
         write_index: bool = True,
+        log_to_mlflow: bool = True,
+        save_in_chunks: bool = True,
+        df_single_file_name: str = 'df',  # append parquet extension later
 ) -> None:
     """
     Convenience function for vectorized dfs: save & log them to mlflow.
@@ -417,31 +519,49 @@ def save_df_and_log_to_mlflow(
         write_index:
             Do we write the index of the file?
 
+        log_to_mlflow:
+            If we're saving files in batch, we don't want to log each one,
+            we'd rather log the whole folder AFTER processing all files
+        save_in_chunks:
+            If we're saving files in batch, we'll only save one output file per input file
+            because dask doesn't give us a way to rename chunked files and could create name
+            collisions.
+        df_single_file_name:
+            If we're saving files in batch, we'll only save one output file per input file.
+            Use this name to map input file to output file.
+
     Returns: None
     """
-    r, c = df.shape
-    mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_rows', r)
-    mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_cols', c)
-
     info(f"  Saving to local... {name_for_metric_and_artifact_folder}...")
     local_subfolder = Path(local_path) / name_for_metric_and_artifact_folder
     Path.mkdir(local_subfolder, exist_ok=True, parents=True)
 
-    # save text file with metadata, because dask doesn't let us configure naming parquet files
-    f_meta = f"manual_meta-{r}_by_{c}.txt"
-    with open(Path(local_subfolder) / f_meta, 'w') as f_:
-        f_.write(f"Original dataframe info\n===\nrows: {r:,.0f}\ncolumns: {c:,.0f}\n")
-        f_.write(f"\nColumn list:\n{list(df.columns)}")
-    # f_df_vect_posts = Path(local_path) / f'{df_filename}-{r}_by_{c}.parquet'
-    # df.to_parquet(f_df_vect_posts)
-    save_pd_df_to_parquet_in_chunks(
-        df=df,
-        path=local_subfolder,
-        target_mb_size=target_mb_size,
-        write_index=write_index,
-    )
-    info(f"  Logging to mlflow...")
-    mlflow.log_artifacts(str(local_subfolder), name_for_metric_and_artifact_folder)
+    r, c = df.shape
+    if log_to_mlflow:
+        mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_rows', r)
+        mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_cols', c)
+
+    if save_in_chunks:
+        # save text file with metadata, because dask doesn't let us configure naming parquet files
+        f_meta = f"manual_meta-{r}_by_{c}.txt"
+        with open(Path(local_subfolder) / f_meta, 'w') as f_:
+            f_.write(f"Original dataframe info\n===\nrows: {r:,.0f}\ncolumns: {c:,.0f}\n")
+            f_.write(f"\nColumn list:\n{list(df.columns)}")
+
+        save_pd_df_to_parquet_in_chunks(
+            df=df,
+            path=local_subfolder,
+            target_mb_size=target_mb_size,
+            write_index=write_index,
+        )
+    else:
+        # save as single parquet file using pandas
+        f_df_vect_posts = Path(local_subfolder) / f'{df_single_file_name}-{r}_by_{c}.parquet'
+        df.to_parquet(f_df_vect_posts)
+
+    if log_to_mlflow:
+        info(f"  Logging to mlflow...")
+        mlflow.log_artifacts(str(local_subfolder), name_for_metric_and_artifact_folder)
 
 
 #
