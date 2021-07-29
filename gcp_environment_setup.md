@@ -314,3 +314,47 @@ dj_ssh_mlflow cpu
 ```
 
 ```
+
+# Monitoring GPU usage
+`htop` doesn't seem to have a way to monitor GPU stats, but here are some alternatives.
+
+## JupterLab `Status Bar`
+On the jupyter-lab UI, you can click on If you click on:
+<br>`View` > `Show Status Bar`
+
+At the bottom of your window you will see some icons on the bottom left-hand side. If you click on them, you can cycle through different stats, one of them will be `GPU` Stats. For example:
+`GPU: Tesla T4 - 33.0%`
+
+## Nvidia CLI tool - `nvidia-smi`
+Nvidia's `nvidia-smi` is a CLI tool for GPU monitoring similar to `htop`. It's not dynamic like `htop` (which auto refreshes), but you can use some commands to refresh the data every N seconds.
+
+```bash
+nvidia-smi
+
+Thu Jul 29 23:26:53 2021       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 460.73.01    Driver Version: 460.73.01    CUDA Version: 11.2     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  Tesla T4            Off  | 00000000:00:04.0 Off |                    0 |
+| N/A   64C    P0    39W /  70W |  14378MiB / 15109MiB |     79%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+```
+
+`watch` is my favorite command here because it auto-refreshes in a pseudo-dynamic way. After you're done (`Ctrl+C` or `:q`), you go back to your terminal without `stdout` clutter. The `-n` flag is followed by how often (in seconds) you want the call to `nvidia-smi` to happen.
+
+`watch -n 5 nvidia-smi`
+
+
+The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new set of stats ever 10 seconds:
+
+`nvidia-smi -l 10`
+
+It's not great because, for example, after 1 minute (60 seconds), if you want to scroll back, you'll go through 6 stdout statements. 
+
+
+
