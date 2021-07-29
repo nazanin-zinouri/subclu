@@ -61,12 +61,11 @@ def vectorize_text_to_embeddings(
         n_sample_comments: int = None,
 ) -> Tuple[callable, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    preprocess_text_folder options:
-    - 'lowercase', 'remove_digits', 'lowercase_and_remove_digits'
+    Take files in GCS as input and run them through selected model to extract embeddings.
 
     run inference to vectorize the text in:
     - posts_path[col_text_post]
-    - posts_path[col_text_post_url]
+    - posts_path[col_text_post_url] (TODO: djb)
     - comments_path[col_text_comment]
     """
     d_params_to_log = {
@@ -131,7 +130,38 @@ def vectorize_text_to_embeddings(
     Path(path_this_model).mkdir(exist_ok=True, parents=True)
     info(f"  Local model saving directory: {path_this_model}")
 
-    df_posts, df_comments, df_subs = None, None, None
+    mlf = MlflowLogger()
+    info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
+    mlf.set_experiment(mlflow_experiment)
+    mlflow.start_run(run_name=run_name)
+    mlf.add_git_hash_to_active_run()
+    mlf.set_tag_hostname(key='host_name')
+    mlf.log_param_hostname(key='host_name')
+
+    mlflow.log_params(d_params_to_log)
+    mlflow.log_param(f"model_location", D_MODELS_TF_HUB[model_name])
+
+    t_start_hub_load = datetime.utcnow()
+    info(f"Loading model {model_name}..."
+         # f"\n  with kwargs: {model_kwargs}"
+         )
+    model = hub.load(D_MODELS_TF_HUB[model_name])
+    elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
+
+    logging.warning(f"For TF-HUB models, the only preprocessing applied is lowercase()")
+
+    # Even if the outputs are null (not processed), these dfs are expected as output
+    df_vect, df_vect_comments, df_vect_subs = None, None, None
+    if subreddits_path is not None:
+        info(f"Load subreddits df...")
+        df_subs = pd.read_parquet(
+            path=f"gs://{bucket_name}/{subreddits_path}",
+            columns=l_cols_subreddits
+        )
+        info(f"  {df_subs.shape} <- df_subs shape")
+        assert len(df_subs) == df_subs[col_subreddit_id].nunique()
+
+    # df_posts, df_comments, df_subs = None, None, None
     if posts_path is not None:
         info(f"Loading df_posts..."
              f"\n  gs://{bucket_name}/{posts_path}")
@@ -171,36 +201,6 @@ def vectorize_text_to_embeddings(
             df_comments = df_comments.sample(n=n_sample_comments)
             info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
 
-    if subreddits_path is not None:
-        info(f"Load subreddits df...")
-        df_subs = pd.read_parquet(
-            path=f"gs://{bucket_name}/{subreddits_path}",
-            columns=l_cols_subreddits
-        )
-        info(f"  {df_subs.shape} <- df_subs shape")
-        assert len(df_subs) == df_subs[col_subreddit_id].nunique()
-
-    mlf = MlflowLogger()
-    info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
-    mlf.set_experiment(mlflow_experiment)
-    mlflow.start_run(run_name=run_name)
-    mlf.add_git_hash_to_active_run()
-    mlf.set_tag_hostname(key='host_name')
-    mlf.log_param_hostname(key='host_name')
-
-    df_vect, df_vect_comments, df_vect_subs = None, None, None
-
-    mlflow.log_params(d_params_to_log)
-    mlflow.log_param(f"model_location", D_MODELS_TF_HUB[model_name])
-
-    t_start_hub_load = datetime.utcnow()
-    info(f"Loading model {model_name}..."
-         # f"\n  with kwargs: {model_kwargs}"
-         )
-    model = hub.load(D_MODELS_TF_HUB[model_name])
-    elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
-
-    logging.warning(f"For TF-HUB models, the only preprocessing applied is lowercase()")
     if subreddits_path is not None:
         info(f"Vectorizing subreddit descriptions...")
         df_vect_subs = get_embeddings_as_df(
