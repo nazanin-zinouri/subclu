@@ -329,7 +329,7 @@ def save_pd_df_to_parquet_in_chunks(
     """
     TODO(djb)
 
-    Dask doesn't support multi-index dataframes, so you need to reset_index()
+    Dask doesn't support multi-index dataframes, so you may need to reset_index()
     before calling this function.
     Maybe it's ok to reset_index and I can set it again on read?
 

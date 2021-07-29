@@ -9,10 +9,9 @@ Main differences:
 import gc
 import logging
 from datetime import datetime, timedelta
-from functools import partial
 from logging import info
 from pathlib import Path
-from typing import Union, Tuple, List, Optional
+from typing import Union, List, Optional
 
 import mlflow
 import pandas as pd
@@ -25,14 +24,16 @@ import tensorflow_hub as hub
 from .registry_tf_hub import D_MODELS_TF_HUB
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
-from ..utils.mlflow_logger import MlflowLogger
+from ..utils.mlflow_logger import (
+    MlflowLogger, save_pd_df_to_parquet_in_chunks,
+    save_and_log_config,
+)
 
 
 def vectorize_text_to_embeddings(
         mlflow_experiment: str,
         model_name: str = 'use_multilingual',
         run_name: str = None,
-        tokenize_function: Union[str, callable] = 'sklearn',
         tokenize_lowercase: bool = False,
 
         bucket_name: str = 'i18n-subreddit-clustering',
@@ -54,12 +55,15 @@ def vectorize_text_to_embeddings(
         col_text_subreddit_description: str = 'subreddit_name_title_and_clean_descriptions',
         col_text_subreddit_word_count: str = 'subreddit_name_title_and_clean_descriptions_word_count',
 
-        tf_batch_inference_rows: int = 1800,
-        tf_limit_first_n_chars: int = 1200,
+        tf_batch_inference_rows: int = 1000,
+        tf_limit_first_n_chars: int = 1000,
+
+        n_sample_post_files: int = None,
+        n_sample_comment_files: int = None,
 
         n_sample_posts: int = None,
         n_sample_comments: int = None,
-) -> Tuple[callable, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> None:
     """
     Take files in GCS as input and run them through selected model to extract embeddings.
 
@@ -70,7 +74,6 @@ def vectorize_text_to_embeddings(
     """
     d_params_to_log = {
         'model_name': model_name,
-        'tokenize_function': tokenize_function,
         'tokenize_lowercase': tokenize_lowercase,
         'bucket_name': bucket_name,
         'subreddits_path': subreddits_path,
@@ -93,15 +96,21 @@ def vectorize_text_to_embeddings(
 
         'tf_batch_inference_rows': tf_batch_inference_rows,
         'tf_limit_first_n_chars': tf_limit_first_n_chars,
+
+        'n_sample_post_files': n_sample_post_files,
+        'n_sample_comment_files': n_sample_comment_files,
+
         'n_sample_posts': n_sample_posts,
         'n_sample_comments': n_sample_comments,
     }
 
     # load only columns needed for joining & inference
-    l_cols_posts = [
+    l_cols_ix_posts = [
         'subreddit_name',
         'subreddit_id',
         'post_id',
+    ]
+    l_cols_posts = l_cols_ix_posts + [
         col_text_post,
         col_text_post_word_count,
         col_text_post_url,
@@ -140,11 +149,14 @@ def vectorize_text_to_embeddings(
 
     mlflow.log_params(d_params_to_log)
     mlflow.log_param(f"model_location", D_MODELS_TF_HUB[model_name])
+    save_and_log_config(
+        d_params_to_log,
+        path_this_model,
+        name_for_artifact_folder='config',
+    )
 
     t_start_hub_load = datetime.utcnow()
-    info(f"Loading model {model_name}..."
-         # f"\n  with kwargs: {model_kwargs}"
-         )
+    info(f"Loading model {model_name}...")
     model = hub.load(D_MODELS_TF_HUB[model_name])
     elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
 
@@ -152,16 +164,44 @@ def vectorize_text_to_embeddings(
 
     # Even if the outputs are null (not processed), these dfs are expected as output
     df_vect, df_vect_comments, df_vect_subs = None, None, None
+
     if subreddits_path is not None:
+        # Even if we have to process thousands of subs, these should be ok
+        #  as a single file. Sometimes BigQuery can output dozens of files even
+        #  if we're only processing a few thousand subs
         info(f"Load subreddits df...")
+        t_start_subs_load = datetime.utcnow()
         df_subs = pd.read_parquet(
             path=f"gs://{bucket_name}/{subreddits_path}",
             columns=l_cols_subreddits
         )
+        elapsed_time(t_start_subs_load, log_label='df_subs loading', verbose=True)
         info(f"  {df_subs.shape} <- df_subs shape")
         assert len(df_subs) == df_subs[col_subreddit_id].nunique()
 
-    # df_posts, df_comments, df_subs = None, None, None
+        info(f"Vectorizing subreddit descriptions...")
+        t_start_subs_vect = datetime.utcnow()
+        df_vect_subs = get_embeddings_as_df(
+            model=model,
+            df=df_subs.reset_index(),
+            col_text=col_text_subreddit_description,
+            cols_index='subreddit_default_',
+            lowercase_text=tokenize_lowercase,
+            batch_size=tf_batch_inference_rows,
+            limit_first_n_chars=tf_limit_first_n_chars,
+        )
+        total_time_subs_vect = elapsed_time(t_start_subs_vect, log_label='df_subs vectorizing', verbose=True)
+        mlflow.log_metric('vectorizing_time_minutes_subreddit_meta',
+                          total_time_subs_vect / timedelta(minutes=1)
+                          )
+        save_df_and_log_to_mlflow(
+            df=df_vect_subs.reset_index(),
+            local_path=path_this_model,
+            name_for_metric_and_artifact_folder='df_vect_subreddits_description',
+        )
+        del df_subs, df_vect_subs
+        gc.collect()
+
     if posts_path is not None:
         info(f"Loading df_posts..."
              f"\n  gs://{bucket_name}/{posts_path}")
@@ -171,7 +211,7 @@ def vectorize_text_to_embeddings(
             columns=l_cols_posts
         )
 
-        elapsed_time(t_start_posts, log_label='df_post', verbose=True)
+        elapsed_time(t_start_posts, log_label='df_post loading', verbose=True)
         info(f"  {df_posts.shape} <- df_posts.shape")
         assert len(df_posts) == df_posts[col_post_id].nunique()
 
@@ -180,49 +220,8 @@ def vectorize_text_to_embeddings(
             df_posts = df_posts.sample(n=n_sample_posts)
             info(f"  {df_posts.shape} <- df_posts.shape AFTER sampling")
 
-    if comments_path is not None:
-        info(f"Load comments df...")
-        df_comments = pd.read_parquet(
-            path=f"gs://{bucket_name}/{comments_path}",
-            columns=l_cols_comments
-        )
-        info(f"  {df_comments.shape} <- df_comments shape")
-        assert len(df_comments) == df_comments[col_comment_id].nunique()
-
-        try:
-            info(f"Keep only comments that match posts IDs in df_posts...")
-            df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
-            info(f"  {df_comments.shape} <- updated df_comments shape")
-        except TypeError:
-            info(f"df_posts missing, so we can't filter comments...")
-
-        if n_sample_comments is not None:
-            info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}")
-            df_comments = df_comments.sample(n=n_sample_comments)
-            info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
-
-    if subreddits_path is not None:
-        info(f"Vectorizing subreddit descriptions...")
-        df_vect_subs = get_embeddings_as_df(
-            model=model,
-            df=df_subs,
-            col_text=col_text_subreddit_description,
-            cols_index='subreddit_default_',
-            lowercase_text=tokenize_lowercase,
-            batch_size=tf_batch_inference_rows,
-            limit_first_n_chars=tf_limit_first_n_chars,
-        )
-        save_df_and_log_to_mlflow(
-            df=df_vect_subs,
-            local_path=path_this_model,
-            df_filename='df_vect_subreddits_description',
-            name_for_metric_and_artifact_folder='df_vect_subreddits_description',
-        )
-        del df_subs
-        gc.collect()
-
-    if posts_path is not None:
         info(f"Vectorizing POSTS...")
+        t_start_posts_vect = datetime.utcnow()
         df_vect = get_embeddings_as_df(
             model=model,
             df=df_posts,
@@ -232,16 +231,43 @@ def vectorize_text_to_embeddings(
             batch_size=tf_batch_inference_rows,
             limit_first_n_chars=tf_limit_first_n_chars,
         )
+        total_time_posts_vect = elapsed_time(t_start_posts_vect, log_label='df_posts vectorizing', verbose=True)
+        mlflow.log_metric('vectorizing_time_minutes_posts',
+                          total_time_posts_vect / timedelta(minutes=1)
+                          )
         save_df_and_log_to_mlflow(
-            df=df_vect,
+            df=df_vect.reset_index(),
             local_path=path_this_model,
-            df_filename='df_vectorized_posts',
             name_for_metric_and_artifact_folder='df_vect_posts',
         )
-        del df_posts
+        del df_vect
+        # We shouldn't delete df_posts because we need the IDs to check comments,
+        #  but we can drop most columns
+        df_posts = df_posts[l_cols_ix_posts]
         gc.collect()
 
     if comments_path is not None:
+        info(f"Load comments df...")
+        df_comments = pd.read_parquet(
+            path=f"gs://{bucket_name}/{comments_path}",
+            columns=l_cols_comments
+        )
+        info(f"  {df_comments.shape} <- df_comments shape")
+        assert len(df_comments) == df_comments[col_comment_id].nunique()
+        gc.collect()
+
+        try:
+            info(f"Keep only comments that match posts IDs in df_posts...")
+            df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
+            info(f"  {df_comments.shape} <- updated df_comments shape")
+        except (TypeError, UnboundLocalError) as e:
+            logging.warning(f"df_posts missing, so we can't filter comments...\n{e}")
+
+        if n_sample_comments is not None:
+            info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}")
+            df_comments = df_comments.sample(n=n_sample_comments)
+            info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
+
         info(f"Vectorizing COMMENTS...")
         df_vect_comments = get_embeddings_as_df(
             model=model,
@@ -253,9 +279,8 @@ def vectorize_text_to_embeddings(
             limit_first_n_chars=tf_limit_first_n_chars,
         )
         save_df_and_log_to_mlflow(
-            df=df_vect_comments,
+            df=df_vect_comments.reset_index(),
             local_path=path_this_model,
-            df_filename='df_vectorized_comments',
             name_for_metric_and_artifact_folder='df_vect_comments',
         )
         del df_comments
@@ -263,11 +288,12 @@ def vectorize_text_to_embeddings(
 
     # finish logging total time + end mlflow run
     total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
-    mlflow.log_metric('vectorizing_time_minutes',
+    mlflow.log_metric('vectorizing_time_minutes_all',
                       total_fxn_time / timedelta(minutes=1)
                       )
     mlflow.end_run()
-    return model, df_vect, df_vect_comments, df_vect_subs
+    # return model, df_vect, df_vect_comments, df_vect_subs
+
 
 def get_embeddings_as_df(
         model: callable,
@@ -371,8 +397,9 @@ def get_embeddings_as_df(
 def save_df_and_log_to_mlflow(
         df: pd.DataFrame,
         local_path: Union[Path, str],
-        df_filename: str,
         name_for_metric_and_artifact_folder: str,
+        target_mb_size: int = None,
+        write_index: bool = True,
 ) -> None:
     """
     Convenience function for vectorized dfs: save & log them to mlflow.
@@ -381,10 +408,14 @@ def save_df_and_log_to_mlflow(
             df to save & log
         local_path:
             path for local folder to save df
-        df_filename:
-            filename prefix, by default function will add shape of df & .parquet filetype
         name_for_metric_and_artifact_folder:
             e.g., df_vect_posts, df_vect_comments, df_vect_sub_meta
+
+        target_mb_size:
+            how big should the target files be? This input size tends to be smaller than
+            the size in disk. e.g., if input is 75MB, file size might be ~100MB
+        write_index:
+            Do we write the index of the file?
 
     Returns: None
     """
@@ -393,10 +424,24 @@ def save_df_and_log_to_mlflow(
     mlflow.log_metric(f'{name_for_metric_and_artifact_folder}_cols', c)
 
     info(f"  Saving to local... {name_for_metric_and_artifact_folder}...")
-    f_df_vect_posts = Path(local_path) / f'{df_filename}-{r}_by_{c}.parquet'
-    df.to_parquet(f_df_vect_posts)
+    local_subfolder = Path(local_path) / name_for_metric_and_artifact_folder
+    Path.mkdir(local_subfolder, exist_ok=True, parents=True)
+
+    # save text file with metadata, because dask doesn't let us configure naming parquet files
+    f_meta = f"manual_meta-{r}_by_{c}.txt"
+    with open(Path(local_subfolder) / f_meta, 'w') as f_:
+        f_.write(f"Original dataframe info\n===\nrows: {r:,.0f}\ncolumns: {c:,.0f}\n")
+        f_.write(f"\nColumn list:\n{list(df.columns)}")
+    # f_df_vect_posts = Path(local_path) / f'{df_filename}-{r}_by_{c}.parquet'
+    # df.to_parquet(f_df_vect_posts)
+    save_pd_df_to_parquet_in_chunks(
+        df=df,
+        path=local_subfolder,
+        target_mb_size=target_mb_size,
+        write_index=write_index,
+    )
     info(f"  Logging to mlflow...")
-    mlflow.log_artifact(str(f_df_vect_posts), name_for_metric_and_artifact_folder)
+    mlflow.log_artifacts(str(local_subfolder), name_for_metric_and_artifact_folder)
 
 
 #
