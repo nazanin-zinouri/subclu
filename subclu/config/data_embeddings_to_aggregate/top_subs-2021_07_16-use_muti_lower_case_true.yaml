@@ -1,0 +1,14 @@
+# embeddings_description: 'Embeddings from USE-multilingual with lower_case=False'
+comments_uuid: 'a948e9fd651545f997430cddc6b529eb'
+comments_folder_embeddings: 'df_vect_comments'
+col_comment_id: 'comment_id'
+col_text_comment_word_count: 'comment_text_word_count'
+
+posts_uuid: 'a948e9fd651545f997430cddc6b529eb'
+posts_folder_embeddings: 'df_vect_posts'
+col_text_post_word_count: 'text_word_count'
+col_post_id: 'post_id'
+
+subreddit_desc_uuid: 'a948e9fd651545f997430cddc6b529eb'
+subreddit_desc_folder_embeddings: 'df_vect_subreddits_description'
+col_subreddit_id: 'subreddit_id'
