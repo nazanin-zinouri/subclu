@@ -1,0 +1,13 @@
+posts_uuid: 'db7a4d8aff04420eb4229d6499055e04'
+posts_folder_embeddings: 'df_vect_posts'
+col_text_post_word_count: 'text_word_count'
+col_post_id: 'post_id'
+
+comments_uuid: 'db7a4d8aff04420eb4229d6499055e04'
+comments_folder_embeddings: 'df_vect_comments'
+col_comment_id: 'comment_id'
+col_text_comment_word_count: 'comment_text_word_count'
+
+subreddit_desc_uuid: 'db7a4d8aff04420eb4229d6499055e04'
+subreddit_desc_folder_embeddings: 'df_vect_subreddits_description'
+col_subreddit_id: 'subreddit_id'
