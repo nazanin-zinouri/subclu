@@ -59,6 +59,34 @@ EXTRAS_REQUIRE = {
         "jupyterlab == 1.2.16",
         "pyarrow == 3.0.0",
 
+        # pre-installed google libraries
+        #  pin them to prevent pip from trying to over-write them
+        "google-api-core == 1.26.2",
+        "google-api-python-client == 2.1.0",
+        "google-auth == 1.28.0",
+        "google-auth-httplib2 == 0.1.0",
+        "google-auth-oauthlib == 0.4.3",
+        "google-cloud-bigquery == 2.13.1",
+        "google-cloud-bigquery-storage == 2.4.0",
+        "google-cloud-bigtable == 2.0.0",
+        "google-cloud-core == 1.6.0",
+        "google-cloud-dataproc == 2.3.1",
+        "google-cloud-datastore == 2.1.0",
+        "google-cloud-firestore == 2.1.0",
+        "google-cloud-kms == 2.2.0",
+        "google-cloud-language == 2.0.0",
+        "google-cloud-logging == 2.3.1",
+        "google-cloud-monitoring == 2.2.1",
+        "google-cloud-pubsub == 1.7.0",
+        "google-cloud-scheduler == 2.2.0",
+        "google-cloud-spanner == 3.3.0",
+        "google-cloud-speech == 2.2.1",
+        "google-cloud-storage == 1.37.1",
+        "google-cloud-tasks == 2.2.0",
+        "google-cloud-translate == 3.1.0",
+        "google-cloud-videointelligence == 2.1.0",
+        "google-cloud-vision  == 2.3.0",
+
         # NLP / embeddings
         "fasttext == 0.9.2",
         "fse == 0.1.15",
@@ -74,6 +102,8 @@ EXTRAS_REQUIRE = {
         #  pip install hdbscan --no-build-isolation --no-binary :all:
         # "hdbscan",
 
+        # Use hydra to manage config files
+        "hydra-core == 1.1.0",
     ],
 
     "pytorch": [
