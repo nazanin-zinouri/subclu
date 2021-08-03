@@ -261,6 +261,12 @@ class MlflowLogger:
                                      columns=columns)
             except TypeError:
                 return read_function(f"{artifact_uri}/{artifact_folder}")
+            except OSError:
+                # This error might happen if there are non-parquet files in the folder
+                # so we'll append `*.parquet` to try to read parquet files
+                return read_function(f"{artifact_uri}/{artifact_folder}/*.parquet",
+                                     columns=columns)
+
         else:
             # load JSON file might be able to use it with other functions, but might
             #  take a long time depending on file size.

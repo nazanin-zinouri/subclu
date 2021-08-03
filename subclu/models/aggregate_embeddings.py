@@ -21,6 +21,7 @@ from hydra import initialize, compose
 from omegaconf import OmegaConf, DictConfig
 
 import mlflow
+from dask import dataframe as dd
 import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
@@ -94,6 +95,10 @@ class AggregateEmbeddings:
             df_subs_meta: pd.DataFrame = None,
             df_posts_meta: pd.DataFrame = None,
             df_comments_meta: pd.DataFrame = None,
+
+            embeddings_read_fxn: callable = dd.read_parquet,
+            metadata_read_fxn: callable = pd.read_parquet,
+            **kwargs
     ):
         """"""
         self.bucket_name = bucket_name
@@ -140,6 +145,9 @@ class AggregateEmbeddings:
         self.agg_post_subreddit_desc_weight = agg_post_subreddit_desc_weight
         self.agg_post_to_subreddit_weight_col = agg_post_to_subreddit_weight_col
 
+        self.embeddings_read_fxn = embeddings_read_fxn
+        self.metadata_read_fxn = metadata_read_fxn
+
         # Create path to store local run
         self.path_local_model = None
 
@@ -162,7 +170,7 @@ class AggregateEmbeddings:
         self.df_subs_agg_b_similarity = None
         self.df_subs_agg_c_similarity = None
 
-    def run_aggregation(self) -> Tuple[pd.DataFrame]:
+    def run_aggregation(self) -> None:
         """Main function to run full aggregation job
 
         TODO(djb): Should I try to emulate fit, fit_transform, & transform methods from sklearn for this class?
@@ -289,10 +297,10 @@ class AggregateEmbeddings:
                           )
         mlflow.end_run()
         info(f"== COMPLETE run_aggregation() method ==")
-        return (
-            self.df_subs_agg_a, self.df_subs_agg_b, self.df_subs_agg_c,
-            self.df_posts_agg_b, self.df_posts_agg_c, None
-        )
+        # return (
+        #     self.df_subs_agg_a, self.df_subs_agg_b, self.df_subs_agg_c,
+        #     self.df_posts_agg_b, self.df_posts_agg_c, None
+        # )
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run
@@ -348,80 +356,101 @@ class AggregateEmbeddings:
         info(f"-- Start _load_raw_embeddings() method --")
         active_run = mlflow.active_run()
         t_start_read_raw_embeds = datetime.utcnow()
+        # ------------------------
+        # Load and check SUBREDDITS
+        # ---
         if self.df_v_sub is None:
             info(f"Loading subreddit description embeddings...")
             self.df_v_sub = self.mlf.read_run_artifact(
                 run_id=self.subreddit_desc_uuid,
                 artifact_folder=self.subreddit_desc_folder,
-                read_function=pd.read_parquet,
+                read_function=self.embeddings_read_fxn,
             )
         else:
             info(f"Raw subreddit embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_sub = self.df_v_sub.copy()
-        info(f"  {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
-        if active_run is not None:
-            r_sub, c_sub = self.df_v_sub.shape
-            mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
-        assert (len(self.df_v_sub) == self.df_v_sub.index.nunique()), f"** Index not unique. Check duplicates df_v_sub **"
 
+        r_sub, c_sub = get_dask_df_shape(self.df_v_sub)
+        info(f"  {r_sub:10,.0f} | {c_sub:4,.0f} <- Raw vectorized subreddit description shape")
+        if active_run is not None:
+            mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
+        assert (r_sub == self.df_v_sub[self.col_subreddit_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_sub **"
+
+        # ------------------------
+        # Load and check POSTS
+        # ---
         if self.df_v_posts is None:
             info(f"Loading POSTS embeddings...")
             self.df_v_posts = self.mlf.read_run_artifact(
                 run_id=self.posts_uuid,
                 artifact_folder=self.posts_folder,
-                read_function=pd.read_parquet,
+                read_function=self.embeddings_read_fxn,
             )
         else:
             info(f"POSTS embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_posts = self.df_v_posts.copy()
 
-        info(f"  {self.df_v_posts.shape} <- Raw POSTS shape")
+        r_post_raw, c_post_raw = get_dask_df_shape(self.df_v_posts)
+        info(f"  {r_post_raw:10,.0f} | {c_post_raw:4,.0f} <- Raw POSTS shape")
         if self.n_sample_posts is not None:
             if len(self.df_v_posts) > self.n_sample_posts:
                 info(f"  Sampling POSTS down to: {self.n_sample_posts:,.0f}")
                 self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
-                info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
+
+                r_post, c_post = get_dask_df_shape(self.df_v_posts)
+                info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- df_posts.shape AFTER sampling")
             else:
                 info(f"  No need to sample POSTS because sample greater than rows in df_posts")
-        if active_run is not None:
-            r_post, c_post = self.df_v_posts.shape
-            mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
-        assert (len(self.df_v_posts) == self.df_v_posts.index.nunique()), f"** Index not unique. Check duplicates df_v_posts **"
+                r_post, c_post = r_post_raw, c_post_raw
+        else:
+            r_post, c_post = r_post_raw, c_post_raw
 
+        if active_run is not None:
+            mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
+        assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_posts **"
+
+        # ------------------------
+        # Load and check COMMENTS
+        # ---
         if self.df_v_comments is None:
             info(f"Loading COMMENTS embeddings...")
             self.df_v_comments = self.mlf.read_run_artifact(
                 run_id=self.comments_uuid,
                 artifact_folder=self.comments_folder,
-                read_function=pd.read_parquet,
+                read_function=self.embeddings_read_fxn,
             )
         else:
             info(f"COMMENTS embeddings pre-loaded")
             self.df_v_comments = self.df_v_comments.copy()
-        info(f"  {self.df_v_comments.shape} <- Raw COMMENTS shape")
+        r_com_raw, c_com_raw = get_dask_df_shape(self.df_v_comments)
+        info(f"  {r_com_raw:10,.0f} | {c_com_raw:4,.0f} <- Raw COMMENTS shape")
         info(f"  Keep only comments for posts with embeddings")
+        # No longer need to use index.get_level_values() b/c I reset_index() before saving
+        #  But now need to use .compute() before .isin() b/c dask doesn't work otherwise...
         self.df_v_comments = (
             self.df_v_comments
-            [self.df_v_comments.index.get_level_values('post_id').isin(
-                self.df_v_posts.index.get_level_values('post_id').unique()
+            [self.df_v_comments['post_id'].compute().isin(
+                self.df_v_posts['post_id'].unique().compute()
              )]
         )
-        info(f"  {self.df_v_comments.shape} <- COMMENTS shape, after keeping only existing posts")
+        r_com, c_com = get_dask_df_shape(self.df_v_comments)
+        info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
 
         if self.n_sample_comments is not None:
             if len(self.df_v_comments) > self.n_sample_comments:
                 info(f"  Sampling COMMENTS down to: {self.n_sample_comments:,.0f}")
                 self.df_v_comments = self.df_v_comments.sample(n=self.n_sample_comments)
-                info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER sampling")
+
+                r_com, c_com = get_dask_df_shape(self.df_v_comments)
+                info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- df_v_comments.shape AFTER sampling")
             else:
                 info(f"  No need to sample comments because sample greater than rows in df_comments")
 
         if active_run is not None:
-            r_com, c_com = self.df_v_comments.shape
             mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
-        assert (len(self.df_v_comments) == self.df_v_comments.index.nunique()), f"** Index not unique. Check duplicates df_v_comments **"
+        assert (r_com == self.df_v_comments[self.col_comment_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_comments **"
 
         elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
         gc.collect()
@@ -499,7 +528,7 @@ class AggregateEmbeddings:
             mask_single_comments = self.df_v_comments.index.get_level_values('post_id').isin(
                 self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 1]['post_id']
             )
-            info(f"  {(~mask_single_comments).sum():9,.0f} <- Comments to use for weighted average")
+            info(f"  {(~mask_single_comments).sum():10,.0f} <- Comments to use for weighted average")
 
             # TODO(djb)/debug: This merge function fails (runs out of memory) when I run on all
             #  comments (around 1.2 million)
@@ -582,7 +611,7 @@ class AggregateEmbeddings:
                 )
                 .set_index(l_ix_post_level)
             )
-            assert (len(df_agg_multi_comments) == df_agg_multi_comments.index.nunique()), "Index not unique"
+            assert (len(df_agg_multi_comments) == df_agg_multi_comments.index.nunique().compute()), "Index not unique"
 
             # Merge into a a single dataframe:
             # - posts w/ multiple comments (already averaged out)
@@ -601,7 +630,7 @@ class AggregateEmbeddings:
                 axis=0
             ).sort_index()
 
-        assert (len(self.df_v_com_agg) == self.df_v_com_agg.index.nunique()), "Index not unique"
+        assert (len(self.df_v_com_agg) == self.df_v_com_agg.index.nunique().compute()), "Index not unique"
         info(f"  {self.df_v_com_agg.shape} <- df_v_com_agg shape after aggregation")
         elapsed_time(start_time=t_start_agg_comments, log_label='Total comments to post agg loading', verbose=True)
 
@@ -643,7 +672,7 @@ class AggregateEmbeddings:
                 return_df=True,
              )
             info(f"Comments per post summary:\n{df_counts_summary}")
-            info(f"  {(self.df_comment_count_per_post['comment_count'] >= 2).sum():9,.0f}"
+            info(f"  {(self.df_comment_count_per_post['comment_count'] >= 2).sum():10,.0f}"
                  f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
             del df_counts_summary
             gc.collect()
@@ -665,7 +694,7 @@ class AggregateEmbeddings:
         mask_posts_without_comments = self.df_v_posts.index.get_level_values('post_id').isin(
             self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 0]['post_id']
         )
-        info(f"  {(~mask_posts_without_comments).sum():9,.0f} <- Posts that need weighted average")
+        info(f"  {(~mask_posts_without_comments).sum():10,.0f} <- Posts that need weighted average")
 
         # Create df with:
         #  - posts with 1+ comments
@@ -709,7 +738,7 @@ class AggregateEmbeddings:
             )
             .set_index(l_ix_post_level)
         )
-        assert (len(df_agg_posts_w_comments) == df_agg_posts_w_comments.index.nunique()), "Index not unique"
+        assert (len(df_agg_posts_w_comments) == df_agg_posts_w_comments.index.nunique().compute()), "Index not unique"
 
         # Merge into a a single dataframe:
         # - posts w/ multiple comments (already averaged out)
@@ -725,7 +754,7 @@ class AggregateEmbeddings:
             axis=0
         ).sort_index()
 
-        assert (len(self.df_posts_agg_b) == self.df_posts_agg_b.index.nunique()), "Index not unique"
+        assert (len(self.df_posts_agg_b) == self.df_posts_agg_b.index.nunique().compute()), "Index not unique"
         info(f"  {self.df_posts_agg_b.shape} <- df_posts_agg_b shape after aggregation")
 
         elapsed_time(start_time=t_start_method, log_label='Total posts & comments agg', verbose=True)
@@ -802,7 +831,7 @@ class AggregateEmbeddings:
             )
             .set_index(l_ix_post_level)
         ).sort_index()
-        assert (len(self.df_posts_agg_c) == self.df_posts_agg_c.index.nunique()), "Index not unique"
+        assert (len(self.df_posts_agg_c) == self.df_posts_agg_c.index.nunique().compute()), "Index not unique"
 
         info(f"  {self.df_posts_agg_c.shape} <- df_posts_agg_c shape after aggregation")
 
@@ -1001,6 +1030,22 @@ class AggregateEmbeddings:
             mlflow.log_artifacts(path_sub_local, artifact_path=folder_)
 
         elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()', verbose=True)
+
+
+def get_dask_df_shape(
+        ddf: dd.DataFrame,
+) -> Tuple[int, int]:
+    """
+    Convenience wrapper around Dask DF to compute and return df shape
+    Use it since I call .shape to log progress a few times and it's annoying
+    to have to .compute() or check whether it was computed every time we call .shape
+    """
+    # Turns out that .shape can also run out of memory...
+    #  index.size is faster and takes up less RAM
+    # r_, c_ = ddf.shape
+    r_ = ddf.index.size.compute()
+    c_ = len(ddf.columns)
+    return r_, c_
 
 
 class AggregateEmbeddingsConfig:
