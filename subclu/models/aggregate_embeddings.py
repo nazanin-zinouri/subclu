@@ -41,61 +41,6 @@ from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time, value_counts_and_pcts
 
 
-@hydra.main(config_path="../config", config_name="aggregate_embeddings")
-def load_config_agg_cli(
-        cfg: DictConfig,
-        return_dict: bool = False,
-) -> dict:
-    """"""
-    if return_dict:
-        return OmegaConf.to_container(cfg)
-    else:
-        return cfg
-
-
-def load_config_agg_jupyter(
-        config_path: str = "../config",
-        config_name: str = 'aggregate_embeddings',
-        overrides: List[str] = None,
-        return_dict: bool = False,
-) -> Union[DictConfig, dict]:
-    """
-    Wrapper around hydra API to load configs.
-
-    Example use:
-    load_default_config_agg_jupyter(
-        return_dict=True,
-        overrides=['data_text_and_metadata=german_subs_2021_06_16']
-    )
-
-    Args:
-        config_path:
-            Path to root config, relative to current file
-        config_name:
-            Name of config, exclude `.yaml` extension
-        overrides:
-            List of items to override from default config.
-            Note: If you add `+` to beginning of override item, it will ADD it, instead of
-            overriding it.
-        return_dict:
-            Set to True to return a python dictionary.
-            By default, function will return an `OmegaConf` object.
-
-    Returns:
-        `OmegaConf` object or python dict
-    """
-    with initialize(config_path=config_path):
-        if overrides is not None:
-            cfg = compose(config_name=config_name, overrides=overrides)
-        else:
-            cfg = compose(config_name=config_name)
-
-    if return_dict:
-        return OmegaConf.to_container(cfg)
-    else:
-        return cfg
-
-
 class AggregateEmbeddings:
     """
     Class to orchestrate different strategies to aggregate embeddings from post & comment-level up to
@@ -171,6 +116,7 @@ class AggregateEmbeddings:
         self.comments_folder = comments_folder
         self.col_comment_id = col_comment_id
         self.col_text_comment_word_count = col_text_comment_word_count
+        self.col_comment_text_len = col_comment_text_len
         self.min_comment_text_len = min_comment_text_len
 
         self.df_v_sub = df_v_sub
@@ -267,7 +213,7 @@ class AggregateEmbeddings:
         if self.min_comment_text_len is not None:
             info(f"{self.min_comment_text_len} <- Removing comments shorter than {self.min_comment_text_len} characters.")
             short_comments_to_remove = self.df_comments_meta[
-                self.df_comments_meta['comment_text_len'] <= self.min_comment_text_len
+                self.df_comments_meta[self.col_comment_text_len] <= self.min_comment_text_len
             ][self.col_comment_id]
 
             self.df_v_comments = (
@@ -1056,6 +1002,130 @@ class AggregateEmbeddings:
 
         elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()', verbose=True)
 
+
+class AggregateEmbeddingsConfig:
+    """Hydra-based config to load & override config
+
+    Example uses:
+    config_test = AggregateEmbeddingsConfig(
+        config_path="../config",
+        config_name='aggregate_embeddings',
+        overrides=['mlflow_experiment=v0.3.2_use_multi_aggregates_test', 'n_sample_posts=1000', 'n_sample_comments=2000']
+    )
+
+    mlflow_experiment_full = 'v0.3.2_use_multi_aggregates'
+    config_full_lc_false = AggregateEmbeddingsConfig(
+        config_path="../config",
+        config_name='aggregate_embeddings',
+        overrides=[f"mlflow_experiment={mlflow_experiment_full}",
+                   'n_sample_posts=null',
+                   'n_sample_comments=null',
+                   'data_embeddings_to_aggregate=top_subs-2021_07_16-use_muti_lower_case_false',
+                  ]
+    )
+    """
+    def __init__(
+            self,
+            config_path: str = "../config",
+            config_name: str = 'aggregate_embeddings',
+            overrides: List[str] = None,
+    ):
+        """
+
+        Args:
+            config_path:
+                Path to root config, relative to current file
+            config_name:
+                Name of config, exclude `.yaml` extension
+            overrides:
+                List of items to override from default config.
+                Note: If you add `+` to beginning of override item, it will ADD it, instead of
+                overriding it.
+        """
+        with initialize(config_path=config_path):
+            if overrides is not None:
+                self.config = compose(config_name=config_name, overrides=overrides)
+            else:
+                self.config = compose(config_name=config_name)
+
+        self.config_dict = OmegaConf.to_container(self.config)
+
+        # Note: it only goes one level
+        self.config_flat = dict()
+        for k, v in self.config_dict.items():
+            if isinstance(v, dict):
+                for k_nested, v_nested in v.items():
+                    self.config_flat[k_nested] = v_nested
+            else:
+                self.config_flat[k] = v
+
+
+def load_config_agg_jupyter(
+        config_path: str = "../config",
+        config_name: str = 'aggregate_embeddings',
+        overrides: List[str] = None,
+        return_dict: bool = False,
+        return_flat: bool = False,
+) -> Union[DictConfig, dict]:
+    """
+    Wrapper around hydra API to load configs.
+
+    Example use:
+    load_default_config_agg_jupyter(
+        return_dict=True,
+        overrides=['data_text_and_metadata=german_subs_2021_06_16']
+    )
+
+    Args:
+        config_path:
+            Path to root config, relative to current file
+        config_name:
+            Name of config, exclude `.yaml` extension
+        overrides:
+            List of items to override from default config.
+            Note: If you add `+` to beginning of override item, it will ADD it, instead of
+            overriding it.
+        return_dict:
+            Set to True to return a python dictionary.
+            By default, function will return an `OmegaConf` object.
+
+    Returns:
+        `OmegaConf` object or python dict
+    """
+    with initialize(config_path=config_path):
+        if overrides is not None:
+            cfg = compose(config_name=config_name, overrides=overrides)
+        else:
+            cfg = compose(config_name=config_name)
+
+    if return_dict:
+        return OmegaConf.to_container(cfg)
+
+    elif return_flat:
+        cfg_nested = OmegaConf.to_container(cfg)
+        cfg_flat = dict()
+        for k, v in cfg_nested.items():
+            if isinstance(v, dict):
+                for k_nested, v_nested in v.items():
+                    cfg_flat[k_nested] = v_nested
+            else:
+                cfg_flat[k] = v
+        return cfg_flat
+
+    else:
+        return cfg
+
+
+@hydra.main(config_path="../config", config_name="aggregate_embeddings")
+def load_config_agg_cli(
+        cfg: DictConfig,
+        return_dict: bool = False,
+) -> Union[DictConfig, dict]:
+    """"""
+    if return_dict:
+        return OmegaConf.to_container(cfg)
+    else:
+        return cfg
 
 
 #
