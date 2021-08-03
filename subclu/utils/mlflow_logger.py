@@ -30,6 +30,7 @@ from dask import dataframe as dd
 import mlflow
 from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
+from tqdm.auto import tqdm
 
 
 class MlflowLogger:
@@ -226,6 +227,8 @@ class MlflowLogger:
             experiment_ids: Union[str, int, List[int]] = None,
             read_function: Union[callable, str] = 'pd_parquet',
             columns: iter = None,
+            cache_locally: bool = True,
+            local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
     ):
         """
         Example:
@@ -251,24 +254,58 @@ class MlflowLogger:
         # logging.info(f"  Getting all runs...")
         df_all_runs = self.search_all_runs(experiment_ids=experiment_ids)
 
+        # Then get the URI for the specific run we want
         artifact_uri = df_all_runs.loc[
             df_all_runs['run_id'] == run_id,
             'artifact_uri'
         ].values[0]
+
+        if cache_locally:
+            storage_client = storage.Client()
+
+            # Extract bucket name & prefix from artifact URI
+            parsed_uri = artifact_uri.replace('gs://', '').split('/')
+            bucket_name = parsed_uri[0]
+            artifact_prefix = '/'.join(parsed_uri[1:])
+            full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
+
+
+            path_local_folder = Path(f"{local_path_root}/{full_artifact_folder}")
+            path_to_load = path_local_folder
+            info(f"Local folder to download artifact(s):\n  {path_local_folder}")
+            Path.mkdir(path_local_folder, exist_ok=True, parents=True)
+
+            bucket = storage_client.get_bucket(bucket_name)
+            l_files_to_download = list(bucket.list_blobs(prefix=full_artifact_folder))
+            for blob_ in tqdm(l_files_to_download):
+                f_name = (
+                    path_local_folder /
+                    f"{blob_.name.split('/')[-1].strip()}"
+                )
+                if f_name.exists():
+                    pass
+                    # info(f"  {f_name.name} <- File already exists, not downloading")
+                else:
+                    blob_.download_to_filename(f_name)
+
+        else:
+            path_to_load = f"{artifact_uri}/{artifact_folder}"
+
         if json.loads != read_function:
             try:
-                return read_function(f"{artifact_uri}/{artifact_folder}",
+                return read_function(path_to_load,
                                      columns=columns)
             except TypeError:
-                return read_function(f"{artifact_uri}/{artifact_folder}")
+                return read_function(path_to_load)
+
             except OSError:
                 # This error might happen if there are non-parquet files in the folder
                 # so we'll append `*.parquet` to try to read parquet files
-                return read_function(f"{artifact_uri}/{artifact_folder}/*.parquet",
+                return read_function(f"{path_to_load}/*.parquet",
                                      columns=columns)
 
         else:
-            # load JSON file might be able to use it with other functions, but might
+            # load JSON file might be able to use it with other readers, but might
             #  take a long time depending on file size.
             # A single JSON file with ~11 rows can take 2+ seconds to load
             storage_client = storage.Client()
