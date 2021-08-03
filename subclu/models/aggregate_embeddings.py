@@ -15,6 +15,11 @@ from logging import info
 from pathlib import Path
 from typing import Tuple, Union, List
 
+# config
+import hydra
+from hydra import initialize, compose
+from omegaconf import OmegaConf, DictConfig
+
 import mlflow
 import pandas as pd
 import numpy as np
@@ -34,6 +39,61 @@ from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
 from ..utils import mlflow_logger
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time, value_counts_and_pcts
+
+
+@hydra.main(config_path="../config", config_name="aggregate_embeddings")
+def load_config_agg_cli(
+        cfg: DictConfig,
+        return_dict: bool = False,
+) -> dict:
+    """"""
+    if return_dict:
+        return OmegaConf.to_container(cfg)
+    else:
+        return cfg
+
+
+def load_config_agg_jupyter(
+        config_path: str = "../config",
+        config_name: str = 'aggregate_embeddings',
+        overrides: List[str] = None,
+        return_dict: bool = False,
+) -> Union[DictConfig, dict]:
+    """
+    Wrapper around hydra API to load configs.
+
+    Example use:
+    load_default_config_agg_jupyter(
+        return_dict=True,
+        overrides=['data_text_and_metadata=german_subs_2021_06_16']
+    )
+
+    Args:
+        config_path:
+            Path to root config, relative to current file
+        config_name:
+            Name of config, exclude `.yaml` extension
+        overrides:
+            List of items to override from default config.
+            Note: If you add `+` to beginning of override item, it will ADD it, instead of
+            overriding it.
+        return_dict:
+            Set to True to return a python dictionary.
+            By default, function will return an `OmegaConf` object.
+
+    Returns:
+        `OmegaConf` object or python dict
+    """
+    with initialize(config_path=config_path):
+        if overrides is not None:
+            cfg = compose(config_name=config_name, overrides=overrides)
+        else:
+            cfg = compose(config_name=config_name)
+
+    if return_dict:
+        return OmegaConf.to_container(cfg)
+    else:
+        return cfg
 
 
 class AggregateEmbeddings:
