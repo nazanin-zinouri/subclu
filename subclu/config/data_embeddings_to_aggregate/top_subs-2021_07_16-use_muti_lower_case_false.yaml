@@ -1,14 +1,14 @@
-# Embeddings from to German subs, USE-multilingual
-comments_uuid: 'db7a4d8aff04420eb4229d6499055e04'
+# embeddings_description: 'Embeddings from USE-multilingual with lower_case=False'
+comments_uuid: 'e66c5db26bd64f6da09c012eea700d0a'
 comments_folder_embeddings: 'df_vect_comments'
 col_comment_id: 'comment_id'
 col_text_comment_word_count: 'comment_text_word_count'
 
-posts_uuid: 'db7a4d8aff04420eb4229d6499055e04'
+posts_uuid: '614a38e6690c4f3ba08725b1585b2ee9'
 posts_folder_embeddings: 'df_vect_posts'
 col_text_post_word_count: 'text_word_count'
 col_post_id: 'post_id'
 
-subreddit_desc_uuid: 'db7a4d8aff04420eb4229d6499055e04'
+subreddit_desc_uuid: '614a38e6690c4f3ba08725b1585b2ee9'
 subreddit_desc_folder_embeddings: 'df_vect_subreddits_description'
 col_subreddit_id: 'subreddit_id'
