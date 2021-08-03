@@ -1,0 +1,6 @@
+# Use these as a group to load raw text & metadata
+dataset_name: 'Top German Subs 2021-06-16'
+bucket_name: 'i18n-subreddit-clustering'
+folder_subreddits_text_and_meta: 'subreddits/de/2021-06-16'
+folder_comments_text_and_meta: 'comments/de/2021-06-16'
+folder_posts_text_and_meta: 'posts/de/2021-06-16'
