@@ -2,13 +2,20 @@
 ### Create a GCP Notebook
 For this project I'm using GCP notebooks for R&D because they offer self-service scalability & ssh connections that make it easy to integrate with PyCharm for local development & github integration.
 
-Here's the dashboard to access GCP instances/notebooks:
-https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-prod-165221
+For v0.1 we'll be using FastText and a CPU instance is good enough.
+For v0.3 we need Tensorflow & GPUs to speed up inference.
 
-For v0/v1 we'll be using FastText and a CPU instance is good enough.
+Here's the dashboard to access GCP instances/notebooks:
+- Prod: https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-prod-165221
+- Data-Science-Prod: https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-science-prod-218515
 
 ![GCP notebook dashboard with available notebooks](images/gcp_notebooks_dashboard.png)
 
+You _could_  also list resources using the `gcloud` CLI tool (but we don't have permissions enabled to use it)
+- https://cloud.google.com/sdk/gcloud/reference/notebooks/instances/list
+```bash
+gcloud notebooks instances list --location=us-west1 --project=data-science-prod
+```
 
 **TODO(djb)**: After v0 try a raw GCP machine instead. Suggested by Ugan:
 - https://console.cloud.google.com/marketplace/product/nvidia-ngc-public/nvidia-gpu-cloud-pytorch-image?project=data-science-prod-218515
