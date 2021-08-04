@@ -297,26 +297,49 @@ pip install -r base_requirements.txt --use-deprecated=legacy-resolver
 
 # Running mlflow server on GCP
 
-Run this command in GCP Notebok/VM:
-```
-# Deprecated
-mlflow server --backend-store-uri sqlite:///mlflow/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
-```
-
-New pattern is to call the mlflow DB for the current client:
+## Step 1: Run this command in the **GCP Notebok/VM**.
+The new pattern is to call the mlflow DB for the current host name:
+### Tensorflow Inference VM
 ```
 mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
 ```
 
+### CPU-based VM with lots of RAM:
 ```
 mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-100-2021-04-28-djb-eda-german-subs/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
 ```
 
 
-Need to tunnel into it from local using custom ssh function:
-```
+## Step 2: SSH into VM from your local
+I created a custom function to tunnel into your VM:
+```bash
 dj_ssh_mlflow cpu
 ```
+
+Function definition
+```bash
+# ssh into gcloud boxes to see mlflow server locally
+function dj_ssh_mlflow(){
+	if [ $1 = "cpu" ];
+	then
+		remote_ip="XXXYYY.us-west1-b.data-prod-165221"
+		local_port=5000
+
+	elif [ $1 = "tf_inference" ];
+	then
+		remote_ip="XXXYYY.us-west1-b.data-prod-165221"
+		local_port=5002
+
+	remote_port=5000
+	ssh -N -L $local_port\:localhost:$remote_port $remote_ip
+}
+```
+
+### Step 3: Open GUI in a browser
+Now you should be able to go to the browser and connect to your mlflow server. Replace the port as needed (e.g., `5000`, `50002` )
+
+https://127.0.0.1:5002/
+
 
 # Debugging
 
