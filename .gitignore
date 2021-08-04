@@ -146,3 +146,6 @@ dmypy.json
 
 # mlflow experiments (parameters, metrics, &/or data)
 *mlruns/
+
+# dask local storage
+*dask-worker-space/
