@@ -5,10 +5,14 @@ Ideally, call these functions so that new columns have the same definitions
 across different notebooks/experiments.
 """
 from logging import info
+from pathlib import Path
 from typing import Dict, Union
 
+from dask import dataframe as dd
+from google.cloud import storage
 import numpy as np
 import pandas as pd
+from tqdm.auto import tqdm
 
 from ..eda.aggregates import get_language_by_sub_wide
 # from subclu.eda.aggregates import get_language_by_sub_wide
@@ -29,11 +33,22 @@ class LoadPosts:
             columns: iter = None,
             col_new_manual_topic: str = 'manual_topic_and_rating',
             col_unique_check: str = 'post_id',
+            local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
+            df_format: str = 'pandas',
     ):
         self.bucket_name = bucket_name
         self.folder_path = folder_path
         self.col_new_manual_topic = col_new_manual_topic
         self.col_unique_check = col_unique_check
+
+        self.local_path_root = local_path_root
+        self.df_format = df_format
+        if df_format == 'pandas':
+            self.read_fxn = pd.read_parquet
+        elif df_format == 'dask':
+            self.read_fxn = dd.read_parquet
+        else:
+            raise NotImplementedError(f"Format not implemented:  {df_format}")
 
         if columns == 'aggregate_embeddings_':
             self.columns = [
@@ -70,12 +85,45 @@ class LoadPosts:
 
     def read_raw(self) -> pd.DataFrame:
         """Read raw files w/o any transformations"""
-        df = pd.read_parquet(
-            path=f"gs://{self.bucket_name}/{self.folder_path}",
+        # TODO(djb) locally cache before reading
+        self._local_cache()
+
+        df = self.read_fxn(
+            # path=f"gs://{self.bucket_name}/{self.folder_path}",
+            path=self.path_local_folder,
             columns=self.columns
         )
-        assert len(df) == df[self.col_unique_check].nunique()
+
+        if self.df_format == 'pandas':
+            assert len(df) == df[self.col_unique_check].nunique()
+
         return df
+
+    def _local_cache(self) -> None:
+        """Download the files locally to speed up load times & reduce bandwidth costs"""
+        storage_client = storage.Client()
+
+        # Extract bucket name & prefix from artifact URI
+        # parsed_uri = artifact_uri.replace('gs://', '').split('/')
+        # artifact_prefix = '/'.join(parsed_uri[1:])
+        # full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
+
+        self.path_local_folder = Path(f"{self.local_path_root}/{self.folder_path}")
+        info(f"Local folder to download artifact(s):\n  {self.path_local_folder}")
+        Path.mkdir(self.path_local_folder, exist_ok=True, parents=True)
+
+        bucket = storage_client.get_bucket(self.bucket_name)
+        l_files_to_download = list(bucket.list_blobs(prefix=self.folder_path))
+        for blob_ in tqdm(l_files_to_download):
+            f_name = (
+                    self.path_local_folder /
+                    f"{blob_.name.split('/')[-1].strip()}"
+            )
+            if f_name.exists():
+                pass
+                # info(f"  {f_name.name} <- File already exists, not downloading")
+            else:
+                blob_.download_to_filename(f_name)
 
     def read_and_apply_transformations(self) -> pd.DataFrame:
         """Read & apply all transformations in a single call"""
@@ -126,13 +174,17 @@ class LoadSubreddits(LoadPosts):
             columns: iter = None,
             col_new_manual_topic: str = 'manual_topic_and_rating',
             col_unique_check: str = 'subreddit_name',
+            local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
+            df_format: str = 'pandas',
     ) -> None:
         super().__init__(
             bucket_name=bucket_name,
             folder_path=folder_path,
             columns=columns,
             col_new_manual_topic=col_new_manual_topic,
-            col_unique_check=col_unique_check
+            col_unique_check=col_unique_check,
+            local_path_root=local_path_root,
+            df_format=df_format,
         )
         self.folder_posts = folder_posts
         # TODO(djb)
@@ -210,13 +262,17 @@ class LoadComments(LoadPosts):
             columns: iter = None,
             col_new_manual_topic: str = 'manual_topic_and_rating',
             col_unique_check: str = 'comment_id',
+            local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
+            df_format: str = 'pandas',
     ) -> None:
         super().__init__(
             bucket_name=bucket_name,
             folder_path=folder_path,
             columns=columns,
             col_new_manual_topic=col_new_manual_topic,
-            col_unique_check=col_unique_check
+            col_unique_check=col_unique_check,
+            local_path_root=local_path_root,
+            df_format=df_format,
         )
         self.folder_posts = folder_posts
 
@@ -251,12 +307,20 @@ class LoadComments(LoadPosts):
                 # 'probability',
                 # 'weighted_language',
                 # 'weighted_language_probability',
-                'comment_text_len',
+                # TODO(djb) add it back to SQL query... not sure why it's missing from top/US query
+                # 'comment_text_len',
                 'comment_text_word_count',
                 # 'comment_body_text',
             ]
         else:
             self.columns = columns
+
+    # TODO(djb) is there a way to quickly calculate and store text len?
+    #  I don't want to have to calculate it each time it's needed
+    # def read_raw(self) -> pd.DataFrame:
+    #     """Over-ride default read and calculate text len column if it's missing"""
+    #     df = super().read_raw()
+    #     if 'comment_text_len' not in df.columns:
 
 
 def create_sub_level_aggregates(
