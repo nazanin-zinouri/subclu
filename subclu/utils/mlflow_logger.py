@@ -229,6 +229,7 @@ class MlflowLogger:
             columns: iter = None,
             cache_locally: bool = True,
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
+            n_sample_files: int = None,
     ):
         """
         Example:
@@ -276,11 +277,16 @@ class MlflowLogger:
 
             bucket = storage_client.get_bucket(bucket_name)
             l_files_to_download = list(bucket.list_blobs(prefix=full_artifact_folder))
+            l_parquet_files_downloaded = list()
+            # not all the files in a folder will be parquet files, so we may need to download all files first
             for blob_ in tqdm(l_files_to_download):
                 f_name = (
                     path_local_folder /
                     f"{blob_.name.split('/')[-1].strip()}"
                 )
+                if str(f_name).endswith('parquet'):
+                    l_parquet_files_downloaded.append(f_name)
+
                 if f_name.exists():
                     pass
                     # info(f"  {f_name.name} <- File already exists, not downloading")
@@ -290,7 +296,14 @@ class MlflowLogger:
         else:
             path_to_load = f"{artifact_uri}/{artifact_folder}"
 
-        if json.loads != read_function:
+        if read_function == dd.read_parquet:
+            try:
+                info(f"  Reading {len(l_parquet_files_downloaded[:n_sample_files])} files")
+                return read_function(l_parquet_files_downloaded[:n_sample_files], columns=columns)
+            except OSError:
+                return read_function(f"{path_to_load}/*.parquet", columns=columns)
+
+        elif json.loads != read_function:
             try:
                 return read_function(path_to_load,
                                      columns=columns)
