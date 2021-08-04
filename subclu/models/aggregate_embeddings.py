@@ -56,9 +56,9 @@ class AggregateEmbeddings:
     def __init__(
             self,
             bucket_name: str = 'i18n-subreddit-clustering',
-            folder_meta_subreddits: str = 'subreddits/de/2021-06-16',
-            folder_meta_comments: str = 'comments/de/2021-06-16',
-            folder_meta_posts: str = 'posts/de/2021-06-16',
+            folder_subreddits_text_and_meta: str = 'subreddits/de/2021-06-16',
+            folder_comments_text_and_meta: str = 'comments/de/2021-06-16',
+            folder_posts_text_and_meta: str = 'posts/de/2021-06-16',
 
             posts_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
             posts_folder: str = 'df_vect_posts',
@@ -83,8 +83,8 @@ class AggregateEmbeddings:
             run_name: str = None,
             mlflow_tracking_uri: str = 'sqlite',
 
-            n_sample_posts: int = None,
-            n_sample_comments: int = None,
+            frac_sample_posts: float = None,
+            frac_sample_comments: float = None,
 
             agg_comments_to_post_weight_col: str = 'comment_text_len',
             agg_post_post_weight: int = 70,
@@ -102,9 +102,9 @@ class AggregateEmbeddings:
     ):
         """"""
         self.bucket_name = bucket_name
-        self.folder_meta_subreddits = folder_meta_subreddits
-        self.folder_meta_comments = folder_meta_comments
-        self.folder_meta_posts = folder_meta_posts
+        self.folder_subreddits_text_and_meta = folder_subreddits_text_and_meta
+        self.folder_comments_text_and_meta = folder_comments_text_and_meta
+        self.folder_posts_text_and_meta = folder_posts_text_and_meta
 
         self.mlflow_experiment = mlflow_experiment
         self.run_name = run_name
@@ -129,8 +129,8 @@ class AggregateEmbeddings:
         self.subreddit_desc_folder = subreddit_desc_folder
         self.col_subreddit_id = col_subreddit_id
 
-        self.n_sample_posts = n_sample_posts
-        self.n_sample_comments = n_sample_comments
+        self.frac_sample_posts = frac_sample_posts
+        self.frac_sample_comments = frac_sample_comments
 
         # use pre-loaded metadata if running in interactive mode
         self.df_subs_meta = df_subs_meta
@@ -218,18 +218,18 @@ class AggregateEmbeddings:
 
         # Filter out short comments using metadata
         # ---
-        if self.min_comment_text_len is not None:
-            info(f"{self.min_comment_text_len} <- Removing comments shorter than {self.min_comment_text_len} characters.")
-            short_comments_to_remove = self.df_comments_meta[
-                self.df_comments_meta[self.col_comment_text_len] <= self.min_comment_text_len
-            ][self.col_comment_id]
-
-            self.df_v_comments = (
-                self.df_v_comments
-                [~(self.df_v_comments.index.get_level_values(self.col_comment_id).isin(short_comments_to_remove))]
-            )
-            info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER removing short comments")
-            gc.collect()
+        # if self.min_comment_text_len is not None:
+        #     info(f"{self.min_comment_text_len} <- Removing comments shorter than {self.min_comment_text_len} characters.")
+        #     short_comments_to_remove = self.df_comments_meta[
+        #         self.df_comments_meta[self.col_comment_text_len] <= self.min_comment_text_len
+        #     ][self.col_comment_id]
+        #
+        #     self.df_v_comments = (
+        #         self.df_v_comments
+        #         [~(self.df_v_comments.index.get_level_values(self.col_comment_id).isin(short_comments_to_remove))]
+        #     )
+        #     info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER removing short comments")
+        #     gc.collect()
 
         # ---------------------
         # Merge all comments at post-level
@@ -310,9 +310,9 @@ class AggregateEmbeddings:
 
         self.config_to_log_and_store = {
             'bucket_name': self.bucket_name,
-            'folder_meta_subreddits': self.folder_meta_subreddits,
-            'folder_meta_comments': self.folder_meta_comments,
-            'folder_meta_posts': self.folder_meta_posts,
+            'folder_subreddits_text_and_meta': self.folder_subreddits_text_and_meta,
+            'folder_comments_text_and_meta': self.folder_comments_text_and_meta,
+            'folder_posts_text_and_meta': self.folder_posts_text_and_meta,
 
             'mlflow_experiment': self.mlflow_experiment,
             'run_name': self.run_name,
@@ -333,8 +333,8 @@ class AggregateEmbeddings:
             'subreddit_desc_folder': self.subreddit_desc_folder,
             'col_subreddit_id': self.col_subreddit_id,
 
-            'n_sample_posts': self.n_sample_posts,
-            'n_sample_comments': self.n_sample_comments,
+            'frac_sample_posts': self.frac_sample_posts,
+            'frac_sample_comments': self.frac_sample_comments,
 
             'agg_comments_to_post_weight_col': self.agg_comments_to_post_weight_col,
             'agg_post_post_weight': self.agg_post_post_weight,
@@ -365,6 +365,7 @@ class AggregateEmbeddings:
                 run_id=self.subreddit_desc_uuid,
                 artifact_folder=self.subreddit_desc_folder,
                 read_function=self.embeddings_read_fxn,
+                cache_locally=True,
             )
         else:
             info(f"Raw subreddit embeddings pre-loaded")
@@ -386,30 +387,32 @@ class AggregateEmbeddings:
                 run_id=self.posts_uuid,
                 artifact_folder=self.posts_folder,
                 read_function=self.embeddings_read_fxn,
+                cache_locally=True,
             )
         else:
             info(f"POSTS embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_posts = self.df_v_posts.copy()
 
-        r_post_raw, c_post_raw = get_dask_df_shape(self.df_v_posts)
-        info(f"  {r_post_raw:10,.0f} | {c_post_raw:4,.0f} <- Raw POSTS shape")
-        if self.n_sample_posts is not None:
-            if len(self.df_v_posts) > self.n_sample_posts:
-                info(f"  Sampling POSTS down to: {self.n_sample_posts:,.0f}")
-                self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
+        # r_post_raw, c_post_raw = get_dask_df_shape(self.df_v_posts)
+        # info(f"  {r_post_raw:10,.0f} | {c_post_raw:4,.0f} <- Raw POSTS shape")
+        if self.frac_sample_posts is not None:
+            # if len(self.df_v_posts) > self.frac_sample_posts:
+            info(f"  Sampling POSTS down to: {self.frac_sample_posts:,.2%}")
+            self.df_v_posts = self.df_v_posts.sample(frac=self.frac_sample_posts)
 
-                r_post, c_post = get_dask_df_shape(self.df_v_posts)
-                info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- df_posts.shape AFTER sampling")
-            else:
-                info(f"  No need to sample POSTS because sample greater than rows in df_posts")
-                r_post, c_post = r_post_raw, c_post_raw
+            r_post, c_post = get_dask_df_shape(self.df_v_posts)
+            info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- df_posts.shape AFTER sampling")
+            # else:
+            #     info(f"  No need to sample POSTS because sample greater than rows in df_posts")
+            #     # r_post, c_post = r_post_raw, c_post_raw
         else:
-            r_post, c_post = r_post_raw, c_post_raw
+            pass
+            # r_post, c_post = r_post_raw, c_post_raw
 
-        if active_run is not None:
-            mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
-        assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_posts **"
+        # if active_run is not None:
+        #     mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
+        # assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_posts **"
 
         # ------------------------
         # Load and check COMMENTS
@@ -420,37 +423,40 @@ class AggregateEmbeddings:
                 run_id=self.comments_uuid,
                 artifact_folder=self.comments_folder,
                 read_function=self.embeddings_read_fxn,
+                cache_locally=True,
             )
         else:
             info(f"COMMENTS embeddings pre-loaded")
             self.df_v_comments = self.df_v_comments.copy()
-        r_com_raw, c_com_raw = get_dask_df_shape(self.df_v_comments)
-        info(f"  {r_com_raw:10,.0f} | {c_com_raw:4,.0f} <- Raw COMMENTS shape")
-        info(f"  Keep only comments for posts with embeddings")
+        # not worth computing the shape of comments, process & filter one at a time
+        #  in another step
+        # r_com_raw, c_com_raw = get_dask_df_shape(self.df_v_comments)
+        # info(f"  {r_com_raw:10,.0f} | {c_com_raw:4,.0f} <- Raw COMMENTS shape")
+        # info(f"  Keep only comments for posts with embeddings")
         # No longer need to use index.get_level_values() b/c I reset_index() before saving
         #  But now need to use .compute() before .isin() b/c dask doesn't work otherwise...
-        self.df_v_comments = (
-            self.df_v_comments
-            [self.df_v_comments['post_id'].compute().isin(
-                self.df_v_posts['post_id'].unique().compute()
-             )]
-        )
-        r_com, c_com = get_dask_df_shape(self.df_v_comments)
-        info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
+        # self.df_v_comments = (
+        #     self.df_v_comments
+        #     [self.df_v_comments['post_id'].compute().isin(
+        #         self.df_v_posts['post_id'].unique().compute()
+        #      )]
+        # )
+        # r_com, c_com = get_dask_df_shape(self.df_v_comments)
+        # info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
 
-        if self.n_sample_comments is not None:
-            if len(self.df_v_comments) > self.n_sample_comments:
-                info(f"  Sampling COMMENTS down to: {self.n_sample_comments:,.0f}")
-                self.df_v_comments = self.df_v_comments.sample(n=self.n_sample_comments)
+        if self.frac_sample_comments is not None:
+            # if len(self.df_v_comments) > self.frac_sample_comments:
+            info(f"  Sampling COMMENTS down to: {self.frac_sample_comments:,.2%}")
+            self.df_v_comments = self.df_v_comments.sample(frac=self.frac_sample_comments)
 
-                r_com, c_com = get_dask_df_shape(self.df_v_comments)
-                info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- df_v_comments.shape AFTER sampling")
-            else:
-                info(f"  No need to sample comments because sample greater than rows in df_comments")
+            r_com, c_com = get_dask_df_shape(self.df_v_comments)
+            info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- df_v_comments.shape AFTER sampling")
+            # else:
+            #     info(f"  No need to sample comments because sample greater than rows in df_comments")
 
-        if active_run is not None:
-            mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
-        assert (r_com == self.df_v_comments[self.col_comment_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_comments **"
+        # if active_run is not None:
+        #     mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
+        # assert (r_com == self.df_v_comments[self.col_comment_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_comments **"
 
         elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
         gc.collect()
@@ -467,7 +473,7 @@ class AggregateEmbeddings:
             info(f"Loading POSTS metadata...")
             self.df_posts_meta = LoadPosts(
                 bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_posts,
+                folder_path=self.folder_posts_text_and_meta,
                 columns='aggregate_embeddings_',
             ).read_and_apply_transformations()
         else:
@@ -478,8 +484,8 @@ class AggregateEmbeddings:
             info(f"Loading subs metadata...")
             self.df_subs_meta = LoadSubreddits(
                 bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_subreddits,
-                folder_posts=self.folder_meta_posts,
+                folder_path=self.folder_subreddits_text_and_meta,
+                folder_posts=self.folder_posts_text_and_meta,
                 columns=None,
             ).read_apply_transformations_and_merge_post_aggs(df_posts=self.df_posts_meta)
         else:
@@ -490,8 +496,9 @@ class AggregateEmbeddings:
             info(f"Loading COMMENTS metadata...")
             self.df_comments_meta = LoadComments(
                 bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_comments,
+                folder_path=self.folder_comments_text_and_meta,
                 columns='aggregate_embeddings_',
+                df_format='dask',
             ).read_raw()
         else:
             info(f"Comments META pre-loaded")
@@ -513,7 +520,6 @@ class AggregateEmbeddings:
             info(f"No column to weight comments, simple mean for comments at post level")
             self.df_v_com_agg = (
                 self.df_v_comments
-                .reset_index()
                 .groupby(l_ix_post_level)
                 .mean()
             )

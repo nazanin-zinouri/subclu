@@ -269,7 +269,6 @@ class MlflowLogger:
             artifact_prefix = '/'.join(parsed_uri[1:])
             full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
 
-
             path_local_folder = Path(f"{local_path_root}/{full_artifact_folder}")
             path_to_load = path_local_folder
             info(f"Local folder to download artifact(s):\n  {path_local_folder}")

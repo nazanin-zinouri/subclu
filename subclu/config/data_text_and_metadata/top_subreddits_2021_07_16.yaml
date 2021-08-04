@@ -1,6 +1,6 @@
 # Use these as a group to load raw text & metadata
-dataset_name: 'Top Subreddits (no Geo) + German Subs 2021-07-16'
+dataset_name: 'Top Subreddits (no Geo) + German Subs 2021-07-16, comments: 2021-07-09'
 bucket_name: 'i18n-subreddit-clustering'
 folder_subreddits_text_and_meta: 'subreddits/top/2021-07-16'
-folder_comments_text_and_meta: 'comments/top/2021-07-16'
+folder_comments_text_and_meta: 'comments/top/2021-07-09'  # Comments have not been updated to 2021-07-16...
 folder_posts_text_and_meta: 'posts/top/2021-07-16'

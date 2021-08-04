@@ -6,5 +6,5 @@ defaults:
 
 mlflow_tracking_uri: 'sqlite'
 mlflow_experiment: 'v0.3.2_use_multi_aggregates'  # 'v0.3.2_use_multi_aggregates_test'
-n_sample_posts: null
-n_sample_comments: null
+frac_sample_posts: null
+frac_sample_comments: null
