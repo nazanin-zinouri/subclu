@@ -6,10 +6,10 @@ by functions from `models/vectorize_text.py`
 
 Vectorize text > Aggregate embeddings > Compress embeddings | Cluster posts | Cluster subs
 """
-
+import logging
 from datetime import datetime, timedelta
 import gc
-import logging
+# import logging
 from logging import info
 # import os
 from pathlib import Path
@@ -367,6 +367,10 @@ class AggregateEmbeddings:
                 read_function=self.embeddings_read_fxn,
                 cache_locally=True,
             )
+            try:
+                self.df_v_sub = self.df_v_sub.drop(self.col_subreddit_id, axis=1)
+            except KeyError:
+                pass
         else:
             info(f"Raw subreddit embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
@@ -376,7 +380,8 @@ class AggregateEmbeddings:
         info(f"  {r_sub:10,.0f} | {c_sub:4,.0f} <- Raw vectorized subreddit description shape")
         if active_run is not None:
             mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
-        assert (r_sub == self.df_v_sub[self.col_subreddit_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_sub **"
+        assert (r_sub == self.df_v_sub['subreddit_name'].nunique().compute()), (f"** Index not unique. "
+                                                                                f"Check duplicates df_v_sub **")
 
         # ------------------------
         # Load and check POSTS
@@ -393,6 +398,10 @@ class AggregateEmbeddings:
                 cache_locally=True,
                 n_sample_files=self.n_sample_posts_files,
             )
+            try:
+                self.df_v_posts = self.df_v_posts.drop(self.col_subreddit_id, axis=1)
+            except KeyError:
+                pass
         else:
             info(f"POSTS embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
@@ -403,7 +412,8 @@ class AggregateEmbeddings:
 
         if active_run is not None:
             mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
-        # assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_posts **"
+        assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), (f"** Post-ID NOT unique. "
+                                                                                   f"Check duplicates df_v_posts **")
 
         # ------------------------
         # Load and check COMMENTS
@@ -419,6 +429,10 @@ class AggregateEmbeddings:
                 cache_locally=True,
                 n_sample_files=self.n_sample_comments_files,
             )
+            try:
+                self.df_v_comments = self.df_v_comments.drop(self.col_subreddit_id, axis=1)
+            except KeyError:
+                pass
         else:
             info(f"COMMENTS embeddings pre-loaded")
             self.df_v_comments = self.df_v_comments.copy()
@@ -447,16 +461,10 @@ class AggregateEmbeddings:
         # TODO(djb) keep only one column for subreddit-level index
         #  because carrying around name & ID makes some things complicated and can take up a ton of memory
         #  we can always add subreddit_id at the end
-        for ddf_ in [self.df_v_sub, self.df_v_posts, self.df_v_comments]:
-            try:
-                ddf_ = ddf_.drop(self.col_subreddit_id, axis=1)
-            except KeyError:
-                info(f"  Col subreddit_id not found in embeddings df {self.col_subreddit_id}")
-
         self.l_ix_sub_level = ['subreddit_name']
         self.l_ix_post_level = self.l_ix_sub_level + [self.col_post_id]
         self.l_ix_comment_level = self.l_ix_post_level + [self.col_comment_id]
-        # the assumptions are:
+        # The assumptions are:
         # - numeric cols that are not index cols are embeddings cols
         # - Embedding cols have the same names for all 3 sources
         self.l_embedding_cols = [c for c in self.df_v_comments.select_dtypes('number').columns if
@@ -520,14 +528,36 @@ class AggregateEmbeddings:
         gc.collect()
         t_start_agg_comments = datetime.utcnow()
 
+        # Calculate comment count per post so we can know which posts to include & exclude
+        #  from aggregation function (which can be expensive)
+        self._calculate_comment_count_per_post()
+
+        info(f"Filtering which comments need to be averaged...")
+        mask_single_comments = self.df_v_comments['post_id'].isin(
+            self.df_comment_count_per_post[self.df_comment_count_per_post[self.col_comment_count] == 1]
+            ['post_id'].compute()
+        )
+        mask_single_comments_pandas = mask_single_comments.compute()
+        info(f"  {mask_single_comments_pandas.sum():11,.0f} <- Comments that DON'T need to be averaged")
+        info(f"  {(~mask_single_comments_pandas).sum():11,.0f} <- Comments that need to be averaged")
+
         if self.agg_comments_to_post_weight_col is None:
             info(f"No column to weight comments, simple mean for comments at post level")
-            self.df_v_com_agg = (
-                self.df_v_comments
-                .groupby(self.l_ix_post_level)
-                [self.l_embedding_cols]
-                .mean()
-                .reset_index()
+
+            self.df_v_com_agg = dd.concat(
+                [
+                    # First, calculate average for posts with 2+ comments
+                    self.df_v_comments
+                    [~mask_single_comments]
+                    .groupby(self.l_ix_post_level)
+                    [self.l_embedding_cols]
+                    .mean()
+                    .reset_index(),
+                    # And append the values for single posts w/o alteration
+                    self.df_v_comments
+                    [mask_single_comments]
+                    [self.l_ix_post_level + self.l_embedding_cols]
+                ]
             )
 
         else:
@@ -546,39 +576,54 @@ class AggregateEmbeddings:
         """
         if self.df_comment_count_per_post is None:
             info(f"Getting count of comments per post...")
+            # dask does not support pandas' “named aggregation”,
+            # so we need to calculate and then rename after calculation
+            # https://github.com/dask/dask/issues/5294
+
+            # hold off on computing until later so that dask can
+            #  optimize the task plan
+            self.col_comment_count = 'comment_count'
             self.df_comment_count_per_post = (
-                self.df_v_comments.index.to_frame(index=False)
-                    .groupby(['post_id'], as_index=False)
-                    .agg(
-                    comment_count=('comment_id', 'count')
-                )
+                self.df_v_comments
+                .groupby(self.l_ix_post_level)
+                [self.col_comment_id].count()
+                .reset_index()
+                .rename(columns={self.col_comment_id: self.col_comment_count})
+                # .compute()
             )
 
             # add posts with zero comments
             self.df_comment_count_per_post = self.df_comment_count_per_post.merge(
-                self.df_v_posts.index.get_level_values('post_id').to_frame(index=False),
+                self.df_v_posts[['post_id']],
                 how='outer',
                 on=['post_id']
             )
-            self.df_comment_count_per_post = self.df_comment_count_per_post.fillna(0)
-            self.df_comment_count_per_post['comment_count_'] = np.where(
-                self.df_comment_count_per_post['comment_count'] >= 4,
-                "4+",
-                self.df_comment_count_per_post['comment_count'].astype(str)
+            self.df_comment_count_per_post[self.col_comment_count] = (
+                self.df_comment_count_per_post[self.col_comment_count].fillna(0)
             )
 
-            df_counts_summary = value_counts_and_pcts(
-                self.df_comment_count_per_post['comment_count_'],
-                add_col_prefix=False,
-                count_type='posts',
-                reset_index=True,
-                sort_index=True,
-                return_df=True,
-             )
-            info(f"Comments per post summary:\n{df_counts_summary}")
-            info(f"  {(self.df_comment_count_per_post['comment_count'] >= 2).sum():10,.0f}"
-                 f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
-            del df_counts_summary
+            try:
+                df_counts_summary = value_counts_and_pcts(
+                    self.df_comment_count_per_post['comment_count'].compute(),
+                    add_col_prefix=False,
+                    count_type='posts',
+                    reset_index=True,
+                    sort_index=True,
+                    return_df=True,
+                    cumsum=False,
+                 )
+
+                # s_val_counts = self.df_comment_count_per_post[col_comment_count].value_counts(normalize=True).head(10)
+                info(f"Comments per post summary:\n{df_counts_summary}")
+                del df_counts_summary
+            except Exception as er:
+                logging.warning("Error creating summary of comments per post.\n{er}")
+
+            # don't compute this now, wait for later when we need to create a mask to get IDs
+            #  for posts & comments that need to be averaged
+            # info(f"  {(self.df_comment_count_per_post['comment_count'].compute() >= 2).sum():10,.0f}"
+            #      f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
+
             gc.collect()
 
     def _agg_posts_and_comments_to_post_level(self):
