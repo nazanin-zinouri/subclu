@@ -1,5 +1,5 @@
 # GCP Notebooks + ssh setup
-### Create a GCP Notebook
+## Create a GCP Notebook
 For this project I'm using GCP notebooks for R&D because they offer self-service scalability & ssh connections that make it easy to integrate with PyCharm for local development & github integration.
 
 For v0.1 we'll be using FastText and a CPU instance is good enough.
@@ -20,6 +20,27 @@ gcloud notebooks instances list --location=us-west1 --project=data-science-prod
 **TODO(djb)**: After v0 try a raw GCP machine instead. Suggested by Ugan:
 - https://console.cloud.google.com/marketplace/product/nvidia-ngc-public/nvidia-gpu-cloud-pytorch-image?project=data-science-prod-218515
 
+### Work-around (if you can't access the Notebook console)
+If you can't access the AI Notebooks console, you can still stop, start, and resize **existing VMs** using the `VM instance` console:
+- https://console.cloud.google.com/compute/instances?project=data-prod-165221
+
+**To Start/Stop:**
+- Click on the name of the VM  you want to update. It will take you to the `VM instance details` page.
+- In the `VM instance details` page, you can click "Start/Stop" in the top row of buttons
+
+**To Edit the VM**
+If you want to change the CPU/RAM configuration:
+- First go to the `VM details` page and stop the VM (see Start/Stop above). 
+- Then, in the `VM instance details` page, click the `Edit` Button at the top left of the page.
+- Once you're in the `Edit` page, you can change configurations and other details.
+
+**To Get the URL for Jupyter Lab**
+- First, go to the `VM details` page and start the instance (see above).
+- Once the instance is running, search for the `proxy-url` field in the `Custom metadata` section. The value of that field should have the URL you can use to access Jupyter Lab.
+
+Example:
+- <UUID_generated_by_google>-dot-us-west1.notebooks.googleusercontent.com
+
 
 ### Set up gcloud tools in your laptop (if you haven't set it up)
 In order to authenticate & connect to a GCP notebook, we need to use the `gcloud` SDK. For the latest instructions see here: https://cloud.google.com/sdk/docs/install
@@ -29,19 +50,59 @@ In order to authenticate & connect to a GCP notebook, we need to use the `gcloud
 - Run this command to install the sdk: `./google-cloud-sdk/install.sh`
 - (Optional) Delete the zipped package
 
-### Run authentication SDK & set default project name
+## Run authentication SDK & set default project name
 After gcloud sdk is installed, run this command to create authentication tokens:
-<br>`gcloud auth login`
+```bash
+gcloud auth login
+```
 
 Set the default project with this command:
-<br>`gcloud config set project data-prod-165221`
+```bash
+gcloud config set project data-prod-165221
+```
+
+### Set multiple configurations [optional]
+If you have VMs in another project besides `data-prod-165221`, here's a guide to manage multiple gcloud configurations:
+- https://www.the-swamp.info/blog/configuring-gcloud-multiple-projects/
+
+The **tl;dr** is:
+You can create a new config with this command:
+```bash
+gcloud config configurations create datascience-project
+# Created [datascience-project].
+# Activated [datascience-project].
+```
+
+Then you can see all your configurations with this command
+```bash
+gcloud config configurations list
+
+# NAME                 IS_ACTIVE  ACCOUNT                   PROJECT                   COMPUTE_DEFAULT_ZONE  COMPUTE_DEFAULT_REGION
+# datascience-project  True       david.bermejo@reddit.com  data-science-prod-218515
+# default              False      david.bermejo@reddit.com  data-prod-165221
+```
+
+And to change your active configuration you use:
+```bash
+gcloud config configurations activate default
+```
 
 ### Create SSH keys & refresh GCP tokens
-`gcloud compute config-ssh`
+```bash
+gcloud compute config-ssh
+# You should now be able to use ssh/scp with your instances.
+# For example, try running:
+#
+#  $ ssh djb-100-2021-04-28-djb-eda-german-subs.us-west1-b.data-prod-165221
+```
+
+The default project is expected to be: `data-prod-165221`. If you want to connect to VMs in a different project you can use a `--project` flag. Or you might need to `activate` configuration (see above).
+<br>`gcloud compute config-ssh --project=data-science-prod-218515`
 
 This command will refresh authentication tokens & checks which virtual machines are available for you. You'll need to run it every ~8 or ~12 hours. [The documentation isn't clear on timing](https://cloud.google.com/sdk/gcloud/reference/compute/config-ssh).
 
-The first time you run the command, it'll also create a new set of SSH keys. Note that you'll be asked to create a passphrase for additional security.
+The first time you run the command, it'll also create a new set of SSH keys. 
+<br>**Note** that you'll be asked to create a passphrase for additional security.
 
 ### Connect to instance from command line
 Once you have the keys & tokens refreshed, you can connect to your instance using regular ssh, like this:
@@ -49,6 +110,16 @@ Once you have the keys & tokens refreshed, you can connect to your instance usin
 
 For example:
 <br>`ssh djb-100-2021-04-28-djb-eda-german-subs.us-west1-b.data-prod-165221`
+
+#### Troubleshooting SSH failures
+If the ssh command above fails, you may be able to use `gcloud` to connect with this command:
+
+```bash
+gcloud compute ssh --zone "us-west1-b" "djb-i18n-topic-modeling-python-cpu-20210804" --project "data-science-prod-218515"
+```
+
+TODO(djb) However, I haven't been able to use regular SSH (or PyCharm) to connect to the VMs in the `data-science-prod-218515` project... :sad-panda:
+- https://cloud.google.com/compute/docs/instances/adding-removing-ssh-keys#instance-only
 
 ### What is home?
 When you ssh, you will only have write access to your personal folder. When you ssh, your home will be:
@@ -341,13 +412,28 @@ Now you should be able to go to the browser and connect to your mlflow server. R
 https://127.0.0.1:5002/
 
 
-# Debugging
+# Useful GCP consoles
+### AI notebooks
+https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-science-prod-218515
+> Create and use Jupyter Notebooks with a notebook instance. Notebook instances have JupyterLab pre-installed and are configured with GPU-enabled machine learning frameworks.
 
-**Warning** installing tensorflow-text without pinning existing dependencies can make GPUs unusable. So before installing anything, here's what a blank/raw GPU environment looks like:
-      
-```
+### VM Instances
+https://console.cloud.google.com/compute/instances?project=data-prod-165221
+> VM instances are highly configurable virtual machines for running workloads on Google infrastructure.
 
-```
+### **Machine Images**
+https://console.cloud.google.com/compute/machineImages?project=data-prod-165221
+> A machine image contains a VM’s properties, metadata, permissions, and data from all its attached disks. You can use a machine image to create, backup, or restore a VM
+
+### **Data Proc clusters**
+- https://console.cloud.google.com/dataproc/clusters?region=us-central1&project=data-science-prod-218515
+- https://cloud.google.com/dataproc
+> Dataproc is a fully managed and highly scalable service for running Apache Spark, Apache Flink, Presto, and 30+ open source tools and frameworks. Use Dataproc for data lake modernization, ETL, and secure data science, at planet scale, fully integrated with Google Cloud, at a fraction of the cost.
+
+By default, these clusters will create a bucket where they'll store data and notebooks.
+- Bucket created by a Data Proc cluster (`dataproc-staging-us-central1-212906482731-fh9nrzce`)
+- [Example GCS data with cluster notebooks](https://console.cloud.google.com/storage/browser/dataproc-staging-us-central1-212906482731-fh9nrzce/notebooks/jupyter/cluster_notebooks;tab=objects?pageState=(%22StorageObjectListTable%22:(%22f%22:%22%255B%255D%22))&project=data-science-prod-218515&prefix=&forceOnObjectsSortingFiltering=false)
+
 
 # Monitoring GPU usage
 `htop` doesn't seem to have a way to monitor GPU stats, but here are some alternatives.
@@ -391,4 +477,11 @@ The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new 
 It's not great because, for example, after 1 minute (60 seconds), if you want to scroll back, you'll go through 6 stdout statements. 
 
 
+# Debugging GPU Usage
+TODO(djb)
 
+**Warning** installing tensorflow-text without pinning existing dependencies can make GPUs unusable. So before installing anything, here's what a blank/raw GPU environment looks like:
+      
+```
+
+```
