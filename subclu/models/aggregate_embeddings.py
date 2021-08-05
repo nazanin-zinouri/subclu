@@ -440,7 +440,27 @@ class AggregateEmbeddings:
 
         # if active_run is not None:
         #     mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
-        # assert (r_com == self.df_v_comments[self.col_comment_id].nunique().compute()), f"** Index not unique. Check duplicates df_v_comments **"
+        # assert (r_com == self.df_v_comments[self.col_comment_id].nunique().compute()),
+        # f"** Index not unique. Check duplicates df_v_comments **"
+
+        # Set columns for index checking
+        # TODO(djb) keep only one column for subreddit-level index
+        #  because carrying around name & ID makes some things complicated and can take up a ton of memory
+        #  we can always add subreddit_id at the end
+        for ddf_ in [self.df_v_sub, self.df_v_posts, self.df_v_comments]:
+            try:
+                ddf_ = ddf_.drop(self.col_subreddit_id, axis=1)
+            except KeyError:
+                info(f"  Col subreddit_id not found in embeddings df {self.col_subreddit_id}")
+
+        self.l_ix_sub_level = ['subreddit_name']
+        self.l_ix_post_level = self.l_ix_sub_level + [self.col_post_id]
+        self.l_ix_comment_level = self.l_ix_post_level + [self.col_comment_id]
+        # the assumptions are:
+        # - numeric cols that are not index cols are embeddings cols
+        # - Embedding cols have the same names for all 3 sources
+        self.l_embedding_cols = [c for c in self.df_v_comments.select_dtypes('number').columns if
+                                 c not in [self.col_subreddit_id] + self.l_ix_comment_level]
 
         elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
         gc.collect()
@@ -499,17 +519,13 @@ class AggregateEmbeddings:
         info(f"-- Start _agg_comments_to_post_level() method --")
         gc.collect()
         t_start_agg_comments = datetime.utcnow()
-        l_ix_comment_level = ['subreddit_name', 'subreddit_id', 'post_id', 'comment_id']
-        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        # the assumption is that numeric cols that are not index cols are embeddings cols
-        l_embedding_cols = [c for c in self.df_v_comments.select_dtypes('number').columns if c not in l_ix_comment_level]
 
         if self.agg_comments_to_post_weight_col is None:
             info(f"No column to weight comments, simple mean for comments at post level")
             self.df_v_com_agg = (
                 self.df_v_comments
-                .groupby(l_ix_post_level)
-                [l_embedding_cols]
+                .groupby(self.l_ix_post_level)
+                [self.l_embedding_cols]
                 .mean()
                 .reset_index()
             )
@@ -656,8 +672,6 @@ class AggregateEmbeddings:
         t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
-        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        l_embedding_cols = list(self.df_v_posts.columns)
 
         # instead of re-calculating post + comment weights, reuse it
         if self.df_posts_agg_b is None:
@@ -698,18 +712,19 @@ class AggregateEmbeddings:
         d_weighted_mean_agg = dict()
         for id_, df in tqdm(df_posts_for_weights.groupby('post_id')):
             d_weighted_mean_agg[id_] = np.average(
-                df[l_embedding_cols],
+                df[self.l_embedding_cols],
                 weights=df[col_weights],
                 axis=0,
             )
         gc.collect()
         # Convert dict to df so we can reshape to input multi-index
         df_agg_posts_w_sub = pd.DataFrame(d_weighted_mean_agg).T
-        df_agg_posts_w_sub.columns = l_embedding_cols
+        df_agg_posts_w_sub.columns = self.l_embedding_cols
         df_agg_posts_w_sub.index.name = 'post_id'
         info(f"  {df_agg_posts_w_sub.shape} <- df_agg_posts_w_sub.shape (only posts with comments)")
 
         # Re-append multi-index so it's the same in original and new output
+        # TODO(djb): stop messing with index & multi-index. Dask can't handle it
         self.df_posts_agg_c = (
             df_agg_posts_w_sub
             .merge(
@@ -717,7 +732,7 @@ class AggregateEmbeddings:
                 how='left',
                 on=['post_id'],
             )
-            .set_index(l_ix_post_level)
+            .set_index(self.l_ix_post_level)
         ).sort_index()
         assert (len(self.df_posts_agg_c) == self.df_posts_agg_c.index.nunique().compute()), "Index not unique"
 
