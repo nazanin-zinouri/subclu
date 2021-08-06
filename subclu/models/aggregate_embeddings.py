@@ -624,21 +624,24 @@ class AggregateEmbeddings:
             )
 
             try:
-                df_counts_summary = value_counts_and_pcts(
-                    self.df_comment_count_per_post['comment_count'].compute(),
-                    add_col_prefix=False,
-                    count_type='posts',
-                    reset_index=True,
-                    sort_index=True,
-                    return_df=True,
-                    cumsum=False,
-                 )
+                if self.n_sample_comments_files <= 4:
+                    # only compute for test runs, otherwise it wastes a lot of compute
+                    df_counts_summary = value_counts_and_pcts(
+                        self.df_comment_count_per_post['comment_count'].compute(),
+                        add_col_prefix=False,
+                        count_type='posts',
+                        reset_index=True,
+                        sort_index=True,
+                        return_df=True,
+                        cumsum=False,
+                     )
 
-                # s_val_counts = self.df_comment_count_per_post[col_comment_count].value_counts(normalize=True).head(10)
-                info(f"Comments per post summary:\n{df_counts_summary}")
-                del df_counts_summary
+                    # dask alternative:
+                    # s_val_counts = self.df_comment_count_per_post[col_comment_count].value_counts(normalize=True).head(10)
+                    info(f"Comments per post summary:\n{df_counts_summary}")
+                    del df_counts_summary
             except Exception as er:
-                logging.warning("Error creating summary of comments per post.\n{er}")
+                logging.warning(f"Error creating summary of comments per post.\n{er}")
 
             # don't compute this now, wait for later when we need to create a mask to get IDs
             #  for posts & comments that need to be averaged
