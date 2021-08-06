@@ -565,9 +565,28 @@ class AggregateEmbeddings:
         else:
             raise NotImplementedError("Currently, only .mean() is implemented")
 
-        info(f"Checking that index is unique after aggregation...")
-        assert (len(self.df_v_com_agg) == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
-        info(f"  {self.df_v_com_agg.shape} <- df_v_com_agg shape after aggregation")
+        logging.warning(f"Checking that index is unique after aggregation... [NOT IMPLEMENTED]")
+        # TODO(djb): Fix this check. Dask fails computing this check with len... try something else
+        #  Instead of len:
+        #       - count?
+        #       - index count?
+        #  or is it .nunique() that is failing?
+        #   maybe simply iterate one subreddt at a time?
+        #  pattern to try:
+        #   - create an empty list where we'll store tuples to compare
+        #   - loop through subreddits in post-level data
+        #       - create a mask for df_v_com_agg for only comments that belong to the subreddit
+        #       - using the mask, create a tuple:
+        #           - unique posts in masked df
+        #           - count of posts in masked df
+        #        - in this loop check compute the values of the unique() and count() fxns
+        #  Alternative: don't compute in that loop and create a 2nd loop where the tuples actually get compared
+        r_com_agg = self.df_v_com_agg[self.col_post_id].nunique().compute()
+        c_com_agg = len(self.df_v_com_agg.columns)
+        if active_run is not None:
+            mlflow.log_metrics({'df_v_com_agg_rows': r_com_agg, 'df_v_com_agg_cols': c_com_agg})
+        # assert (r_com_agg == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
+        info(f"  {r_com_agg:11,.0f} | {c_com_agg:4,.0f} <- df_v_com_agg SHAPE")
         elapsed_time(start_time=t_start_agg_comments, log_label='Total comments to post agg loading', verbose=True)
 
     def _calculate_comment_count_per_post(self):
