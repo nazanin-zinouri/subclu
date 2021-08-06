@@ -440,17 +440,19 @@ class AggregateEmbeddings:
         #  in another step
         # r_com_raw, c_com_raw = get_dask_df_shape(self.df_v_comments)
         # info(f"  {r_com_raw:10,.0f} | {c_com_raw:4,.0f} <- Raw COMMENTS shape")
-        # info(f"  Keep only comments for posts with embeddings")
         # No longer need to use index.get_level_values() b/c I reset_index() before saving
         #  But now need to use .compute() before .isin() b/c dask doesn't work otherwise...
-        # self.df_v_comments = (
-        #     self.df_v_comments
-        #     [self.df_v_comments['post_id'].compute().isin(
-        #         self.df_v_posts['post_id'].unique().compute()
-        #      )]
-        # )
-        # r_com, c_com = get_dask_df_shape(self.df_v_comments)
-        # info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
+        if self.n_sample_comments_files is not None:
+            info(f"  Keep only comments for posts with embeddings")
+            self.df_v_comments = self.df_v_comments[
+                self.df_v_comments[self.col_post_id].isin(
+                    self.df_v_posts[self.col_post_id].compute()
+                 )
+            ]
+
+            if self.n_sample_comments_files <= 4:
+                r_com, c_com = get_dask_df_shape(self.df_v_comments)
+                info(f"  {r_com:11,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
 
         # if active_run is not None:
         #     mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
