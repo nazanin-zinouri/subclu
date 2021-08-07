@@ -601,8 +601,8 @@ class AggregateEmbeddings:
             # so we need to calculate and then rename after calculation
             # https://github.com/dask/dask/issues/5294
 
-            # hold off on computing until later so that dask can
-            #  optimize the task plan
+            # First get count for posts with comments
+            # hold off on computing until later so dask can optimize the DAG
             self.col_comment_count = 'comment_count'
             self.df_comment_count_per_post = (
                 self.df_v_comments
@@ -613,14 +613,21 @@ class AggregateEmbeddings:
                 # .compute()
             )
 
-            # add posts with zero comments
-            self.df_comment_count_per_post = self.df_comment_count_per_post.merge(
-                self.df_v_posts[['post_id']],
-                how='outer',
-                on=['post_id']
+            self.mask_posts_posts_with_comments = self.df_v_posts['post_id'].isin(
+                self.df_v_comments['post_id'].compute()
             )
-            self.df_comment_count_per_post[self.col_comment_count] = (
-                self.df_comment_count_per_post[self.col_comment_count].fillna(0)
+
+            # 2nd, add posts with zero comments
+            #  Make sure to add the same columns & merge at the same index level!
+            # Use concat instead of merge b/c it's less compute-intensive
+            self.df_comment_count_per_post = dd.concat(
+                [
+                    self.df_comment_count_per_post,
+                    self.df_v_posts[~self.mask_posts_posts_with_comments][self.l_ix_post_level].assign(
+                        **{self.col_comment_count: 0}
+                    )
+                ],
+                axis=0,
             )
 
             try:
