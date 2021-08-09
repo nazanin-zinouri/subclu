@@ -690,13 +690,8 @@ class AggregateEmbeddings:
 
         t_start_method = datetime.utcnow()
         l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        l_embedding_cols = list(self.df_v_posts.columns)
 
         self._calculate_comment_count_per_post()
-        mask_posts_without_comments = self.df_v_posts.index.get_level_values('post_id').isin(
-            self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 0]['post_id']
-        )
-        info(f"  {(~mask_posts_without_comments).sum():10,.0f} <- Posts that need weighted average")
 
         # Create df with:
         #  - posts with 1+ comments
@@ -704,62 +699,73 @@ class AggregateEmbeddings:
         #  - comments for posts
         #    - one row per post, these are already aggregated
         #    - add new col with input weight
-        df_posts_for_weights = pd.concat(
+        self.df_posts_for_weights = dd.concat(
             [
-                self.df_v_posts[~mask_posts_without_comments].assign(
+                self.df_v_posts[self.mask_posts_posts_with_comments].assign(
                     **{col_weights: self.agg_post_post_weight}
                 ),
                 self.df_v_com_agg.assign(
                     **{col_weights: self.agg_post_comment_weight}
                 ),
-             ]
+             ],
+            interleave_partitions=True
         )
+        try:
+            if self.n_sample_comments_files <= 4:
+                # use alias instead of calculating again
+                mask_posts_without_comments = ~self.mask_posts_posts_with_comments
 
-        # iterate to get weighted average for each post_id that has comments
-        d_weighted_mean_agg = dict()
-        for id_, df in tqdm(df_posts_for_weights.groupby('post_id')):
-            d_weighted_mean_agg[id_] = np.average(
-                df[l_embedding_cols],
-                weights=df[col_weights],
-                axis=0,
-            )
-        gc.collect()
-        # Convert dict to df so we can reshape to input multi-index
-        df_agg_posts_w_comments = pd.DataFrame(d_weighted_mean_agg).T
-        df_agg_posts_w_comments.columns = l_embedding_cols
-        df_agg_posts_w_comments.index.name = 'post_id'
-        info(f"  {df_agg_posts_w_comments.shape} <- df_agg_posts_w_comments.shape (only posts with comments)")
+                mask_posts_without_comments_pandas = mask_posts_without_comments.compute()
+                info(f"  {mask_posts_without_comments_pandas.sum():11,.0f} <- Posts that DON'T need weighted average")
+                info(f"  {(~mask_posts_without_comments_pandas).sum():11,.0f} <- Posts that need weighted average")
 
-        # Re-append multi-index so it's the same in original and new output
-        df_agg_posts_w_comments = (
-            df_agg_posts_w_comments
-            .merge(
-                self.df_v_posts.index.to_frame(index=False).drop_duplicates(),
-                how='left',
-                on=['post_id'],
+                r_weights, c_weights = get_dask_df_shape(self.df_posts_for_weights)
+                info(f"  {r_weights:11,.0f} | {c_weights:4,.0f} <- Shape of df(posts+comments) to weight")
+        except (ValueError, TypeError):
+            pass
+
+        info(f"DEFINE agg_posts_w_comments...")
+        # When using dask, we don't need to manually iterate, we can let dask figure that out:
+        ddf_agg_posts_w_comments = (
+            self.df_posts_for_weights.groupby(self.l_ix_post_level)
+            .apply(
+                partial(
+                    weighted_mean_for_groupby_np,
+                    cols_to_avg=self.l_embedding_cols,
+                    col_weights=col_weights,
+                ),
+                meta={c: np.float32 for c in self.l_embedding_cols}
             )
-            .set_index(l_ix_post_level)
+            .reset_index()
         )
-        assert (len(df_agg_posts_w_comments) == df_agg_posts_w_comments.index.nunique().compute()), "Index not unique"
+        # info(f"Compute agg_posts_w_comments...")
+        # df_agg_posts_w_comments = ddf_agg_posts_w_comments.compute()
+        info(f"  {ddf_agg_posts_w_comments.shape} <- df_agg_posts_w_comments.shape (only posts with comments)")
 
         # Merge into a a single dataframe:
         # - posts w/ multiple comments (already averaged out)
         # - posts with 1 comment (no need for weights)
-        # Sort because we want most posts for a subreddit in one file or
+        # NVM for now: Sort because we want most posts for a subreddit in one file or
         #  adjacent files when we save to multiple dfs
-        self.df_posts_agg_b = pd.concat(
+        info(f"Concat aggregated comments+posts with posts-without comments")
+        self.df_posts_agg_b = dd.concat(
             [
-                df_agg_posts_w_comments,
-                self.df_v_posts[mask_posts_without_comments]
+                ddf_agg_posts_w_comments,
+                self.df_v_posts[~self.mask_posts_posts_with_comments]
             ],
-            ignore_index=False,
+            interleave_partitions=True,
             axis=0
-        ).sort_index()
+        )
 
-        assert (len(self.df_posts_agg_b) == self.df_posts_agg_b.index.nunique().compute()), "Index not unique"
-        info(f"  {self.df_posts_agg_b.shape} <- df_posts_agg_b shape after aggregation")
+        r_agg_posts, c_agg_comments = get_dask_df_shape(self.df_posts_agg_b)
+        info(f"  {r_agg_posts:11,.0f} | {c_agg_comments:4,.0f} <- df_posts_agg_b shape after aggregation")
 
-        elapsed_time(start_time=t_start_method, log_label='Total posts & comments agg', verbose=True)
+        if self.n_sample_comments_files is not None:
+            if self.n_sample_comments_files <= 4:
+                logging.warning(f"Unique check only applied when sampling/testing")
+                assert (r_agg_posts == self.df_posts_agg_b[self.col_post_id].nunique().compute()), "Index not unique"
+
+        elapsed_time(start_time=t_start_method, log_label='Total posts & comments agg (df_posts_agg_b)', verbose=True)
 
     def _agg_posts_comments_and_sub_descriptions_to_post_level(self):
         """roll up post & comment embeddings to post-level
