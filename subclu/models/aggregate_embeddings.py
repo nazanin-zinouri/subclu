@@ -9,6 +9,7 @@ Vectorize text > Aggregate embeddings > Compress embeddings | Cluster posts | Cl
 import logging
 from datetime import datetime, timedelta
 import gc
+from functools import partial
 # import logging
 from logging import info
 # import os
@@ -21,6 +22,7 @@ from hydra import initialize, compose
 from omegaconf import OmegaConf, DictConfig
 
 import mlflow
+import dask.dataframe
 from dask import dataframe as dd
 import pandas as pd
 import numpy as np
@@ -528,6 +530,8 @@ class AggregateEmbeddings:
         """
         info(f"-- Start _agg_comments_to_post_level() method --")
         gc.collect()
+        # Check active run for each method because we don't know order of calls
+        active_run = mlflow.active_run()
         t_start_agg_comments = datetime.utcnow()
 
         # Calculate comment count per post so we can know which posts to include & exclude
@@ -555,17 +559,18 @@ class AggregateEmbeddings:
                     [self.l_embedding_cols]
                     .mean()
                     .reset_index(),
-                    # And append the values for single posts w/o alteration
+                    # And append the values for of single comments  (no agg needed)
                     self.df_v_comments
                     [mask_single_comments]
                     [self.l_ix_post_level + self.l_embedding_cols]
-                ]
+                ],
+                interleave_partitions=True
             )
 
         else:
             raise NotImplementedError("Currently, only .mean() is implemented")
 
-        logging.warning(f"Checking that index is unique after aggregation... [NOT IMPLEMENTED]")
+
         # TODO(djb): Fix this check. Dask fails computing this check with len... try something else
         #  Instead of len:
         #       - count?
@@ -581,11 +586,14 @@ class AggregateEmbeddings:
         #           - count of posts in masked df
         #        - in this loop check compute the values of the unique() and count() fxns
         #  Alternative: don't compute in that loop and create a 2nd loop where the tuples actually get compared
-        r_com_agg = self.df_v_com_agg[self.col_post_id].nunique().compute()
+        r_com_agg = len(self.df_v_com_agg[self.col_post_id].compute())
         c_com_agg = len(self.df_v_com_agg.columns)
         if active_run is not None:
             mlflow.log_metrics({'df_v_com_agg_rows': r_com_agg, 'df_v_com_agg_cols': c_com_agg})
-        # assert (r_com_agg == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
+        if self.n_sample_comments_files is not None:
+            if self.n_sample_comments_files <= 4:
+                logging.warning(f"Checking that index is unique after aggregation... [only when testing]")
+                assert (r_com_agg == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
         info(f"  {r_com_agg:11,.0f} | {c_com_agg:4,.0f} <- df_v_com_agg SHAPE")
         elapsed_time(start_time=t_start_agg_comments, log_label='Total comments to post agg loading', verbose=True)
 
