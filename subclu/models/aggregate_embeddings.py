@@ -647,7 +647,21 @@ class AggregateEmbeddings:
                     # s_val_counts = self.df_comment_count_per_post[col_comment_count].value_counts(normalize=True).head(10)
                     info(f"Comments per post summary:\n{df_counts_summary}")
                     del df_counts_summary
-            except Exception as er:
+
+                    info(f"TESTING that all post IDs are counted in df_comment_count_per_post...")
+                    set_post_ids_in_posts = set(self.df_v_posts[self.col_post_id].compute())
+                    set_post_ids_comment_count = set(self.df_comment_count_per_post[self.col_post_id].compute())
+                    test_set = set_post_ids_in_posts == set_post_ids_comment_count
+                    info(f"  {test_set} <- Post IDs in df_v_posts == df_comment_count_per_post")
+                    if not test_set:
+                        logging.error(
+                            f"  Post IDs ARE NOT EQUAL!"
+                            f"\n    {len(set_post_ids_in_posts - set_post_ids_comment_count)} Posts - Comment count"
+                            f"\n    {len(set_post_ids_comment_count - set_post_ids_in_posts)} Comment count - Posts"
+                        )
+                        raise Exception(f"Error calculating comment count per post")
+
+            except (KeyError, ValueError, TypeError) as er:
                 logging.warning(f"Error creating summary of comments per post.\n{er}")
 
             # don't compute this now, wait for later when we need to create a mask to get IDs
