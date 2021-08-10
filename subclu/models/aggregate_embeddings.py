@@ -685,7 +685,7 @@ class AggregateEmbeddings:
 
         Single posts = posts where there's only one comment, so we don't need to calculate weights
         """
-        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        info(f"-- Start (df_posts_agg_b) _agg_posts_and_comments_to_post_level() method --")
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
 
@@ -783,14 +783,14 @@ class AggregateEmbeddings:
                 logging.warning(f"Unique check only applied when sampling/testing")
                 assert (r_agg_posts == self.df_posts_agg_b[self.col_post_id].nunique().compute()), "Index not unique"
 
-        elapsed_time(start_time=t_start_method, log_label='Total posts & comments agg (df_posts_agg_b)', verbose=True)
+        elapsed_time(start_time=t_start_method, log_label='Total (df_posts_agg_b) posts & comments agg', verbose=True)
 
     def _agg_posts_comments_and_sub_descriptions_to_post_level(self):
         """roll up post & comment embeddings to post-level
 
         Single posts = posts where there's only one comment, so we don't need to calculate weights
         """
-        info(f"-- Start _agg_posts_comments_and_sub_descriptions_to_post_level() method --")
+        info(f"-- Start (df_posts_agg_c) _agg_posts_comments_and_sub_descriptions_to_post_level() method --")
         t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
@@ -808,59 +808,69 @@ class AggregateEmbeddings:
         #  - subreddit descriptions
         #    - create new df: one row per post, each row has the embeddings for the sub
         #    - add new col with input weight
-        #    - TODO: maybe do it within a loop?
-        #        b/c we'll get a lot of copies for same data, but maybe 1 merge function is
-        #        better than thousands of merge calls
-        df_posts_for_weights = pd.concat(
+        self.df_posts_for_weights = dd.concat(
             [
-                self.df_posts_agg_b.reset_index().assign(
+                self.df_posts_agg_b.assign(
                     **{col_weights: (self.agg_post_post_weight + self.agg_post_comment_weight)}
                 ),
                 (
-                    self.df_posts_agg_b.index.to_frame(index=False)
-                    .merge(
+                    self.df_posts_agg_b[self.l_ix_post_level].merge(
                         self.df_v_sub,
                         how='left',
-                        left_on=['subreddit_name', 'subreddit_id'],
-                        right_index=True,
+                        on=self.l_ix_sub_level,
                     )
+                    .reset_index()
                 ).assign(
                     **{col_weights: self.agg_post_subreddit_desc_weight}
                 ),
             ]
         )
 
-        # iterate to get weighted average for each post_id that has comments
-        d_weighted_mean_agg = dict()
-        for id_, df in tqdm(df_posts_for_weights.groupby('post_id')):
-            d_weighted_mean_agg[id_] = np.average(
-                df[self.l_embedding_cols],
-                weights=df[col_weights],
-                axis=0,
+        df_expected_agg_output = pd.DataFrame(
+            columns=self.l_embedding_cols,
+            index=[self.col_post_id],
+            dtype=np.float32,
+        )
+        # With Dask, we don't need to manually iterate, it can manage the iterating for us
+        self.df_agg_posts_w_sub = (
+            self.df_posts_for_weights
+            .groupby(self.col_post_id)
+            .apply(
+                partial(
+                    weighted_mean_for_groupby_np,
+                    cols_to_avg=self.l_embedding_cols,
+                    col_weights=col_weights,
+                ),
+                meta=df_expected_agg_output,
             )
-        gc.collect()
-        # Convert dict to df so we can reshape to input multi-index
-        df_agg_posts_w_sub = pd.DataFrame(d_weighted_mean_agg).T
-        df_agg_posts_w_sub.columns = self.l_embedding_cols
-        df_agg_posts_w_sub.index.name = 'post_id'
-        info(f"  {df_agg_posts_w_sub.shape} <- df_agg_posts_w_sub.shape (only posts with comments)")
+            .reset_index()
+            # Renaming the `index` is a workaround for a dask failing to rename the
+            #  actual index column ('post_id') column after .reset_index()
+            .rename(columns={'index': self.col_post_id})
+        )
+        info(f"  {self.df_agg_posts_w_sub.shape} <- df_agg_posts_w_sub.shape (only posts with comments)")
 
-        # Re-append multi-index so it's the same in original and new output
-        # TODO(djb): stop messing with index & multi-index. Dask can't handle it
+        # Re-append index columns so it's the same in original and new output (but not as index)
         self.df_posts_agg_c = (
-            df_agg_posts_w_sub
+            self.df_agg_posts_w_sub
             .merge(
-                self.df_v_posts.index.to_frame(index=False).drop_duplicates(),
+                self.df_v_posts[self.l_ix_post_level].drop_duplicates(),
                 how='left',
-                on=['post_id'],
+                on=[self.col_post_id],
             )
-            .set_index(self.l_ix_post_level)
-        ).sort_index()
-        assert (len(self.df_posts_agg_c) == self.df_posts_agg_c.index.nunique().compute()), "Index not unique"
+            # .reset_index()
+            # .set_index(self.l_ix_post_level)
+        )  # .sort_index()
 
-        info(f"  {self.df_posts_agg_c.shape} <- df_posts_agg_c shape after aggregation")
+        r_agg_posts, c_agg_posts = get_dask_df_shape(self.df_posts_agg_c, col_len_check=self.col_post_id)
+        info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_c shape after aggregation")
 
-        elapsed_time(start_time=t_start_method, log_label='Total posts+comments+subs agg', verbose=True)
+        if self.n_sample_comments_files is not None:
+            if self.n_sample_comments_files <= 4:
+                logging.warning(f"Unique check only applied when sampling/testing")
+                assert (r_agg_posts == self.df_posts_agg_c[self.col_post_id].nunique().compute()), "Index not unique"
+
+        elapsed_time(start_time=t_start_method, log_label='Total (df_posts_agg_c) posts+comments+subs agg', verbose=True)
 
     def _agg_post_aggregates_to_subreddit_level(self):
         """Roll up post-level aggregations to subreddit-level"""
