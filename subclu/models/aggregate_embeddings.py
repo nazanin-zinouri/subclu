@@ -1059,6 +1059,7 @@ class AggregateEmbeddings:
 
 def get_dask_df_shape(
         ddf: dd.DataFrame,
+        col_len_check: str = None,
 ) -> Tuple[int, int]:
     """
     Convenience wrapper around Dask DF to compute and return df shape
@@ -1068,9 +1069,45 @@ def get_dask_df_shape(
     # Turns out that .shape can also run out of memory...
     #  index.size is faster and takes up less RAM
     # r_, c_ = ddf.shape
-    r_ = ddf.index.size.compute()
+
     c_ = len(ddf.columns)
-    return r_, c_
+    if col_len_check is None:
+        return ddf.index.size.compute(), c_
+    else:
+        return len(ddf[col_len_check].compute()), c_
+
+
+def weighted_mean_for_groupby_np(
+        partition: dask.dataframe,
+        cols_to_avg: Union[list, iter],
+        col_weights: str,
+        output_dtype=np.float32,
+):
+    """Wrapper to get weighted average"""
+
+    # when calculating a single value, the values are NOT np arrays,
+    # . but when creating a batch, they do become NP arrays... ?? seems confusing
+    try:
+        return pd.Series(
+            np.average(
+                partition[cols_to_avg].values,
+                weights=partition[col_weights].values,
+                axis=0,
+            ),
+            index=cols_to_avg
+        ).astype(output_dtype)
+    except ValueError as e:
+        print(e)
+        logging.info(e)
+
+        return pd.Series(
+            np.average(
+                partition[cols_to_avg].values.compute(),
+                weights=partition[col_weights].values.compute(),
+                axis=0,
+            ),
+            index=cols_to_avg
+        ).astype(output_dtype)
 
 
 class AggregateEmbeddingsConfig:
