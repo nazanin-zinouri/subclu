@@ -376,7 +376,7 @@ def save_and_log_config(
 
 
 def save_pd_df_to_parquet_in_chunks(
-        df: pd.DataFrame,
+        df: Union[pd.DataFrame, dd.DataFrame],
         path: Union[str, Path],
         target_mb_size: int = None,
         write_index: bool = True,
@@ -392,31 +392,37 @@ def save_pd_df_to_parquet_in_chunks(
 
     For reference, BigQuery dumped 75 files for ~1 million comments, each file is ~4MB
     """
-    mem_usage_mb = df.memory_usage(deep=True).sum() / 1048576
+    if isinstance(df, pd.DataFrame):
+        info(f"Converting pandas to dask...")
+        mem_usage_mb = df.memory_usage(deep=True).sum() / 1048576
 
-    info(f"  {mem_usage_mb:6,.1f} MB <- Memory usage")
+        info(f"  {mem_usage_mb:6,.1f} MB <- Memory usage")
 
-    if target_mb_size is None:
-        if mem_usage_mb < 100:
-            target_mb_size = 30
-        elif 100 <= mem_usage_mb < 1000:
-            target_mb_size = 40
-        elif 1000 <= mem_usage_mb < 3000:
-            target_mb_size = 60
-        else:
-            target_mb_size = 75
+        if target_mb_size is None:
+            if mem_usage_mb < 100:
+                target_mb_size = 30
+            elif 100 <= mem_usage_mb < 1000:
+                target_mb_size = 40
+            elif 1000 <= mem_usage_mb < 3000:
+                target_mb_size = 60
+            else:
+                target_mb_size = 75
 
-    n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
+        n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
 
-    info(f"  {n_dask_partitions:6,.0f}\t<- target Dask partitions"
-         f"\t {target_mb_size:6,.1f} <- target MB partition size"
-         )
+        info(f"  {n_dask_partitions:6,.0f}\t<- target Dask partitions"
+             f"\t {target_mb_size:6,.1f} <- target MB partition size"
+             )
 
     # info(f"Saving parquet files to:\n  {path}...")
-    (
-        dd.from_pandas(df, npartitions=n_dask_partitions)
-        .to_parquet(path, write_index=write_index)
-    )
+        (
+            dd.from_pandas(df, npartitions=n_dask_partitions)
+            .to_parquet(path, write_index=write_index)
+        )
+    else:
+        # if it's a dask df, simply save as is
+        info(f"  {df.npartitions:6,.0f}\t<- EXISTING Dask partitions")
+        df.to_parquet(path, write_index=write_index)
 
 
 
