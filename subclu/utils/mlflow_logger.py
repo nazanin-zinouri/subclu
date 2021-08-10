@@ -230,6 +230,7 @@ class MlflowLogger:
             cache_locally: bool = True,
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             n_sample_files: int = None,
+            verbose: bool = False,
     ):
         """
         Example:
@@ -306,6 +307,11 @@ class MlflowLogger:
                 else:
                     blob_.download_to_filename(f_name)
             info(f"  Parquet files found: {len(l_parquet_files_downloaded[:n_sample_files]):,.0f}")
+            if verbose:
+                input_files = ['/'.join(f_.name.split('/')[-2:]) for f_ in l_files_to_download]
+                parquet_files = ['/'.join(str(f_).split('/')[-2:]) for f_ in l_parquet_files_downloaded]
+                info(f"Input files: \n{input_files}")
+                info(f"Parquet files: \n{parquet_files}")
         else:
             path_to_load = f"{artifact_uri}/{artifact_folder}"
 
@@ -314,8 +320,7 @@ class MlflowLogger:
                 return read_function(l_parquet_files_downloaded[:n_sample_files], columns=columns)
             except OSError:
                 return read_function(f"{path_to_load}/*.parquet", columns=columns)
-
-        elif json.loads != read_function:
+        elif json.loads != read_function:  # meant for pd.read_parquet
             try:
                 return read_function(path_to_load,
                                      columns=columns)
