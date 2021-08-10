@@ -568,6 +568,7 @@ class AggregateEmbeddings:
             )
 
         else:
+            # TODO(djb): add new calculation to get weighted average for comments
             raise NotImplementedError("Currently, only .mean() is implemented")
 
 
@@ -689,7 +690,6 @@ class AggregateEmbeddings:
         col_weights = '_col_method_weight_'
 
         t_start_method = datetime.utcnow()
-        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
 
         self._calculate_comment_count_per_post()
 
@@ -726,21 +726,34 @@ class AggregateEmbeddings:
 
         info(f"DEFINE agg_posts_w_comments...")
         # When using dask, we don't need to manually iterate, we can let dask figure that out:
-        ddf_agg_posts_w_comments = (
-            self.df_posts_for_weights.groupby(self.l_ix_post_level)
+        # HOWEVER, when using multi-index, we need to add more metadata
+        #  https://github.com/dask/dask/issues/6286
+        # There's a weird bug with dask where after .apply(), it'll create an empty column called "index"
+        #  So we need to drop it *sigh*
+        df_expected_agg_output = pd.DataFrame(
+            columns=self.l_embedding_cols,
+            index=self.l_ix_post_level,
+            dtype=np.float32,
+        )
+
+        self.ddf_agg_posts_w_comments = (
+            self.df_posts_for_weights
+            .groupby(self.l_ix_post_level)
             .apply(
                 partial(
                     weighted_mean_for_groupby_np,
                     cols_to_avg=self.l_embedding_cols,
                     col_weights=col_weights,
                 ),
-                meta={c: np.float32 for c in self.l_embedding_cols}
+                # meta={c: np.float32 for c in self.l_embedding_cols} # this gives us the weird index error
+                meta=df_expected_agg_output,
             )
             .reset_index()
         )
+
         # info(f"Compute agg_posts_w_comments...")
         # df_agg_posts_w_comments = ddf_agg_posts_w_comments.compute()
-        info(f"  {ddf_agg_posts_w_comments.shape} <- df_agg_posts_w_comments.shape (only posts with comments)")
+        info(f"  {self.ddf_agg_posts_w_comments.shape} <- df_agg_posts_w_comments.shape (only posts with comments)")
 
         # Merge into a a single dataframe:
         # - posts w/ multiple comments (already averaged out)
@@ -750,15 +763,20 @@ class AggregateEmbeddings:
         info(f"Concat aggregated comments+posts with posts-without comments")
         self.df_posts_agg_b = dd.concat(
             [
-                ddf_agg_posts_w_comments,
+                self.ddf_agg_posts_w_comments,
                 self.df_v_posts[~self.mask_posts_posts_with_comments]
             ],
             interleave_partitions=True,
             axis=0
         )
+        # We need to drop this blank `index` column because of the weird dask .multi-index error
+        try:
+            self.df_posts_agg_b = self.df_posts_agg_b.drop(['index'], axis=1)
+        except (ValueError, KeyError):
+            pass
 
-        r_agg_posts, c_agg_comments = get_dask_df_shape(self.df_posts_agg_b)
-        info(f"  {r_agg_posts:11,.0f} | {c_agg_comments:4,.0f} <- df_posts_agg_b shape after aggregation")
+        r_agg_posts, c_agg_posts = get_dask_df_shape(self.df_posts_agg_b, col_len_check=self.col_post_id)
+        info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_b shape after aggregation")
 
         if self.n_sample_comments_files is not None:
             if self.n_sample_comments_files <= 4:
@@ -772,7 +790,7 @@ class AggregateEmbeddings:
 
         Single posts = posts where there's only one comment, so we don't need to calculate weights
         """
-        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        info(f"-- Start _agg_posts_comments_and_sub_descriptions_to_post_level() method --")
         t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'

@@ -36,7 +36,7 @@ User preferences:
             "selector": ".jp-Notebook.jp-mod-editMode",
             "command": "notebook:run-all-above",
             "keys": [
-                "Shift Alt Enter"
+                "Shift Accel Enter"
             ],
         },
     ]
