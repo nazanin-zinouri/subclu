@@ -874,13 +874,10 @@ class AggregateEmbeddings:
 
     def _agg_post_aggregates_to_subreddit_level(self):
         """Roll up post-level aggregations to subreddit-level"""
-        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        info(f"-- Start _agg_post_aggregates_to_subreddit_level() method --")
         t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
-        # l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        l_ix_sub_level = ['subreddit_name', 'subreddit_id', ]
-        l_embedding_cols = list(self.df_v_posts.columns)
 
         if self.agg_post_to_subreddit_weight_col is None:
             info(f"No column to weight comments, simple mean to roll up posts to subreddit-level...")
@@ -889,22 +886,22 @@ class AggregateEmbeddings:
             info(f"A - posts only")
             self.df_subs_agg_a = (
                 self.df_v_posts
-                .reset_index()
-                [l_ix_sub_level + l_embedding_cols]
-                .groupby(l_ix_sub_level)
+                [self.l_ix_sub_level + self.l_embedding_cols]
+                .groupby(self.l_ix_sub_level)
                 .mean()
-            ).sort_index()
+                .reset_index()
+            )  # .sort_index()
             info(f"  {self.df_subs_agg_a.shape} <- df_subs_agg_a.shape (only posts)")
 
             # B - posts + comments
             info(f"B - posts + comments")
             self.df_subs_agg_b = (
                 self.df_posts_agg_b
-                .reset_index()
-                [l_ix_sub_level + l_embedding_cols]
-                .groupby(l_ix_sub_level)
+                [self.l_ix_sub_level + self.l_embedding_cols]
+                .groupby(self.l_ix_sub_level)
                 .mean()
-            ).sort_index()
+                .reset_index()
+            )  # .sort_index()
             info(f"  {self.df_subs_agg_b.shape} <- df_subs_agg_b.shape (posts + comments)")
 
             # C - posts + comments + sub descriptions
@@ -912,16 +909,17 @@ class AggregateEmbeddings:
             self.df_subs_agg_c = (
                 self.df_posts_agg_c
                 .reset_index()
-                [l_ix_sub_level + l_embedding_cols]
-                .groupby(l_ix_sub_level)
+                [self.l_ix_sub_level + self.l_embedding_cols]
+                .groupby(self.l_ix_sub_level)
                 .mean()
-            ).sort_index()
+                .reset_index()
+            )  # .sort_index()
             info(f"  {self.df_subs_agg_c.shape} <- df_subs_agg_c.shape (posts + comments + sub description)")
 
         else:
             raise NotImplementedError(f"Using weighted average (posts) to roll up to subreddits not implemented.")
 
-        elapsed_time(start_time=t_start_method, log_label='Total for all subreddit-level agg', verbose=True)
+        elapsed_time(start_time=t_start_method, log_label='Total for ALL subreddit-level agg', verbose=True)
 
     def _calculate_subreddit_similarities(self):
         """For each subreddit aggregation, calculate subreddit similarity/distances
@@ -932,9 +930,9 @@ class AggregateEmbeddings:
         t_start_method = datetime.utcnow()
 
         info(f"A...")
-        ix_a = self.df_subs_agg_a.index.droplevel('subreddit_id')
+        ix_a = self.df_subs_agg_a['subreddit_name'].compute()
         self.df_subs_agg_a_similarity = pd.DataFrame(
-            cosine_similarity(self.df_subs_agg_a.droplevel('subreddit_id', axis='index')),
+            cosine_similarity(self.df_subs_agg_a[self.l_embedding_cols]),
             index=ix_a,
             columns=ix_a,
         )
@@ -942,7 +940,8 @@ class AggregateEmbeddings:
         self.df_subs_agg_a_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_a_similarity.shape} <- df_subs_agg_a_similarity.shape")
 
-        _, self.df_subs_agg_a_similarity_pair = reshape_distances_to_pairwise_bq(
+        # Keep the DF that has all the distances, not just the top
+        self.df_subs_agg_a_similarity_pair, _ = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_a_similarity,
             df_sub_metadata=self.df_subs_meta,
             top_subs_to_keep=20,
@@ -951,16 +950,16 @@ class AggregateEmbeddings:
         gc.collect()
 
         info(f"B...")
-        ix_b = self.df_subs_agg_b.index.droplevel('subreddit_id')
+        ix_b = self.df_subs_agg_b['subreddit_name'].compute()
         self.df_subs_agg_b_similarity = pd.DataFrame(
-            cosine_similarity(self.df_subs_agg_b.droplevel('subreddit_id', axis='index')),
+            cosine_similarity(self.df_subs_agg_b[self.l_embedding_cols]),
             index=ix_b,
             columns=ix_b,
         )
         self.df_subs_agg_b_similarity.columns.name = None
         self.df_subs_agg_b_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
-        _, self.df_subs_agg_b_similarity_pair = reshape_distances_to_pairwise_bq(
+        self.df_subs_agg_b_similarity_pair, _ = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_b_similarity,
             df_sub_metadata=self.df_subs_meta,
             top_subs_to_keep=20,
@@ -969,16 +968,16 @@ class AggregateEmbeddings:
         gc.collect()
 
         info(f"C...")
-        ix_c = self.df_subs_agg_c.index.droplevel('subreddit_id')
+        ix_c = self.df_subs_agg_c['subreddit_name'].compute()
         self.df_subs_agg_c_similarity = pd.DataFrame(
-            cosine_similarity(self.df_subs_agg_c.droplevel('subreddit_id', axis='index')),
+            cosine_similarity(self.df_subs_agg_c[self.l_embedding_cols]),
             index=ix_c,
             columns=ix_c,
         )
         self.df_subs_agg_c_similarity.columns.name = None
         self.df_subs_agg_c_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_c_similarity.shape} <- df_subs_agg_c_similarity.shape")
-        _, self.df_subs_agg_c_similarity_pair = reshape_distances_to_pairwise_bq(
+        self.df_subs_agg_c_similarity_pair, _ = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_c_similarity,
             df_sub_metadata=self.df_subs_meta,
             index_name='subreddit_name',
