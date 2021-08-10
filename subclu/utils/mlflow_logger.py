@@ -230,12 +230,21 @@ class MlflowLogger:
             cache_locally: bool = True,
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             n_sample_files: int = None,
+            verbose: bool = False,
     ):
         """
         Example:
         df_v_sub = (
             pd.read_parquet(f"{artifact_uri}/{folder_vect_subs}")
         )
+        WARNING! if a folder name is a subset of another name, it's possible that
+        GCS will return files that are in the other similar folders.
+        TODO(djb) Create a check to make sure that the parent of each file matches
+         the input folder WITHOUT FUZZY MATCHES
+        Example input: df_sub_level__sub_desc_similarity
+         output will include:
+              - df_sub_level__sub_desc_similarity (expected)
+              - df_sub_level__sub_desc_similarity_pair (DO NOT WANT!)
         """
         # set some defaults for common file types so we don't have to load
         if isinstance(read_function, str):
@@ -280,6 +289,11 @@ class MlflowLogger:
             l_parquet_files_downloaded = list()
             # not all the files in a folder will be parquet files, so we may need to download all files first
             for blob_ in tqdm(l_files_to_download):
+                # Skip files that aren't in the same folder as the expected (input) folder
+                parent_folder = blob_.name.split('/')[-2]
+                if artifact_folder != parent_folder:
+                    continue
+
                 f_name = (
                     path_local_folder /
                     f"{blob_.name.split('/')[-1].strip()}"
@@ -292,18 +306,21 @@ class MlflowLogger:
                     # info(f"  {f_name.name} <- File already exists, not downloading")
                 else:
                     blob_.download_to_filename(f_name)
-
+            info(f"  Parquet files found: {len(l_parquet_files_downloaded[:n_sample_files]):,.0f}")
+            if verbose:
+                input_files = ['/'.join(f_.name.split('/')[-2:]) for f_ in l_files_to_download]
+                parquet_files = ['/'.join(str(f_).split('/')[-2:]) for f_ in l_parquet_files_downloaded]
+                info(f"Input files: \n{input_files}")
+                info(f"Parquet files: \n{parquet_files}")
         else:
             path_to_load = f"{artifact_uri}/{artifact_folder}"
 
         if read_function == dd.read_parquet:
             try:
-                info(f"  Reading {len(l_parquet_files_downloaded[:n_sample_files])} files")
                 return read_function(l_parquet_files_downloaded[:n_sample_files], columns=columns)
             except OSError:
                 return read_function(f"{path_to_load}/*.parquet", columns=columns)
-
-        elif json.loads != read_function:
+        elif json.loads != read_function:  # meant for pd.read_parquet
             try:
                 return read_function(path_to_load,
                                      columns=columns)
