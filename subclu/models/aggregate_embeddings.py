@@ -216,6 +216,8 @@ class AggregateEmbeddings:
         #   - date posted/created
         #   - up votes
         # ---
+        # TODO(djb): re-enable after fixing other bugs &/or move its order?
+        #  b/c we don't use it until later...
         self._load_metadata()
 
         # Filter out short comments using metadata
@@ -283,13 +285,6 @@ class AggregateEmbeddings:
         # ---
         self._calculate_subreddit_similarities()
 
-        # TODO create dataframes subfolder for local model path
-        # TODO: for each df type, create a subfolder & save it using dask (so we can save to multiple files)
-        #  TODO(djb): when saving a df to parquet, save in multiple files, otherwise
-        #   reading from a single file can take over 1 minute for ~1.2 million rows
-        #   maybe use dask to save dfs?
-        # TODO log dataframes subfolder to mlflow (one call) to preserve subfolder structure?
-        #   i.e., Call mlflow log artifacts on whole subfolder
         self._save_and_log_aggregate_and_similarity_dfs()
 
         # finish logging total time + end mlflow run
@@ -462,7 +457,7 @@ class AggregateEmbeddings:
         # f"** Index not unique. Check duplicates df_v_comments **"
 
         # Set columns for index checking
-        # TODO(djb) keep only one column for subreddit-level index
+        # Keep only one column for subreddit-level index
         #  because carrying around name & ID makes some things complicated and can take up a ton of memory
         #  we can always add subreddit_id at the end
         self.l_ix_sub_level = ['subreddit_name']
@@ -544,8 +539,19 @@ class AggregateEmbeddings:
             ['post_id'].compute()
         )
         mask_single_comments_pandas = mask_single_comments.compute()
-        info(f"  {mask_single_comments_pandas.sum():11,.0f} <- Comments that DON'T need to be averaged")
-        info(f"  {(~mask_single_comments_pandas).sum():11,.0f} <- Comments that need to be averaged")
+        n_comments_single = mask_single_comments_pandas.sum()
+        n_comments_to_average = (~mask_single_comments_pandas).sum()
+        info(f"  {n_comments_single:11,.0f} <- Comments that DON'T need to be averaged")
+        info(f"  {n_comments_to_average:11,.0f} <- Comments that need to be averaged")
+        try:
+            mlflow.log_metrics(
+                {'n_comments_single_no_agg_needed': n_comments_single,
+                 'n_comments_multiple_agg_needed': n_comments_to_average,
+                 'comments_raw_rows': n_comments_single + n_comments_to_average,
+                 }
+            )
+        except Exception as e:
+            logging.warning(f"Error logging metrics: {e}")
 
         if self.agg_comments_to_post_weight_col is None:
             info(f"No column to weight comments, simple mean for comments at post level")
@@ -592,7 +598,7 @@ class AggregateEmbeddings:
         if active_run is not None:
             mlflow.log_metrics({'df_v_com_agg_rows': r_com_agg, 'df_v_com_agg_cols': c_com_agg})
         if self.n_sample_comments_files is not None:
-            if self.n_sample_comments_files <= 4:
+            if self.n_sample_comments_files <= 9:
                 logging.warning(f"Checking that index is unique after aggregation... [only when testing]")
                 assert (r_com_agg == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
         info(f"  {r_com_agg:11,.0f} | {c_com_agg:4,.0f} <- df_v_com_agg SHAPE")
@@ -735,7 +741,12 @@ class AggregateEmbeddings:
             index=self.l_ix_post_level,
             dtype=np.float32,
         )
-
+        # TODO(djb): I've run into memory errors with 16 ad 12 workers (and 520 GB RAM)
+        #  would it be better if I computed this df in 2 steps:
+        #  - create group of 2 (or 3) subreddit batches
+        #  - concat the batches as 2 separate functions
+        #  It's possible that the masking step could be expensive, but it might limit
+        #  the amount of RAM needed by a single worker and allow to spread out the work
         self.ddf_agg_posts_w_comments = (
             self.df_posts_for_weights
             .groupby(self.l_ix_post_level)
@@ -859,14 +870,14 @@ class AggregateEmbeddings:
                 on=[self.col_post_id],
             )
             # .reset_index()
-            # .set_index(self.l_ix_post_level)
         )  # .sort_index()
 
-        r_agg_posts, c_agg_posts = get_dask_df_shape(self.df_posts_agg_c, col_len_check=self.col_post_id)
-        info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_c shape after aggregation")
-
         if self.n_sample_comments_files is not None:
-            if self.n_sample_comments_files <= 4:
+            if self.n_sample_comments_files <= 9:
+                # Only calculate with fewer than 10 files, this might be taking up 30+ minutes!!
+                r_agg_posts, c_agg_posts = get_dask_df_shape(self.df_posts_agg_c, col_len_check=self.col_post_id)
+                info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_c shape after aggregation")
+
                 logging.warning(f"Unique check only applied when sampling/testing")
                 assert (r_agg_posts == self.df_posts_agg_c[self.col_post_id].nunique().compute()), "Index not unique"
 
@@ -1007,20 +1018,20 @@ class AggregateEmbeddings:
         #  - C) posts + comments + subreddit description
 
         d_dfs_to_save = {
-            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
-            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
-
-            'df_sub_level_agg_a_post_only': self.df_subs_agg_a,
-            'df_sub_level_agg_a_post_only_similarity': self.df_subs_agg_a_similarity,
-            'df_sub_level_agg_a_post_only_similarity_pair': self.df_subs_agg_a_similarity_pair,
+            'df_sub_level_agg_c_post_comments_and_sub_desc': self.df_subs_agg_c,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity': self.df_subs_agg_c_similarity,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair': self.df_subs_agg_c_similarity_pair,
 
             'df_sub_level_agg_b_post_and_comments': self.df_subs_agg_b,
             'df_sub_level_agg_b_post_and_comments_similarity': self.df_subs_agg_b_similarity,
             'df_sub_level_agg_b_post_and_comments_similarity_pair': self.df_subs_agg_b_similarity_pair,
 
-            'df_sub_level_agg_c_post_comments_and_sub_desc': self.df_subs_agg_c,
-            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity': self.df_subs_agg_c_similarity,
-            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair': self.df_subs_agg_c_similarity_pair,
+            'df_sub_level_agg_a_post_only': self.df_subs_agg_a,
+            'df_sub_level_agg_a_post_only_similarity': self.df_subs_agg_a_similarity,
+            'df_sub_level_agg_a_post_only_similarity_pair': self.df_subs_agg_a_similarity_pair,
+
+            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
+            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
         }
 
         # create dict to make it easier to reload dataframes logged as artifacts

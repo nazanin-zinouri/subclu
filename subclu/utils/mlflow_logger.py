@@ -420,8 +420,10 @@ def save_pd_df_to_parquet_in_chunks(
             .to_parquet(path, write_index=write_index)
         )
     else:
+        info(f"  Saving existing dask df as parquet...")
         # if it's a dask df, simply save as is
-        info(f"  {df.npartitions:6,.0f}\t<- EXISTING Dask partitions")
+        # Don't log partition size, this might add overhead/time that's a waste
+        # info(f"  {df.npartitions:6,.0f}\t<- EXISTING Dask partitions")
         df.to_parquet(path, write_index=write_index)
 
 
