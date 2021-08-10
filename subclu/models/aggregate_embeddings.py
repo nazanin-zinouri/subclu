@@ -645,7 +645,7 @@ class AggregateEmbeddings:
                 axis=0,
             )
 
-            try:
+            if self.n_sample_comments_files is not None:
                 if self.n_sample_comments_files <= 4:
                     # only compute for test runs, otherwise it wastes a lot of compute
                     df_counts_summary = value_counts_and_pcts(
@@ -675,9 +675,6 @@ class AggregateEmbeddings:
                             f"\n    {len(set_post_ids_comment_count - set_post_ids_in_posts)} Comment count - Posts"
                         )
                         raise Exception(f"Error calculating comment count per post")
-
-            except (KeyError, ValueError, TypeError) as er:
-                logging.warning(f"Error creating summary of comments per post.\n{er}")
 
             # don't compute this now, wait for later when we need to create a mask to get IDs
             #  for posts & comments that need to be averaged
