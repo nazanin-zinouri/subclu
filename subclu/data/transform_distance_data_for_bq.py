@@ -296,7 +296,7 @@ def reshape_distances_to_pairwise_bq(
         .sort_values(by=['subreddit_name_a', 'cosine_distance'], ascending=[True, False])
     )
     info(f"  {df_dist_pair.shape} <- df_dist_pair_meta.shape (before setting index)")
-    info(f"  {df_dist_pair.shape} <- df_dist_pair_meta_top_only.shape (before setting index)")
+    info(f"  {df_dist_pair_top_only.shape} <- df_dist_pair_meta_top_only.shape (before setting index)")
 
     try:
         return (

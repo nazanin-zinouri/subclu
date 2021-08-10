@@ -1038,6 +1038,8 @@ class AggregateEmbeddings:
             info(f"Saving locally...")
             path_sub_local = self.path_local_model / folder_
 
+            # The assumption is that similarity DFs should be pandas DFs
+            #  so we should be safe saving index for them
             if folder_.endswith('_similarity'):
                 info(f"Keeping index intact...")
                 rows_, cols_ = df_.shape
@@ -1047,13 +1049,17 @@ class AggregateEmbeddings:
                     write_index=True,
                 )
             else:
-                rows_, cols_ = df_.reset_index().shape
+                if isinstance(df_, pd.DataFrame):
+                    rows_, cols_ = df_.shape
+                else:
+                    rows_, cols_ = get_dask_df_shape(df_)
                 save_pd_df_to_parquet_in_chunks(
                     df=df_.reset_index(),
                     path=path_sub_local,
                     write_index=False,
                 )
 
+            # for dask dfs, don't try to
             mlflow.log_metrics(
                 {f"{folder_}-rows": rows_,
                  f"{folder_}-cols": cols_,
