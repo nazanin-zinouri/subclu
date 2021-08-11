@@ -1,0 +1,17 @@
+# embeddings_description: 'Embeddings from USE-multilingual with lower_case=False'
+run_uuid: '99158c385c5442b1bf5ff96fc44af7da'
+l_ix_sub: ['subreddit_name', ]   # 'subreddit_id',  b/c of dask's multi-index, I'm only using nam
+l_ix_post: ['subreddit_name', 'post_id']
+
+df_post_level_agg_b_post_and_comments: 'df_post_level_agg_b_post_and_comments'
+df_post_level_agg_c_post_comments_sub_desc: 'df_post_level_agg_c_post_comments_sub_desc'
+
+df_sub_level_agg_a_post_only: 'df_sub_level_agg_a_post_only'
+df_sub_level_agg_a_post_only_similarity: 'df_sub_level_agg_a_post_only_similarity'
+df_sub_level_agg_a_post_only_similarity_pair: 'df_sub_level_agg_a_post_only_similarity_pair'
+df_sub_level_agg_b_post_and_comments: 'df_sub_level_agg_b_post_and_comments'
+df_sub_level_agg_b_post_and_comments_similarity: 'df_sub_level_agg_b_post_and_comments_similarity'
+df_sub_level_agg_b_post_and_comments_similarity_pair: 'df_sub_level_agg_b_post_and_comments_similarity_pair'
+df_sub_level_agg_c_post_comments_and_sub_desc: 'df_sub_level_agg_c_post_comments_and_sub_desc'
+df_sub_level_agg_c_post_comments_and_sub_desc_similarity: 'df_sub_level_agg_c_post_comments_and_sub_desc_similarity'
+df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair: 'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair'
