@@ -115,4 +115,43 @@ ORDER BY cluster_id_agg_ward_cosine_35 ASC, users_l28 DESC
 ;
 
 
+-- Join with latest ratings information
+-- As of 2021-08-10, it doesn't look like ratings changed but maybe
+-- that's because there's a new table/format for new ratings
+SELECT
+    lbl.subreddit_name
+    , lbl.subreddit_id
+    , rt.rating
+    , rt.version    AS rating_version
+    , lbl.rating AS rating_from_july
+    , (rt.rating != lbl.rating)  AS rating_change
+    , manual_topic_and_rating
+    , lbl.cluster_id_agg_ward_cosine_35
+    , post_median_word_count
+    , German_posts_percent
+    , subreddit_language
+    , posts_l28
+    , subscribers
+    , users_l7
+    , users_l28
+    , subreddit_title
+    , subreddit_public_description
+
+    , svd_0
+    , svd_1
+    , svd_2
+
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v031_a` AS lbl
+
+LEFT JOIN (
+    SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_ratings`
+    WHERE DATE(pt) = (CURRENT_DATE() - 2)
+) AS rt
+    ON lbl.subreddit_name = rt.subreddit_name
+
+WHERE rt.rating IN ('g', 'pg', 'pg13')
+ORDER BY rating_change ASC, cluster_id_agg_ward_cosine_35 ASC, users_l28 DESC
+;
+
+
 
