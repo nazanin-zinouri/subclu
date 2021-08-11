@@ -477,6 +477,21 @@ The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new 
 It's not great because, for example, after 1 minute (60 seconds), if you want to scroll back, you'll go through 6 stdout statements. 
 
 
+# Debug connection
+Sometimes the connection via the web will stop working (e.g., 524 errors). If jupyter itself is still working, you can restart the docker service that's in charge of the reverse proxy:
+
+TODO(djb): add instructions to:
+- ssh into machine
+- check status of Jupyter server (first)
+- check status of docker server (doesn't matter much... when in doubt restart)
+
+For more troubleshooting tips:
+https://cloud.google.com/notebooks/docs/troubleshooting#restart_the_docker_service
+
+```shell
+sudo service docker restart
+```
+
 # Debugging GPU Usage
 TODO(djb)
 
