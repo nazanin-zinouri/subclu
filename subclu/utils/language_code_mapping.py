@@ -13,6 +13,11 @@ TODO(djb)
 
 
 D_CLD3_CODE_TO_LANGUAGE_NAME = {
+    # manually added from JSON file:
+    "tl": "Tagalog",
+    "he": "Hebrew",
+
+    # From Google's github page:
     # 'Output Code': 'Language Name'
     'af': 'Afrikaans',
     'am': 'Amharic',
@@ -123,12 +128,13 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     'zu': 'Zulu'
 }
 
-L_USE_MULTILINGUAL_LANGUAGES = [
+L_USE_MULTILINGUAL_LANGUAGE_NAMES = [
     'Arabic',
+    # USE-multilingual differentiates simplified & traditional Chinese
+    #  cld3 does not, so create a Chinese w/o qualifier so that it matches cld3 output:
+    'Chinese',
     'Chinese-simplified',
     'Chinese-traditional',
-    # Create a Chinese w/o qualifier so that it matches cld3 output:
-    'Chinese',
     'English',
     'French',
     'German',
@@ -149,8 +155,47 @@ L_USE_MULTILINGUAL_LANGUAGES = [
 #  all the codes to the Language before filtering
 L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL = list()
 for lang_code, lang_name in D_CLD3_CODE_TO_LANGUAGE_NAME.items():
-    if lang_name in L_USE_MULTILINGUAL_LANGUAGES:
+    if lang_name in L_USE_MULTILINGUAL_LANGUAGE_NAMES:
         L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL.append(lang_code)
+
+# These codes were extracted from top subreddit posts extract from:
+#  top_subreddits_2021-07_16.yaml
+L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
+    'en',
+    'de',
+    'pt',
+    'es',
+    'fr',
+    'no',
+    'af',
+    'nl',
+    'it',
+    'id',
+    'da',
+    'so',
+    'tl',
+    'cy',
+    'sv',
+    'ca',
+    'tr',
+    'ro',
+    'et',
+    'fi',
+    'hr',
+    'sw',
+    'pl',
+    'hu',
+    'ja',
+    'la',
+    'sl',
+    'lb',
+    'vi',
+]
+
+L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL = list(
+    set(L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL) |
+    set(L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT)
+)
 
 
 #
