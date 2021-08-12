@@ -15,6 +15,12 @@ import pandas as pd
 from tqdm.auto import tqdm
 
 from ..eda.aggregates import get_language_by_sub_wide
+from ..utils.language_code_mapping import (
+    L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL,
+    L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL,
+    L_USE_MULTILINGUAL_LANGUAGE_NAMES,
+    D_CLD3_CODE_TO_LANGUAGE_NAME,
+)
 # from subclu.eda.aggregates import get_language_by_sub_wide
 
 
@@ -109,12 +115,19 @@ class LoadPosts:
         # full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
 
         self.path_local_folder = Path(f"{self.local_path_root}/{self.folder_path}")
+        # need to check the parent folder only:
+        artifact_folder = self.folder_path.split('/')[-1]
         info(f"Local folder to download artifact(s):\n  {self.path_local_folder}")
         Path.mkdir(self.path_local_folder, exist_ok=True, parents=True)
 
         bucket = storage_client.get_bucket(self.bucket_name)
         l_files_to_download = list(bucket.list_blobs(prefix=self.folder_path))
         for blob_ in tqdm(l_files_to_download):
+            # Skip files that aren't in the same folder as the expected (input) folder
+            parent_folder = blob_.name.split('/')[-2]
+            if artifact_folder != parent_folder:
+                continue
+
             f_name = (
                     self.path_local_folder /
                     f"{blob_.name.split('/')[-1].strip()}"
@@ -135,11 +148,20 @@ class LoadPosts:
         if 'post_nsfw' in df.columns:
             df['post_nsfw'] = df['post_nsfw'].fillna('unlabeled')
 
+        # Start using the list of Languages in USE-multilingual to get a better idea of
+        #  other languages, not just German
+        # Need to convert language code to Language Name to prevent duplicates for
+        #  languages w/ multiple codes e.g., (Chinese, Russian)
         if 'weighted_language' in df.columns:
             df['weighted_language_top'] = np.where(
-                df['weighted_language'].isin(['en', 'de', ]),
-                df['weighted_language'],
-                'other'
+                df['weighted_language'].isin(['UNKNOWN'] + L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL),
+                df['weighted_language'].replace(D_CLD3_CODE_TO_LANGUAGE_NAME),
+                'Other language'
+            )
+            df['weighted_language_in_use_multilingual'] = np.where(
+                df['weighted_language'].isin(L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL),
+                True,
+                False
             )
         if 'post_type' in df.columns:
             df['post_type_agg3'] = np.where(
@@ -206,6 +228,7 @@ class LoadSubreddits(LoadPosts):
             l_cols_post_aggs_only = [
                 'subreddit_name',
                 'subreddit_id',
+                'post_id',
                 'weighted_language',    # For language aggs
                 'post_type',            # For post aggs
                 'combined_topic_and_rating',    # Needed for new manual label
@@ -347,18 +370,41 @@ def create_sub_level_aggregates(
         l_add_extra_cols.append(col_subreddit_id)
 
     # create roll ups for "other languages"
+    # TODO(djb): add more languages!
+    #  e.g., the 16 languages in USE-multilingual?
+
+    # We assume that language codes have been converted to language names already
+    # d_map_language_codes_to_names_pct = {
+    #     f"{code_}_percent": f"{D_CLD3_CODE_TO_LANGUAGE_NAME[code_]}_posts_percent" for code_ in L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL
+    # }
+    # d_map_language_codes_to_names_pct['other_percent'] = 'other_language_posts_percent'
     df_lang_sub = get_language_by_sub_wide(
         df_posts,
         col_sub_name=col_sub_key,
         col_lang_weighted=col_language,
         col_total_posts=col_total_posts,
-    ).rename(
-        columns={'de_percent': 'German_posts_percent',
-                 'en_percent': 'English_posts_percent',
-                 'other_percent': 'other_language_posts_percent',
-                 }
     )
-    df_lang_sub = df_lang_sub[[c for c in df_lang_sub.columns if c.endswith('_posts_percent')]]
+    # Only keep the percent cols, not the counts
+    df_lang_sub = df_lang_sub.rename(
+        columns={c: c.replace('_percent', '_posts_percent') for c in df_lang_sub.columns}
+    )
+    l_cols_language_percent = [c for c in df_lang_sub.columns if c.endswith('_posts_percent')]
+    df_lang_sub = df_lang_sub[l_cols_language_percent]
+
+    # Create new column for predominant language name
+    df_lang_sub['primary_post_language'] = (
+        df_lang_sub[l_cols_language_percent].idxmax(axis=1).str.replace('_posts_percent', '')
+    )
+    # Create new col for predominant language percent
+    df_lang_sub['primary_post_language_percent'] = (
+        df_lang_sub[l_cols_language_percent].max(axis=1)
+    )
+    # Append column with whether predominant language is covered by use-multilingual
+    df_lang_sub['primary_post_language_in_use_multilingual'] = np.where(
+        df_lang_sub['primary_post_language'].isin(L_USE_MULTILINGUAL_LANGUAGE_NAMES),
+        True,
+        False
+    )
 
     df_post_type_sub = get_language_by_sub_wide(
         df_posts,
