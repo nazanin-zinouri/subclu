@@ -500,3 +500,53 @@ TODO(djb)
 ```
 
 ```
+
+# Setting up versioning for a bucket
+
+Enabling Object Versioning can keep copies of a file if/when it is over-written.
+This could be nice in case we over-write something by accident. More details:
+- https://cloud.google.com/storage/docs/using-object-versioning#gsutil
+
+## Turning on Object Versioning
+However, it's good to limit how many copies we keep to prevent high costs if we store multiple versions of large files.
+
+We can't check the status in the GUI/console, so we have to use `gsutil`. First, we can check the versioning status:
+
+```bash
+gsutil versioning get gs://i18n-subreddit-clustering
+# gs://i18n-subreddit-clustering: Suspended
+```
+
+Then, we can enable it with `set on` or disable with `set off`:
+```bash
+gsutil versioning set on gs://i18n-subreddit-clustering
+# Enabling versioning for gs://i18n-subreddit-clustering/...
+```
+
+If we check again, we see that it's now enabled:
+```bash
+gsutil versioning get gs://i18n-subreddit-clustering
+# gs://i18n-subreddit-clustering: Enabled
+```
+
+## Setting up Object Lifecycle Policy
+- https://cloud.google.com/storage/docs/lifecycle
+- https://console.cloud.google.com/storage/browser/i18n-subreddit-clustering;tab=lifecycle?project=data-science-prod-218515
+
+
+## Viewing/ working with older file versions
+- https://cloud.google.com/storage/docs/using-versioned-objects#list-gsutil
+
+You can view the retention in the console:
+- Click on bucket to see bucket details
+- Then click on the "LIFECCLE" tab at the top
+
+You can also view it in gsutil:
+```bash
+gsutil lifecycle get gs://i18n-subreddit-clustering
+# {"rule": 
+#  [
+#     {"action": {"type": "Delete"}, "condition": {"numNewerVersions": 3}}
+#  ]
+# }
+```
