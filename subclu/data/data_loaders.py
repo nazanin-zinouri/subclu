@@ -350,7 +350,7 @@ def create_sub_level_aggregates(
         df_posts: pd.DataFrame,
         col_sub_key: str = 'subreddit_name',
         col_language: str = 'weighted_language_top',
-        col_post_type: str = 'post_type_agg3',
+        col_post_type: str = 'post_type',
         col_word_count: str = 'text_word_count',
         col_total_posts: str = 'total_posts_count',
         col_manual_label: str = None,
@@ -369,15 +369,10 @@ def create_sub_level_aggregates(
     if col_subreddit_id is not None:
         l_add_extra_cols.append(col_subreddit_id)
 
-    # create roll ups for "other languages"
-    # TODO(djb): add more languages!
-    #  e.g., the 16 languages in USE-multilingual?
-
+    # =====================
+    # Posts: Detected language percentages + Primary post-language
+    # ===
     # We assume that language codes have been converted to language names already
-    # d_map_language_codes_to_names_pct = {
-    #     f"{code_}_percent": f"{D_CLD3_CODE_TO_LANGUAGE_NAME[code_]}_posts_percent" for code_ in L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL
-    # }
-    # d_map_language_codes_to_names_pct['other_percent'] = 'other_language_posts_percent'
     df_lang_sub = get_language_by_sub_wide(
         df_posts,
         col_sub_name=col_sub_key,
@@ -406,20 +401,35 @@ def create_sub_level_aggregates(
         False
     )
 
+    # =====================
+    # Posts: percentages of post-type + Primary post-type
+    # ===
     df_post_type_sub = get_language_by_sub_wide(
         df_posts,
         col_sub_name=col_sub_key,
         col_lang_weighted=col_post_type,
         col_total_posts=col_total_posts,
-    ).rename(
-        columns={'image_percent': 'image_post_type_percent',
-                 'text_percent': 'text_post_type_percent',
-                 'link_percent': 'link_post_type_percent',
-                 'other_percent': 'other_post_type_percent',
-                 }
     )
-    df_post_type_sub = df_post_type_sub[[c for c in df_post_type_sub.columns if c.endswith('_post_type_percent')]]
+    # Only keep the percent cols, not the counts
+    suffix_post_type_pct = '_post_type_percent'
+    df_post_type_sub = df_post_type_sub.rename(
+        columns={c: c.replace('_percent', suffix_post_type_pct) for c in df_post_type_sub.columns}
+    )
+    l_cols_post_type_percent = [c for c in df_post_type_sub.columns if c.endswith(suffix_post_type_pct)]
+    df_post_type_sub = df_post_type_sub[l_cols_post_type_percent]
 
+    # Create new column for predominant post_type
+    #  this way it'll be easier to compare subreddits by post type w/o
+    #  having to check 3 or more columns!
+    df_post_type_sub['primary_post_type'] = (
+        df_post_type_sub[l_cols_post_type_percent].idxmax(axis=1).str.replace(suffix_post_type_pct, '')
+    )
+    # Create new col for predominant language percent
+    df_post_type_sub['primary_post_type_percent'] = (
+        df_post_type_sub[l_cols_post_type_percent].max(axis=1)
+    )
+
+    # Merge the aggregated posts
     df_merged = (
         df_lang_sub
         .merge(
@@ -433,8 +443,10 @@ def create_sub_level_aggregates(
                 df_posts
                 .groupby(col_sub_key)
                 .agg(
-                    **{'post_median_word_count': (col_word_count, 'median')
-                       }
+                    **{
+                        'posts_for_modeling_count': ('post_id', 'count'),
+                        'post_median_word_count': (col_word_count, 'median'),
+                    }
                 )
             ),
             left_index=True,
