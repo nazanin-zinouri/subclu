@@ -61,6 +61,10 @@ class LoadCounterpartSeeds:
                 # manual counterparts
                 'counterpart_1',
                 'counterpart_2',
+                'counterpart_3',
+                'counterpart_4',
+                'counterpart_5',
+                'counterpart_6',
             ]
         else:
             self.columns = columns
@@ -103,7 +107,6 @@ class LoadCounterpartSeeds:
                 f_to_load,
                 columns=None
             )
-
 
         return df
 
@@ -157,7 +160,8 @@ class LoadCounterpartSeeds:
             .rename(columns={c: c.lower().replace(' ', '_').replace('?', '') for c in df.columns})
         )
         if self.columns is not None:
-            df = df[self.columns]
+            # try one column at a time instead of all at once in case a column is missing
+            df = df[[c for c in self.columns if (c in df.columns)]]
 
         # clean up/standardize column values
         d_fix_subreddit_names = {
@@ -195,11 +199,69 @@ class LoadCounterpartSeeds:
             .rename(columns={'level_1': 'manual_counterpart', 0: 'counterpart_name'})
         ).merge(
             df[['subreddit_name'] + list(df.drop(l_ix_seeds_stack, axis=1))],
-            how='left',
+            # Merge outer so that we keep subreddits that didn't have a counterpart
+            how='outer',
             on='subreddit_name',
         )
 
         return df_seeds_reshape
+
+
+def combine_reshaped_seeds(
+        df_new: pd.DataFrame,
+        df_old: pd.DataFrame,
+        cols_combine: iter,
+) -> pd.DataFrame:
+    """
+    When combining reshaped seeds, we want to merge both the new & old data
+
+    Args:
+        df_new:
+        df_old:
+
+    Returns:
+        pd.DataFrame concat (and w/o duplicates)
+    """
+    if cols_combine is None:
+        cols_combine = [
+            'subreddit_name',
+            'manual_counterpart',
+            'counterpart_name',
+            'ambassador_sub',
+            'type_of_content_seed',
+            'counterpart_priority'
+        ]
+
+    l_cols_dupe_check = [
+        'subreddit_name',
+        'counterpart_name',
+    ]
+    df_combined = (
+        pd.concat(
+            [
+                df_new[cols_combine],
+                df_old[cols_combine],
+            ]
+        )
+        .drop_duplicates(subset=l_cols_dupe_check, keep='first')
+        .sort_values(by=['counterpart_priority', 'subreddit_name', 'manual_counterpart'],
+                     ascending=[False, True, True])
+    )
+
+    # find subs with at least 1 counterpart, then drop any rows where these subs have a null counterpart_name
+    # . they're prob duplicates and we don't need a 2nd row of nulls.
+    # Example: `ich_iel` shows
+    set_sub_names_duped = set(
+        df_combined[df_combined['subreddit_name'].duplicated()]['subreddit_name'])
+
+    mask_duped_sub_names_and_null_counterpart = (
+            df_combined['subreddit_name'].isin(set_sub_names_duped) &
+            (df_combined['counterpart_name']).isnull()
+    )
+    info(f"{df_combined.shape} <- Shape before removing dupes")
+    info(f"{df_combined[~mask_duped_sub_names_and_null_counterpart].shape} <- Shape AFTER removing dupes")
+
+    return df_combined[~mask_duped_sub_names_and_null_counterpart]
 
 
 #

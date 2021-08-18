@@ -3,5 +3,8 @@ dataset_name: 'German subreddit seeds for counterparts'
 bucket_name: 'i18n-subreddit-clustering'
 folder_data_prefix: 'data/subreddit_counterparts'
 
-f_seeds: 'Criteria for default subs - [OLD]default subs-2021-08-13_15-17.csv'
-f_skiprows: 3
+f_seeds1: 'Criteria for default subs - [OLD]default subs-2021-08-13_15-17.csv'
+f_skiprows1: 3
+
+f_seeds2: 'Criteria for default subs - [final] autosub+counterpart-2021-08-18.csv'
+f_skiprows2: 1
