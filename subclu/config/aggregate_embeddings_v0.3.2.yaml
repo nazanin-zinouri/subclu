@@ -1,0 +1,10 @@
+# Use this config to get aggregate embeddings
+defaults:
+  - data_text_and_metadata:  top_subreddits_2021_07_16
+  - data_embeddings_to_aggregate: top_subs-2021_07_16-use_muti_lower_case_false
+  - aggregate_params: default_agg
+
+mlflow_tracking_uri: 'sqlite'
+mlflow_experiment: 'v0.3.2_use_multi_aggregates'  # 'v0.3.2_use_multi_aggregates_test'
+n_sample_posts_files: null
+n_sample_comments_files: null
