@@ -1,0 +1,6 @@
+# Use this config to get aggregate embeddings
+defaults:
+  - data_text_and_metadata:  top_subreddits_2021_07_16
+  - data_embeddings_to_cluster: top_subs-2021_07_16-use_multi_lower_case_false_00
+  - data_cluster_outputs: top_subreddits_v0.3.2a
+
