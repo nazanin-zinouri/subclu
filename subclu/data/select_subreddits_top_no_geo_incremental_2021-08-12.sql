@@ -6,17 +6,16 @@
 -- Filter NOTE:
 -- Here we're removing only subreddits that are marked over_18="f" BY THE MODS! We still might seem some NSFW subreddits
 --  if they haven't been rated by reddit
+-- TODO(djb) pull new subs (incremental) to append to previous 3,700 subs
 DECLARE partition_date DATE DEFAULT '2021-08-10';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE min_users_l7 NUMERIC DEFAULT 100;
-DECLARE min_posts_l28 NUMERIC DEFAULT 15;
-
+DECLARE min_users_l7 NUMERIC DEFAULT 20;
+DECLARE min_posts_l28 NUMERIC DEFAULT 10;
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_incremental_20210812`
 AS (
-
-top_subs AS (
+WITH selected_subs AS (
 -- Here we select subreddits from anywhere based on minimum users(views) & post counts
 SELECT
     asr.subreddit_name
@@ -43,10 +42,17 @@ LEFT JOIN (
 ) AS slo
     ON asr.subreddit_name = slo.name
 
+-- Use this table to exclude subreddits that we've already processed
+LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210716` prev
+    ON asr.subreddit_name = prev.subreddit_name
+
 WHERE 1=1
     AND asr.users_l7 >= min_users_l7
     AND asr.posts_l28 >= min_posts_l28
     AND slo.over_18 = "f"
+
+    -- Exclude subreddit's we've already processed
+    AND prev.subreddit_name IS NULL
 
     -- Exclude active flag for now... it kills off a lot of subs that might be interesting
     # AND acs.active = True
@@ -163,25 +169,26 @@ LEFT JOIN subreddit_lookup AS slo
 
 WHERE
     -- Re-apply minimum post count in case something unexpected happened in previous joins
-    asr.posts_l28 >= min_DACH_posts_l28
+    asr.posts_l28 >= min_posts_l28
 )
 
 
 -- Selection for table creation
 SELECT DISTINCT * FROM final_table
 ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
+
 )  -- Close out CREATE TABLE parens
 ;
 
 
 -- Count BEFORE creating table:
-# SELECT
-#     COUNT(*) AS row_count
-#     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
-#     , SUM(posts_l28)    AS total_posts_l28
-#     , SUM(comments_l28) AS total_comments_l28
-# FROM final_table
-# ;
+-- SELECT
+--     COUNT(*) AS row_count
+--     , COUNT(DISTINCT subreddit_name)  AS unique_subreddits_count
+--     , SUM(posts_l28)    AS total_posts_l28
+--     , SUM(comments_l28) AS total_comments_l28
+-- FROM final_table
+-- ;
 -- row_count	unique_subreddits_count	total_posts_l28	total_comments_l28
 -- 3,767 	    3,767 	                3,164,327 	    42,786,190
 
