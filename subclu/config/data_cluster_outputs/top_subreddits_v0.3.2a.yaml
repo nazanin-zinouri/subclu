@@ -6,4 +6,6 @@ folder_model_outputs: 'data/models/clustering/manual_2021-08-11_04_45'
 f_subs_agg_c_cluster_labels: 'df_subs_only-meta_and_multiple_clustering_algos-2021-08-13_022453-3767_by_58.parquet'
 f_subs_agg_c_similarity_pair: 'df_sub_level_agg_c_similarity_pair-2021-08-13_021828-14186522_by_18.parquet'
 
+f_cluster_summary_qa: 'qa_files/QA for i18n subreddit clusters v0.3.2 - QA cluster summary-2021-08-19_1003.csv'
+f_skiprows_cluster_summary_qa: 1
 col_best_clusters_a: 'cluster_id_agg_ward_cosine_200'
