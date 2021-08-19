@@ -8,4 +8,7 @@ f_subs_agg_c_similarity_pair: 'df_sub_level_agg_c_similarity_pair-2021-08-13_021
 
 f_cluster_summary_qa: 'qa_files/QA for i18n subreddit clusters v0.3.2 - QA cluster summary-2021-08-19_1003.csv'
 f_skiprows_cluster_summary_qa: 1
+f_sub_level_cluster_qa_raw: 'df_subs_only-meta_and_clustering_for_qa-2021-08-18_2339-3768_by_37.csv'
+f_skiprows_sub_level_cluster_qa_raw: 0
+
 col_best_clusters_a: 'cluster_id_agg_ward_cosine_200'
