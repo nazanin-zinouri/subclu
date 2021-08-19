@@ -1,0 +1,3 @@
+dataset_name: 'German subreddit ambassador subreddits'
+bucket_name: 'i18n-subreddit-clustering'
+folder_data_prefix: 'data/ambassador_subreddits/2021-08-18'
