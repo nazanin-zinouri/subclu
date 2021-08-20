@@ -154,4 +154,45 @@ ORDER BY rating_change ASC, cluster_id_agg_ward_cosine_35 ASC, users_l28 DESC
 ;
 
 
+-- Query that adds latest ratings from new tagging/rating table!
+WITH cluster_for_selected_sub AS(
+SELECT
+    cluster_id_agg_ward_cosine_200
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v032_a`
+WHERE subreddit_name = 'bundesliga'
+)
+
+SELECT
+    subreddit_name
+    , subreddit_title
+    , rating AS old_rating
+    , topic AS old_topic
+    , nt.rating_short
+    , nt.rating_name
+    , nt.rating_weight
+    , nt.primary_topic
+    , nt.survey_version
+    , nt.pt AS pt_new_topic
+
+    , lbl.cluster_id_agg_ward_cosine_200
+
+    , lbl.primary_post_language  -- Source: ML model predicts language for each post
+    , lbl.primary_post_language_percent
+    , lbl.primary_post_type
+    , lbl.primary_post_type_percent
+
+
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v032_a` AS lbl
+INNER JOIN cluster_for_selected_sub AS sel
+    ON lbl.cluster_id_agg_ward_cosine_200 = sel.cluster_id_agg_ward_cosine_200
+LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
+    ON nt.subreddit_id = lbl.subreddit_id
+
+WHERE 1=1
+    AND nt.pt = (CURRENT_DATE() - 1)
+ORDER BY cluster_id_agg_ward_cosine_200 ASC, users_l28 DESC
+LIMIT 25
+;
+
+
 
