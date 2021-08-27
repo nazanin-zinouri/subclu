@@ -329,3 +329,67 @@ WHERE DATE(_PARTITIONTIME) = "2021-05-30"
 
 LIMIT 200
 ;
+
+
+-- There are two different "post-types":
+-- a) how the post was created
+-- b) how it was viewed
+SELECT
+  type_1,
+  type_2,
+  count(*) AS posts
+FROM
+  (
+    SELECT
+      a.post_id,
+      a.post_type AS type_1,
+      b.post_type AS type_2
+    FROM
+      (
+        SELECT
+          post_id,
+          post_type
+        FROM
+          `data-prod-165221.events_v2.analytics`
+        WHERE
+          pt = '2021-07-19'
+          AND source = 'post'
+          AND ACTION = 'view'
+          AND noun = 'post'
+        GROUP BY
+          1,
+          2
+      ) a
+      INNER JOIN (
+        SELECT
+          post_id,
+          post_type
+        FROM
+          cnc.successful_posts
+        WHERE
+          dt = '2021-07-19'
+          AND removed = 0
+        GROUP BY
+          1,
+          2
+      ) b ON a.post_id = b.post_id
+  )
+GROUP BY
+  1,
+  2
+
+-- Map country codes to country names
+-- The "regions" are not that helpful because they put
+-- Europe, Middle East, and Africa together
+SELECT
+    subreddit_name
+    , cm.country_name
+    , cm.region
+    , cm.country_code
+FROM `data-prod-165221.i18n.geo_sfw_communities` AS geo
+LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
+    ON geo.country = cm.country_code
+WHERE DATE(pt) = (CURRENT_DATE() - 2)
+    AND (cm.region = 'LATAM' OR cm.country_name = 'Spain')
+    AND cm.country_name != 'Brazil'
+;
