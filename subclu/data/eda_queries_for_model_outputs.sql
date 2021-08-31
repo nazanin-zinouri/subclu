@@ -197,14 +197,88 @@ LIMIT 25
 
 -- Use new QA table to filter subreddits by their cluster
 SELECT
-    cluster_id_agg_ward_cosine_200
-    , qa_cluster_is_nsfw  -- if "yes", 90%+ sure that cluster is NSFW
-    , subs_in_cluster_count
-    , german_subs_in_cluster_count
-    , german_subs_in_cluster_percent
-    , subs_over18_nsfw_in_cluster_percent
+    qa.cluster_id_agg_ward_cosine_200  -- cluster column to JOIN on
+    , qa.subs_in_cluster_count
+    , qa.german_subs_in_cluster_count
+    , qa.german_subs_in_cluster_percent
+    , qa.subs_over18_nsfw_in_cluster_percent
+    , qa.qa_topic_rating   -- rating for the MAJORITY os subreddits in a cluster
+    , qa.qa_topic_rating_name
+    , qa.qa_topic_tier_1
+    , qa.qa_topic_tier_2
+    , qa.qa_cluster_notes
 
 FROM `reddit-employee-datasets.david_bermejo.subclu_cluster_summary_v032a`
+ORDER BY german_subs_in_cluster_count DESC, german_subs_in_cluster_percent DESC
+;
+
+
+-- Merge QA table with subreddit + cluster-labels table
+-- Use new QA table to filter subreddits by their cluster
+SELECT
+    lbl.subreddit_name
+    , lbl.subreddit_id
+    , rating
+    , topic
+
+    , qa.cluster_id_agg_ward_cosine_200
+    , qa.qa_topic_rating   -- rating for the MAJORITY os subreddits in a cluster
+    , qa.qa_topic_rating_name
+    , qa.qa_topic_tier_1
+    , qa.qa_topic_tier_2
+    -- , qa.qa_cluster_notes
+
+    , lbl.primary_post_language  -- Source: ML model predicts language for each post
+    , lbl.primary_post_language_percent
+    , lbl.primary_post_type
+    , lbl.primary_post_type_percent
+
+    , qa.subs_in_cluster_count
+    , qa.german_subs_in_cluster_count
+    , qa.german_subs_in_cluster_percent
+    , qa.subs_over18_nsfw_in_cluster_percent
+
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v032_a` AS lbl
+LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_cluster_summary_v032a` AS qa
+    ON lbl.cluster_id_agg_ward_cosine_200 = qa.cluster_id_agg_ward_cosine_200
+
+WHERE 1=1
+    AND (
+        qa.qa_topic_rating IS NULL
+        OR qa.qa_topic_rating NOT IN ("X", "D")
+        )
+
+ORDER BY german_subs_in_cluster_count DESC, german_subs_in_cluster_percent DESC
+;
+
+
+-- Merge QA table with distance table (pairwise)
+-- Use new QA table to filter subreddits by their cluster
+SELECT
+    dst.cosine_distance
+    , dst.subreddit_name_a
+    , dst.subreddit_name_b
+    , dst.subreddit_id_a
+    , dst.subreddit_id_b
+
+    , qaa.cluster_id_agg_ward_cosine_200 AS cluster_id_agg_ward_cosine_200_a
+    , qaa.qa_topic_rating    AS qa_topic_rating_a  -- rating for the MAJORITY os subreddits in a cluster
+
+    , qaa.qa_topic_rating_name   AS qa_topic_rating_name_a
+    , qaa.qa_topic_tier_1    AS qa_topic_tier_1_a
+    , qaa.qa_topic_tier_2    AS qa_topic_tier_2_a
+
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_distance_v0032_c_posts_and_comments_and_meta` AS dst
+LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v032_a` AS lbla
+    ON lbla.subreddit_id = dst.subreddit_id_a
+LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_cluster_summary_v032a` AS qaa
+    ON lbla.cluster_id_agg_ward_cosine_200 = qaa.cluster_id_agg_ward_cosine_200
+
+WHERE 1=1
+    AND (
+        qaa.qa_topic_rating IS NULL
+        OR qaa.qa_topic_rating NOT IN ("X", "D")
+        )
 LIMIT 1000
 ;
 
@@ -373,5 +447,63 @@ WHERE slo.dt = (CURRENT_DATE() - 1)
     AND 'sex' in UNNEST(mature_themes)
 
 ORDER BY slo.subscribers DESC
+;
+
+-- Add geo-relevant countries to cluster labels
+WITH geo_subs_raw AS (
+SELECT
+    geo.*
+    , cm.country_name
+    , cm.country_code
+    , RANK () OVER (PARTITION BY subreddit_id, country ORDER BY pt desc) as sub_geo_rank_no
+FROM `data-prod-165221.i18n.geo_sfw_communities` AS geo
+LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
+    ON geo.country = cm.country_code
+WHERE DATE(pt) BETWEEN (CURRENT_DATE() - 28) AND (CURRENT_DATE() - 2)
+
+-- Order by country name here so that the aggregation sorts the names alphabetically
+ORDER BY subreddit_name, cm.country_name
+),
+
+geo_subs_agg AS (
+SELECT
+    geo.subreddit_id
+    , geo.subreddit_name
+    , STRING_AGG(geo.country_name, ', ') AS geo_relevant_countries
+    , COUNT(geo.country_code) AS geo_relevant_country_count
+
+FROM geo_subs_raw AS geo
+
+-- Drop repeated country names
+WHERE geo.sub_geo_rank_no = 1
+
+GROUP BY 1, 2
+ORDER BY subreddit_name
+)
+
+SELECT
+    lbl.subreddit_name
+
+    , lbl.primary_post_language  -- Source: ML model predicts language for each post
+    , geo.geo_relevant_countries
+    , geo.geo_relevant_country_count
+    , lbl.primary_post_type
+
+    , lbl.cluster_id_agg_ward_cosine_200
+    , rating
+    , topic
+    , subreddit_title
+
+    , lbl.primary_post_language_percent
+    , lbl.primary_post_type_percent
+
+    , subreddit_language  -- This language is set by the Moderators
+    -- , subreddit_public_description
+
+FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v032_a` AS lbl
+LEFT JOIN geo_subs_agg AS geo
+    ON geo.subreddit_id = lbl.subreddit_id
+
+WHERE lbl.cluster_id_agg_ward_cosine_200 = 22
 ;
 
