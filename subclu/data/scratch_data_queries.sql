@@ -377,6 +377,8 @@ FROM
 GROUP BY
   1,
   2
+;
+
 
 -- Map country codes to country names
 -- The "regions" are not that helpful because they put
@@ -392,4 +394,126 @@ LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
 WHERE DATE(pt) = (CURRENT_DATE() - 2)
     AND (cm.region = 'LATAM' OR cm.country_name = 'Spain')
     AND cm.country_name != 'Brazil'
+;
+
+-- Get OCR Text for German-related communities (!)
+-- It looks like in this OCR table we could get multiple rows for a post ID:
+-- * because a post could have links to multiple images and the current behavior
+--     saves & scans each page for OCR content
+-- Limit to only post_type = 'image' for QA
+WITH geo_subs_raw AS (
+SELECT
+    geo.*
+    , cm.country_name
+    , cm.country_code
+    , RANK () OVER (PARTITION BY subreddit_id, country ORDER BY pt desc) as sub_geo_rank_no
+FROM `data-prod-165221.i18n.geo_sfw_communities` AS geo
+LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
+    ON geo.country = cm.country_code
+
+WHERE DATE(pt) BETWEEN (CURRENT_DATE() - 5) AND (CURRENT_DATE() - 2)
+    AND cm.country_code = 'DE'
+
+-- Order by country name here so that the aggregation sorts the names alphabetically
+ORDER BY subreddit_name, cm.country_name
+),
+geo_subs_agg AS (
+SELECT
+    geo.subreddit_id
+    , geo.subreddit_name
+    , STRING_AGG(geo.country_code, ', ') AS geo_relevant_country_codes
+    , STRING_AGG(geo.country_name, ', ') AS geo_relevant_country_names
+    , COUNT(geo.country_code) AS geo_relevant_country_count
+
+FROM geo_subs_raw AS geo
+
+-- Drop repeated country names
+WHERE geo.sub_geo_rank_no = 1
+
+GROUP BY 1, 2
+ORDER BY subreddit_name
+),
+ocr_text_agg AS (
+-- WE need to agg the text because one post could have multiple images
+SELECT
+    ocr.post_id
+    , pt
+    , STRING_AGG(inferred_text, '. ') AS inferred_text_agg
+    , COUNT(media_url) AS images_in_post_count
+
+FROM `data-prod-165221.swat_tables.image_ocr_text` AS ocr
+
+WHERE DATE(ocr.pt) = (CURRENT_DATE() - 3)
+
+GROUP BY 1, 2
+)
+
+SELECT
+    -- COUNT(*)
+    sp.subreddit_name
+    , geo.geo_relevant_country_codes
+    , geo.geo_relevant_country_names
+    , geo.geo_relevant_country_count
+    , sp.post_id
+    , sp.removed
+    , sp.submit_date
+    , sp.post_title
+    -- , sp.post_body_text
+    , sp.post_type
+    , ocr.images_in_post_count
+    , ocr.inferred_text_agg
+
+FROM `data-prod-165221.cnc.successful_posts` AS sp
+INNER JOIN geo_subs_agg AS geo
+    ON geo.subreddit_id = sp.subreddit_id
+LEFT JOIN ocr_text_agg AS ocr
+    ON ocr.post_id = sp.post_id AND DATE(sp.dt) = DATE(ocr.pt)
+
+WHERE 1=1
+    AND sp.post_type = 'image'
+    AND sp.dt = (CURRENT_DATE() - 3)
+    AND sp.removed = 0
+
+ORDER BY sp.subreddit_name, sp.post_id
+LIMIT 1000
+;
+
+
+
+-- Get subreddits that have geo-relevance overlap for Spain, Mexico, & Argentina
+-- Seems like only ~20 subs and most of these are small
+WITH geo_subs_raw AS (
+SELECT
+    geo.*
+    , cm.country_name
+    , cm.country_code
+    , RANK () OVER (PARTITION BY subreddit_id, country ORDER BY pt desc) as sub_geo_rank_no
+FROM `data-prod-165221.i18n.geo_sfw_communities` AS geo
+LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
+    ON geo.country = cm.country_code
+WHERE DATE(pt) BETWEEN (CURRENT_DATE() - 60) AND (CURRENT_DATE() - 2)
+    AND cm.country_name IN ('Spain', 'Mexico', 'Argentina')
+
+-- Order by country name here so that the aggregation sorts the names alphabetically
+ORDER BY subreddit_name, cm.country_name
+),
+geo_subs_agg AS (
+SELECT
+    geo.subreddit_id
+    , geo.subreddit_name
+    , STRING_AGG(geo.country_name, ', ') AS geo_relevant_countries
+    , COUNT(geo.country_code) AS geo_relevant_country_count
+
+FROM geo_subs_raw AS geo
+
+-- Only keep one country name
+WHERE geo.sub_geo_rank_no = 1
+
+GROUP BY 1, 2
+ORDER BY subreddit_name
+)  -- close 2nd subselection
+
+
+SELECT * FROM geo_subs_agg AS geo
+WHERE geo.geo_relevant_country_count > 1
 ;
