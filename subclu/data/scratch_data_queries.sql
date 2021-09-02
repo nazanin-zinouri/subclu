@@ -517,3 +517,43 @@ ORDER BY subreddit_name
 SELECT * FROM geo_subs_agg AS geo
 WHERE geo.geo_relevant_country_count > 1
 ;
+
+
+-- 2021-09-02; more debugging on tryint to filter out NSFW (sex-related) subreddits
+SELECT
+    slo.name    AS subreddit_name
+    , slo.subscribers
+    , rating_short
+    , rating_name
+    , primary_topic
+    , rating_weight
+    , nt.survey_version  AS tag_survey_version
+    , nt.pt AS new_rating_pt
+    , array_to_string(secondary_topics,", ") as secondary_topics
+    , array_to_string(mature_themes,", ") as mature_themes_list
+    -- , nt.* EXCEPT (
+    --     liveness_ts, subreddit_id, pt
+    --     , rating_short
+    --     , rating_name
+    --     , primary_topic
+    --     , secondary_topics
+    --     , mature_themes
+    -- )
+FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
+
+LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup` AS slo
+    ON nt.subreddit_id = slo.subreddit_id
+
+WHERE slo.dt = (CURRENT_DATE() - 1)
+    AND nt.pt = (CURRENT_DATE() - 1)
+    -- AND nt.rating_short = 'E'
+    AND nt.rating_short != 'X'
+    -- AND nt.primary_topic = 'Mature Themes and Adult Content'
+    AND (
+        'sex' in UNNEST(mature_themes)
+        OR 'sex_porn' in UNNEST(mature_themes)
+        OR 'nudity_explicit' in UNNEST(mature_themes)
+    )
+
+ORDER BY slo.subscribers DESC
+;
