@@ -1,4 +1,4 @@
--- noinspection SqlNoDataSourceInspectionForFile
+-- noinspection SqlResolveForFile, SqlNoDataSourceInspectionForFile
 
 CREATE TABLE `reddit-employee-datasets.david_bermejo.eda_post_counts`
 PARTITION BY submit_date
