@@ -210,3 +210,41 @@ WHERE 1=1
 GROUP BY 1, 2
 ;
 
+
+-- After chatting with Anna, she recommended using post_lookup table to get
+--  the latest status of a post
+-- Check post & comment counts for the past ~5 years
+DECLARE pt_date DATE DEFAULT '2021-09-07';
+
+-- USE CTE because we want to calculate differences between uniques & deleted
+WITH post_count_per_year AS (
+SELECT
+    EXTRACT(YEAR from created_timestamp) AS YEAR
+    , COUNT(*) total_rows
+    , COUNT(DISTINCT post_id) AS post_id_unique
+    , SUM(
+        CASE WHEN (deleted = true) THEN 1
+            ELSE 0
+        END
+    ) AS post_ids_deleted
+FROM `data-prod-165221.ds_v2_postgres_tables.post_lookup` AS plo
+
+WHERE DATE(_PARTITIONTIME) = pt_date
+    AND created_timestamp >= '2015-01-01'
+
+GROUP BY 1
+
+ORDER BY 1
+)
+
+SELECT
+    *
+    , (post_id_unique - post_ids_deleted) AS post_ids_not_deleted
+    , (total_rows = post_id_unique) AS total_rows_equal_unique_ids
+FROM post_count_per_year
+;
+
+
+-- COMMENT level doesn't have an equivalent table to `post_lookup`
+-- Using `successful_comment` returns a very small number of posts, not sure why/how
+-- is it because they're filtering out spam or something else?
