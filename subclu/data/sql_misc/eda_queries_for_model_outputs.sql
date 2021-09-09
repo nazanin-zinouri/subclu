@@ -449,7 +449,8 @@ WHERE slo.dt = (CURRENT_DATE() - 1)
 ORDER BY slo.subscribers DESC
 ;
 
--- Add geo-relevant countries to cluster labels
+
+-- Add geo-relevant countries to cluster labels AND new RATINGS
 WITH geo_subs_raw AS (
 SELECT
     geo.*
@@ -489,6 +490,15 @@ SELECT
     , geo.geo_relevant_country_count
     , lbl.primary_post_type
 
+    , rating_short
+    , rating_name
+    , primary_topic
+    , rating_weight
+    , nt.survey_version  AS tag_survey_version
+    , nt.pt AS new_rating_pt
+    , array_to_string(secondary_topics,", ") as secondary_topics
+    , array_to_string(mature_themes,", ") as mature_themes_list
+
     , lbl.cluster_id_agg_ward_cosine_200
     , rating
     , topic
@@ -503,7 +513,9 @@ SELECT
 FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_cluster_labels_v032_a` AS lbl
 LEFT JOIN geo_subs_agg AS geo
     ON geo.subreddit_id = lbl.subreddit_id
+LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
+    ON lbl.subreddit_id = nt.subreddit_id
 
-WHERE lbl.cluster_id_agg_ward_cosine_200 = 22
+WHERE lbl.cluster_id_agg_ward_cosine_200 = 49
+    AND nt.pt = (CURRENT_DATE() - 2)
 ;
-
