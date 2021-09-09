@@ -149,3 +149,8 @@ dmypy.json
 
 # dask local storage
 *dask-worker-space/
+
+# office temp files
+~$*.xl*
+~$*.doc*
+~$*.ppt*
