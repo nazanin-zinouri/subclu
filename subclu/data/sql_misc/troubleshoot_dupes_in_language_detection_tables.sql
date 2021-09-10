@@ -49,6 +49,7 @@ DECLARE pt_end_date DATE DEFAULT '2021-09-08';
 WITH language_data AS (
 SELECT
     DATE(_PARTITIONTIME) as pt
+    -- thing_type DESC = sort `POST` before `COMMENT`
     , ROW_NUMBER() OVER(PARTITION BY post_id ORDER BY thing_type DESC, created_timestamp ASC) AS thing_order_in_post
     -- , *
     , created_timestamp
@@ -245,11 +246,111 @@ FROM post_count_per_year
 ;
 
 
+-- for successful posts we can get something close to it:
+DECLARE pt_start_date DATE DEFAULT '2021-09-04';
+DECLARE pt_end_date DATE DEFAULT '2021-09-07';
+
+
+-- Select duplicated posts to see why they're duplicated
+WITH duplicated_check AS (
+SELECT
+    -- Use row_number to get the latest edit as row=1
+    ROW_NUMBER() OVER (
+        PARTITION BY post_id
+        ORDER BY endpoint_timestamp DESC, removal_timestamp desc
+    ) AS row_num
+    , removal_timestamp
+    , removed
+    , * EXCEPT(removal_timestamp, removed)
+
+FROM `data-prod-165221.cnc.successful_posts` AS sp
+
+WHERE sp.dt BETWEEN pt_start_date AND pt_end_date
+    -- Post IDs that have duplicates in `successful_posts`
+    --  Too many duplicates 't3_pits1o', 't3_phn3iu'
+    AND post_id IN ('t3_pits1o', 't3_pih5t4', 't3_pi4jz7', 't3_pijlpp', 't3_phnk2k')
+    -- post IDs that aren't duplicated
+    OR post_id IN (
+        't3_piqzou', 't3_pj61di', 't3_pj9xfo',
+        't3_pj3wld', 't3_pisbia', 't3_pj58h3', 't3_pj8nzu', 't3_piuu4j'
+    )
+
+ORDER BY post_id, row_num
+)
+
+-- Find posts that are duplicated or NOT duplicated
+-- SELECT
+--     post_id
+--     , COUNT(*)  AS row_count
+
+-- FROM `data-prod-165221.cnc.successful_posts` AS sp
+
+-- WHERE sp.dt BETWEEN pt_start_date AND pt_end_date
+--     AND removed = 0
+
+-- GROUP BY 1
+
+-- ORDER BY 2 ASC
+-- LIMIT 1500
+-- ;
+
+
+-- Count posts
+-- SELECT
+--     COUNT(*) total_rows
+--     , COUNT(DISTINCT post_id) AS post_id_unique
+--     , SUM(
+--         CASE WHEN (removed = 0) THEN 1
+--             ELSE 0
+--         END
+--     ) AS post_ids_active
+--     , SUM(
+--         CASE WHEN (removed = 1) THEN 1
+--             ELSE 0
+--         END
+--     ) AS post_ids_removed
+
+-- FROM `data-prod-165221.cnc.successful_posts` AS sp
+
+-- WHERE sp.dt BETWEEN pt_start_date AND pt_end_date
+-- ;
+
+-- ===============
+-- CTE calls
+-- ===
+-- If we sort by removal date, what happens if removal date is blank?
+SELECT
+    *
+FROM duplicated_check
+;
+
+-- HOWEVER, it looks like we can find duplicates if we exclude: removal_timestamp
+--  it appears that this is the column that can change over time :mind-blown: sigh
+--  so we should probably row_num() over removed time stamp and keep the latest action
+-- SELECT
+--     DISTINCT * EXCEPT(removal_timestamp, row_num)
+-- FROM duplicated_check
+-- ;
+
+-- We can also get uniques by picking only row_num = 1
+-- SELECT
+--     *
+-- FROM duplicated_check
+-- WHERE row_num = 1
+-- ;
+
+-- Try DISTINCT: it doesn't remove any duplicates on all columns
+-- SELECT
+--     DISTINCT * EXCEPT (row_num)
+-- FROM duplicated_check
+-- ;
+
+
+
+
 -- COMMENT level doesn't have an equivalent table to `post_lookup`
--- Using `successful_comment` returns a very small number of posts, not sure why/how
--- is it because they're filtering out spam or something else?
--- Get unique comments in `successful_comments` table
--- Looks like `data-prod-165221.cnc.successful_comments` also has some duplicates
+-- Using `successful_comment` returns a very small number of comments not sure why.
+--   is it because they're filtering out spam or something else?
 DECLARE pt_start_date DATE DEFAULT '2015-01-01';
 DECLARE pt_end_date DATE DEFAULT '2021-09-07';
 
