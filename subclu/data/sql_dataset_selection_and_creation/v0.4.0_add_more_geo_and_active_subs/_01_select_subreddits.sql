@@ -402,6 +402,24 @@ WITH
 ;
 
 
+-- Export data to google cloud storage (GCS)
+-- CHANGE/Update:
+--  1) URI date folder
+--  2) source table
+EXPORT DATA
+    OPTIONS(
+        uri='gs://i18n-subreddit-clustering/subreddits/top/2021-09-10/*.parquet',
+        format='PARQUET',
+        overwrite=true
+    ) AS
+
+    SELECT
+        sel.*
+    FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210910` AS sel
+    ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
+;
+
+
 -- ==============================
 -- Check  final_table
 -- SELECT
