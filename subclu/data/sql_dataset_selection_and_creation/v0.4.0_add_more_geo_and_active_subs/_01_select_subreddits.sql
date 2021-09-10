@@ -12,71 +12,69 @@ DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
 DECLARE min_users_l7 NUMERIC DEFAULT 3000;
 DECLARE min_posts_l28 NUMERIC DEFAULT 110;
 
-DECLARE min_users_geo_l7 NUMERIC DEFAULT 15;
-DECLARE min_posts_geo_l28 NUMERIC DEFAULT 5;
+DECLARE min_users_geo_l7 NUMERIC DEFAULT 300;
+DECLARE min_posts_geo_l28 NUMERIC DEFAULT 10;
 
 -- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_geo_20210831`
 -- AS (
 
 -- First select subreddits based on geo-relevance
 WITH
-    -- TODO(djb): Change name to show these are only ACTIVE subreddits
-    geo_subs_raw AS (
+    -- These subs come from a custom table that lowers the percent to qualify as geo-relevant
+    --   this table includes subs even if they are `active=false`
+    geo_subs_custom_raw AS (
         SELECT
-            -- Lower so it's easier to merge with other tables
-            LOWER(geo.subreddit_name)  AS subreddit_name
-            , geo.* EXCEPT(subreddit_name)
-            -- We need to split the name b/c: "Bolivia, State of..."
-            , SPLIT(cm.country_name, ', ')[OFFSET(0)] AS country_name
-            , cm.country_code
-            , cm.region
-            , ROW_NUMBER() OVER (PARTITION BY subreddit_id, country ORDER BY pt desc) as sub_geo_rank_no
-        FROM `data-prod-165221.i18n.geo_sfw_communities` AS geo
-        LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
-            ON geo.country = cm.country_code
-        WHERE DATE(pt) BETWEEN (CURRENT_DATE() - 56) AND (CURRENT_DATE() - 2)
+            subreddit_name
+            , subreddit_id
+            , country_name
+            , geo2.geo_country_code AS country_code
+            , geo2.geo_region AS region
+            , ROW_NUMBER() OVER (PARTITION BY subreddit_id, geo_country_code ORDER BY pt desc) as sub_geo_rank_no
+        -- This table is a single snapshot, so no need to filter by partition
+        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210909` AS geo2
+        WHERE 1=1
             AND (
-                cm.country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
-                OR cm.region = 'LATAM'
+                country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
+                OR geo_region = 'LATAM'
             )
-        -- Order by country name here so that the aggregation sorts the names alphabetically
-        ORDER BY subreddit_name ASC, cm.country_name ASC
+        -- ORDER BY subreddit_name ASC, country_name ASC
     ),
-    -- geo_subs_custom_raw AS (
-    --     SELECT
-    -- )
 
     subs_selected_by_geo AS (
         SELECT
             geo.subreddit_id
             , geo.subreddit_name
-            , STRING_AGG(geo.country_name, ', ') AS geo_relevant_countries
+
+            -- Order to sthat we get (Mexico, US) only, and not (US, Mexico)
+            , STRING_AGG(geo.country_name, ', ' ORDER BY geo.country_name) AS geo_relevant_countries
             , COUNT(geo.country_code) AS geo_relevant_country_count
 
-            -- use for checks but exclude for joins to prevent naming conflicts
-            -- , asr.users_l7
-            -- , asr.posts_l28
-            -- , asr.comments_l28
-            -- , nt.rating_name
-            -- , nt.primary_topic
+            -- cols for checking/debugging
+            , asr.users_l7
+            , asr.posts_l28
+            , asr.comments_l28
+            , nt.rating_name
+            , nt.primary_topic
 
-        FROM geo_subs_raw AS geo
-        LEFT JOIN `data-prod-165221.all_reddit.all_reddit_subreddits` AS asr
+        FROM geo_subs_custom_raw AS geo
+        LEFT JOIN (
+            SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+            WHERE DATE(pt) = partition_date
+        ) AS asr
             ON geo.subreddit_name = asr.subreddit_name
-        LEFT JOIN `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`    AS acs
-            ON asr.subreddit_name = acs.subreddit_name
-        LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`             AS slo
+        LEFT JOIN (
+            SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+            WHERE dt = partition_date
+        ) AS slo
             ON asr.subreddit_name = LOWER(slo.name)
         LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
-            ON acs.subreddit_id = nt.subreddit_id
+            ON geo.subreddit_id = nt.subreddit_id
 
         WHERE 1=1
             -- Drop duplicated country names
             AND geo.sub_geo_rank_no = 1
 
-            AND DATE(asr.pt) = partition_date
-            AND DATE(acs._PARTITIONTIME) = partition_date
-            AND slo.dt = partition_date
+            -- AND DATE(acs._PARTITIONTIME) = partition_date
             AND nt.pt = partition_date
 
             -- remove quarantine filter, b/c if we score them we might be able to clusters
@@ -85,8 +83,54 @@ WITH
             AND asr.users_l7 >= min_users_geo_l7
             AND asr.posts_l28 >= min_posts_geo_l28
 
+            -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
+            -- Better to include some in clustering than exclude a sub that was mislabeled
+            -- REMOVE `NOT` to reverse (show only the things we filtered out)
+            --      'askredditespanol' -- rated as X... sigh
+            AND NOT (
+                (
+                    COALESCE(slo.whitelist_status, '') = 'no_ads'
+                    AND COALESCE(nt.rating_short, '') = 'X'
+                    AND (
+                        COALESCE(nt.primary_topic, '') IN ('Mature Themes and Adult Content', 'Celebrity')
+                        OR 'sex_porn' IN UNNEST(mature_themes)
+                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
+                        OR 'nudity_explicit' IN UNNEST(mature_themes)
+                    )
+                )
+                OR COALESCE(nt.primary_topic, '') = 'Celebrity'
+                OR (
+                    COALESCE(nt.rating_short, '') = 'X'
+                    AND 'nudity_explicit' IN UNNEST(mature_themes)
+                    AND 'nudity_full' IN UNNEST(mature_themes)
+                )
+                OR (
+                    -- r/askredditEspanol doesn't get caught by this because it has a NULL primary_topic
+                    COALESCE(nt.rating_short, 'M') = 'X'
+                    AND COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
+                    AND (
+                        'sex_porn' IN UNNEST(mature_themes)
+                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
+                        OR 'nudity_explicit' IN UNNEST(mature_themes)
+                        OR 'sex_explicit_ref' IN UNNEST(mature_themes)
+                    )
+                )
+                OR (
+                    'sex_porn' IN UNNEST(mature_themes)
+                    AND (
+                        'sex_content_arousal' IN UNNEST(mature_themes)
+                        OR 'nudity_explicit' IN UNNEST(mature_themes)
+                        OR 'sex_ref_regular' IN UNNEST(mature_themes)
+                    )
+                )
+                OR (
+                    COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
+                    AND 'sex_content_arousal' IN UNNEST(mature_themes)
+                )
+            )
+
         GROUP BY 1, 2
-            -- , 5, 6, 7, 8, 9
+            , 5, 6, 7, 8, 9
         ORDER BY geo.subreddit_name
     ),
 
@@ -300,16 +344,40 @@ WITH
 
 
 -- ###############
--- CHECKS
+-- Tests/CHECKS
 -- ###
--- Check selected sub count
+
+-- Test selecting from subs_selected_by_geo subs
+-- SELECT *
+-- FROM subs_selected_by_geo AS geo
+-- WHERE 1=1
+--     -- AND geo.geo_relevant_country_count > 1
+
+-- ORDER BY users_l7 DESC, posts_l28 DESC, geo.geo_relevant_countries
+-- ;
+
+-- Count subreddits for each country
 SELECT
-    COUNT(*)    AS row_count
-    , COUNT(DISTINCT subreddit_name) AS subreddit_name_count
-    , COUNT(DISTINCT subreddit_id) AS subreddit_id_count
--- FROM selected_subs
-FROM (SELECT DISTINCT * FROM selected_subs)
+    geo_relevant_countries
+    -- , rating_name
+    , COUNT( DISTINCT subreddit_id) AS subreddit_count
+
+FROM subs_selected_by_geo AS geo
+GROUP BY 1
+ORDER BY 1, 2 DESC
 ;
+
+
+
+-- Check selected sub count
+-- SELECT
+--     COUNT(*)    AS row_count
+--     , COUNT(DISTINCT subreddit_name) AS subreddit_name_count
+--     , COUNT(DISTINCT subreddit_id) AS subreddit_id_count
+-- -- FROM selected_subs
+-- FROM (SELECT DISTINCT * FROM selected_subs)
+-- ;
+
 
 -- check selected subs missing name & ID (duplicates)
 -- We still need to do SELECT DISTINCT(*) to remove duplicates
@@ -323,26 +391,6 @@ FROM (SELECT DISTINCT * FROM selected_subs)
 -- ORDER BY sub_row_number DESC, subreddit_name
 -- ;
 
-
-
--- Test selecting from geo-selected subs
--- SELECT *
--- FROM subs_selected_by_geo AS geo
--- WHERE geo.geo_relevant_country_count > 1
-
--- ORDER BY geo.geo_relevant_countries
---     -- , users_l7 DESC
--- ;
-
--- Count subreddits for each country
--- SELECT
---     geo_relevant_countries
---     , COUNT( DISTINCT subreddit_id) AS subreddit_count
-
--- FROM subs_selected_by_geo AS geo
--- GROUP BY 1
--- ORDER BY 1, 2 DESC
--- ;
 
 -- Test selecting subs by activity
 -- SELECT
