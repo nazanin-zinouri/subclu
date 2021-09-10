@@ -125,7 +125,7 @@ WHERE 1=1
     AND acs.active = True
 ),
 
-subreddit_lookup AS (
+subreddit_lookup_clean_text_meta AS (
     SELECT
         *
         , COALESCE(array_length(regexp_extract_all(clean_description, r"\b\w+\b")), 0)      AS subreddit_clean_description_word_count
