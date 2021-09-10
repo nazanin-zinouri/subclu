@@ -449,8 +449,9 @@ WHERE slo.dt = (CURRENT_DATE() - 1)
 ORDER BY slo.subscribers DESC
 ;
 
-
+-- ========================
 -- Add geo-relevant countries to cluster labels AND new RATINGS
+-- ===
 WITH geo_subs_raw AS (
 SELECT
     geo.*
@@ -486,6 +487,8 @@ SELECT
     lbl.subreddit_name
 
     , lbl.primary_post_language  -- Source: ML model predicts language for each post
+     , lbl.primary_post_language_percent
+
     , geo.geo_relevant_countries
     , geo.geo_relevant_country_count
     , lbl.primary_post_type
@@ -504,7 +507,7 @@ SELECT
     , topic
     , subreddit_title
 
-    , lbl.primary_post_language_percent
+
     , lbl.primary_post_type_percent
 
     , subreddit_language  -- This language is set by the Moderators
@@ -516,6 +519,11 @@ LEFT JOIN geo_subs_agg AS geo
 LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
     ON lbl.subreddit_id = nt.subreddit_id
 
-WHERE lbl.cluster_id_agg_ward_cosine_200 = 49
+
+WHERE 1=1
+    -- 81= soccer, futbol
+    -- 49= dating, meeting online & in real life (irl)
+    -- 22= finanze /finanzen
+    AND lbl.cluster_id_agg_ward_cosine_200 = 81
     AND nt.pt = (CURRENT_DATE() - 2)
 ;
