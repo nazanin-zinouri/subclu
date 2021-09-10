@@ -15,8 +15,8 @@ DECLARE min_posts_l28 NUMERIC DEFAULT 115;
 DECLARE min_users_geo_l7 NUMERIC DEFAULT 300;
 DECLARE min_posts_geo_l28 NUMERIC DEFAULT 10;
 
--- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_geo_20210831`
--- AS (
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210910`
+AS (
 
 -- First select subreddits based on geo-relevance
 WITH
@@ -45,8 +45,9 @@ WITH
             geo.subreddit_id
             , geo.subreddit_name
 
-            -- Order to sthat we get (Mexico, US) only, and not (US, Mexico)
+            -- Order so that we get (Mexico, US) only, and not (US, Mexico)
             , STRING_AGG(geo.country_name, ', ' ORDER BY geo.country_name) AS geo_relevant_countries
+            , STRING_AGG(geo.country_code, ', ' ORDER BY geo.country_code) AS geo_relevant_country_codes
             , COUNT(geo.country_code) AS geo_relevant_country_count
 
             -- cols for checking/debugging
@@ -130,7 +131,7 @@ WITH
             )
 
         GROUP BY 1, 2
-            , 5, 6, 7, 8, 9
+            , 6, 7, 8, 9, 10
         ORDER BY geo.subreddit_name
     ),
 
@@ -154,7 +155,8 @@ WITH
             asr.subreddit_name
             , slo.subreddit_id
 
-            -- Use for checks but drop for prod to reduce name conflicts
+            -- Use for checks but drop for prod to reduce name conflicts & reduce query complexity
+            --  we'll add these later for all subreddits in the final table
             # , acs.* EXCEPT( subreddit_name)
             -- , asr.users_l7
             -- , asr.posts_l28
@@ -167,7 +169,6 @@ WITH
             -- , array_to_string(mature_themes,", ") as mature_themes_list
 
         FROM `data-prod-165221.all_reddit.all_reddit_subreddits` AS asr
-
         LEFT JOIN `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`    AS acs
             ON asr.subreddit_name = acs.subreddit_name
         LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`             AS slo
@@ -241,11 +242,12 @@ WITH
             )
     ),
 
+    -- Here's where we merge all subreddits to cluster: top (no geo), Geo-top, & ambassador subs
     selected_subs AS (
-        -- Here's where we merge all subreddits to cluster: top (no geo), German top, & ambassador subs
-        SELECT
+        SELECT DISTINCT
             merged.subreddit_name
             , merged.subreddit_id
+            , geo.geo_relevant_country_codes
             , geo.geo_relevant_countries
             , geo.geo_relevant_country_count
 
@@ -281,7 +283,7 @@ WITH
             *
             , COALESCE(array_length(regexp_extract_all(clean_description, r"\b\w+\b")), 0)      AS subreddit_clean_description_word_count
             , array_length(regexp_extract_all(subreddit_name_title_public_description, r"\b\w+\b"))       AS subreddit_name_title_public_description_word_count
-            # do word count for full concat column on final query
+            -- do word count for full concat column on final query
             , CASE
                 WHEN (description = public_description) THEN subreddit_name_title_public_description
                 ELSE CONCAT(subreddit_name_title_public_description, ". \n", COALESCE(clean_description, ""))
@@ -307,10 +309,10 @@ WITH
 
     final_table AS (
         SELECT
-            -- Subreddit_id was missing from original query, adding it back here for the future
-            slo.subreddit_id
+            partition_date AS pt_date
             , sel.*
 
+            -- TODO replace my old manual rating cols with the NEW ratings & tag columns
             , COALESCE (
                 LOWER(dst.topic),
                 "uncategorized"
@@ -325,11 +327,11 @@ WITH
                 )
                 END         AS combined_topic_and_rating
 
-            , rt.rating
-            , rt.version    AS rating_version
-
-            , dst.topic
-            , dst.version   AS topic_version
+            , nt.rating_short
+            , nt.rating_name
+            , nt.primary_topic
+            , array_to_string(secondary_topics,", ") as secondary_topics
+            , array_to_string(mature_themes,", ") as mature_themes_list
 
             -- Meta from lookup
             , slo.over_18
@@ -356,44 +358,74 @@ WITH
             , slo.title     AS subreddit_title
             , slo.public_description AS subreddit_public_description
             , slo.description AS subreddit_description
-            # , slo.clean_description AS subreddit_clean_description
+            -- , slo.clean_description AS subreddit_clean_description
             , slo.subreddit_name_title_and_clean_descriptions
 
         -- Use distinct in case a sub qualifies for more than 1 reason
         FROM (SELECT DISTINCT * FROM selected_subs) AS sel
-
         LEFT JOIN (
             -- Using sub-selection in case there are subs that haven't been registered in asr table
             SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
             WHERE DATE(pt) = partition_date
         ) AS asr
             ON sel.subreddit_name = asr.subreddit_name
-
         LEFT JOIN (
             SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_ratings`
             WHERE DATE(pt) = partition_date
         ) AS rt
             ON sel.subreddit_name = rt.subreddit_name
-
         LEFT JOIN(
             SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_topics`
             WHERE DATE(pt) = partition_date
         ) AS dst
             ON sel.subreddit_name = dst.subreddit_name
-
         LEFT JOIN subreddit_lookup_clean_text_meta AS slo
             ON sel.subreddit_name = LOWER(slo.name)
+        LEFT JOIN (
+            SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
+            WHERE pt = partition_date
+         ) AS nt
+            ON sel.subreddit_id = nt.subreddit_id
 
-        WHERE
+        -- WHERE 1=1
             -- Re-apply minimum post count in case something unexpected happened in previous joins
-            asr.posts_l28 >= min_posts_geo_l28
+            -- UPDATE: remove this check because some ambassador subs might get dropped by it
+            -- AND asr.posts_l28 >= min_posts_geo_l28
     )
 
+
+    -- SELECT for TABLE CREATION (or table preview)
+    SELECT *
+    FROM final_table
+    ORDER BY users_l28 DESC, posts_l28 DESC
+)  -- Close CREATE TABLE parens
+;
+
+
+-- ==============================
+-- Check  final_table
+-- SELECT
+--     COUNT(*)    AS row_count
+--     , COUNT(DISTINCT subreddit_name) AS subreddit_name_count
+--     , COUNT(DISTINCT subreddit_id) AS subreddit_id_count
+-- FROM final_table
+-- ;
 
 
 -- ###############
 -- Tests/CHECKS
 -- ###
+-- Counts for all tables together
+-- TODO(djb) maybe also add COUNT(DISTINCT subreddit_id) to check dupes
+-- SELECT
+--     (SELECT COUNT(*) FROM geo_subs_custom_raw) AS geo_subs_custom_raw_count
+--     , (SELECT COUNT(*) FROM subs_selected_by_geo) AS subs_selected_by_geo_count
+--     , (SELECT COUNT(*) FROM ambassador_subs) AS ambassador_subs_count
+--     , (SELECT COUNT(*) FROM subs_selected_by_activity) AS subs_selected_by_activity_count
+--     , (SELECT COUNT(*) FROM selected_subs) AS selected_subs_count
+--     , (SELECT COUNT(*) FROM final_table) AS final_table_count
+-- ;
+
 
 -- Test selecting from subs_selected_by_geo subs
 -- SELECT *
@@ -417,11 +449,12 @@ WITH
 
 
 -- Test subs count by ACTIVITY
-SELECT
-    COUNT(*) AS row_count
-    , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
-FROM subs_selected_by_activity
-;
+-- SELECT
+--     COUNT(*) AS row_count
+--     , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+-- FROM subs_selected_by_activity
+-- ;
+
 
 -- Check whether r/reggeaton makes the cut by activity...
 -- SELECT
@@ -446,26 +479,28 @@ FROM subs_selected_by_activity
 -- ;
 
 
-
+-- ==============================
 -- Check selected sub count
+--   NOTE that we need to do SELECT DISTINCT to remove duplicates
+--   I moved the DISTINCT statement to the query itself so we shouldn't need it here anymore
 -- SELECT
 --     COUNT(*)    AS row_count
 --     , COUNT(DISTINCT subreddit_name) AS subreddit_name_count
 --     , COUNT(DISTINCT subreddit_id) AS subreddit_id_count
--- -- FROM selected_subs
--- FROM (SELECT DISTINCT * FROM selected_subs)
+-- FROM selected_subs
 -- ;
 
-
--- check selected subs missing name & ID (duplicates)
+-- Check selected subs missing name & ID (duplicates)
 -- We still need to do SELECT DISTINCT(*) to remove duplicates
 -- SELECT
 --     subreddit_name
 --     , ROW_NUMBER () OVER (PARTITION BY subreddit_id ORDER BY subreddit_name) as sub_row_number
 --     , * EXCEPT(subreddit_name )
 -- -- FROM selected_subs
--- FROM (SELECT DISTINCT * FROM selected_subs)
-
+-- FROM (SELECT DISTINCT * FROM selected_subs) AS sel
+-- WHERE 1=1
+--     -- AND sel.ambassador_subreddit = true
+--     AND sel.subreddit_name LIKE "vega%"
 -- ORDER BY sub_row_number DESC, subreddit_name
 -- ;
 
