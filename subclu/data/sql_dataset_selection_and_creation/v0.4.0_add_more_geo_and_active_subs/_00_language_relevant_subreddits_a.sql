@@ -1,7 +1,7 @@
 -- ==========================================
 -- NOTE: WIP. Won't be using for first iteration because of QA issues with duplicates
 --      in language detection tables (hard to get a good count number of posts in a language)
-
+-- ===
 -- Get count of Spanish language subreddits in past l28 days
 --  we can use this to figure out if we want to select subreddits in a language
 --  even if they don't qualify from a geo-location score
