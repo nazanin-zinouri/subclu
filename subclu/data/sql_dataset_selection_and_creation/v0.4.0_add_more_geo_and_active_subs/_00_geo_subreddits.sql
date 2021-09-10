@@ -185,3 +185,97 @@ FROM final_geo_output
 
 -- ORDER BY subreddit_unique_count DESC
 -- ;
+
+
+
+-- WIP/SCRATCH FILTER OUT porn subreddits to select for clustering
+-- use it for v0.4.0 filtering
+SELECT
+    rating_short
+    , rating_name
+    , primary_topic
+
+    , geo.subreddit_name
+    , geo.geo_country_code
+    , geo.total_users
+    , slo.whitelist_status AS ads_allowlist_status
+
+    , array_to_string(secondary_topics,", ") as secondary_topics
+    , array_to_string(mature_themes,", ") as mature_themes_list
+    , rating_weight
+    , geo.* EXCEPT (subreddit_name, geo_country_code, total_users)
+    , nt.survey_version  AS tag_survey_version
+    , nt.pt AS new_rating_pt
+
+FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210909` AS geo
+LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
+    ON nt.subreddit_id = geo.subreddit_id
+LEFT JOIN (
+    SELECT *
+    FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+    WHERE dt = (CURRENT_DATE() - 2)
+)AS slo
+    ON geo.subreddit_id = slo.subreddit_id
+
+WHERE 1=1
+    AND nt.pt = (CURRENT_DATE() - 1)
+    -- AND geo_country_code NOT IN ('US')
+    -- AND geo_country_code IN ('MX', "DE")
+    AND total_users >= 800
+    AND (
+        country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
+        OR geo_region = 'LATAM'
+    )
+
+    -- Test to see X, M, or unrated communities
+    -- AND COALESCE(nt.rating_short, '') != 'E'
+
+    -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
+    -- Better to include some in clustering than exclude a sub that was mislabeled
+    -- REMOVE `NOT` to reverse (show only the things we filtered out)
+    --      'askredditespanol' -- rated as X... sigh
+    AND NOT (
+        (
+            COALESCE(slo.whitelist_status, '') = 'no_ads'
+            AND COALESCE(nt.rating_short, '') = 'X'
+            AND (
+                COALESCE(nt.primary_topic, '') IN ('Mature Themes and Adult Content', 'Celebrity')
+                OR 'sex_porn' IN UNNEST(mature_themes)
+                OR 'sex_content_arousal' IN UNNEST(mature_themes)
+                OR 'nudity_explicit' IN UNNEST(mature_themes)
+            )
+        )
+        OR COALESCE(nt.primary_topic, '') = 'Celebrity'
+        OR (
+            COALESCE(nt.rating_short, '') = 'X'
+            AND 'nudity_explicit' IN UNNEST(mature_themes)
+            AND 'nudity_full' IN UNNEST(mature_themes)
+        )
+        OR (
+            -- r/askredditEspanol doesn't get caught by this because it has a NULL primary_topic
+            COALESCE(nt.rating_short, 'M') = 'X'
+            AND COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
+            AND (
+                'sex_porn' IN UNNEST(mature_themes)
+                OR 'sex_content_arousal' IN UNNEST(mature_themes)
+                OR 'nudity_explicit' IN UNNEST(mature_themes)
+                OR 'sex_explicit_ref' IN UNNEST(mature_themes)
+            )
+        )
+        OR (
+            'sex_porn' IN UNNEST(mature_themes)
+            AND (
+                'sex_content_arousal' IN UNNEST(mature_themes)
+                OR 'nudity_explicit' IN UNNEST(mature_themes)
+                OR 'sex_ref_regular' IN UNNEST(mature_themes)
+            )
+        )
+        OR (
+            COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
+            AND 'sex_content_arousal' IN UNNEST(mature_themes)
+        )
+    )
+
+ORDER BY total_users DESC, subreddit_name
+-- LIMIT 2000
+;
