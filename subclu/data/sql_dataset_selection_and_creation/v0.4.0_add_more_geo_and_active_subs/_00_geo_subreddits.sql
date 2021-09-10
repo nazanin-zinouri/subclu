@@ -10,7 +10,7 @@ DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and No
 
 -- Setting to 0.17 instead of 0.4 because some subreddits in LATAM
 --  wouldn't show up as relevent b/c their country visits are split between too many countries
-DECLARE min_pct_country NUMERIC DEFAULT 0.17;
+DECLARE min_pct_country NUMERIC DEFAULT 0.15;
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210909`
