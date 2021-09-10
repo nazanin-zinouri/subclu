@@ -122,12 +122,15 @@ FROM (
     FROM `reddit-protected-data.language_detection.comment_language_v2`
     WHERE _PARTITIONTIME BETWEEN TIMESTAMP(start_date) AND TIMESTAMP(end_date)
         AND thing_type = 'comment'
+        AND id !=
 ) AS tl
 INNER JOIN geo
     ON tl.subreddit_id = geo.subreddit_id
         AND tl.post_id = geo.post_id
         AND tl.thing_type = geo.noun
         AND tl.user_id = geo.user_id
+        -- TODO(djb): add to future queries, it might help remove dupes?
+        -- AND tl.id = geo.comment_id
 
 -- Exclude some known bots
 WHERE geo.user_id NOT IN ("t2_4kh8rj3k")

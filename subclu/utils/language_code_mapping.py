@@ -9,6 +9,7 @@ We could also use Unicode's cldr:
 
 For IP geolocation we'll need to research what coding system they use.
 TODO(djb)
+
 """
 
 
@@ -160,16 +161,17 @@ for lang_code, lang_name in D_CLD3_CODE_TO_LANGUAGE_NAME.items():
 
 # These codes were extracted from top subreddit posts extract from:
 #  top_subreddits_2021-07_16.yaml
+# Languages with * next to them are high priority for i18n
 L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
-    'en',
-    'de',
-    'pt',
-    'es',
-    'fr',
+    'en',  # English
+    'de',  # German *
+    'pt',  # Portuguese *
+    'es',  # Spanish *
+    'fr',  # French *
     'no',
     'af',
     'nl',
-    'it',
+    'it',  # Italian *
     'id',
     'da',
     'so',
