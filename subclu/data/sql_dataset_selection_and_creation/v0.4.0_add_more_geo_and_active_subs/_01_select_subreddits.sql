@@ -9,8 +9,8 @@
 DECLARE partition_date DATE DEFAULT '2021-09-07';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE min_users_l7 NUMERIC DEFAULT 3000;
-DECLARE min_posts_l28 NUMERIC DEFAULT 110;
+DECLARE min_users_l7 NUMERIC DEFAULT 3100;
+DECLARE min_posts_l28 NUMERIC DEFAULT 115;
 
 DECLARE min_users_geo_l7 NUMERIC DEFAULT 300;
 DECLARE min_posts_geo_l28 NUMERIC DEFAULT 10;
@@ -148,10 +148,8 @@ WITH
     ),
 
     -- ###############
-    -- Now, select subs based on activity
-    -- ###
+    -- Here we select subreddits from anywhere based on minimum users(views) & post counts
     subs_selected_by_activity AS (
-        -- Here we select subreddits from anywhere based on minimum users(views) & post counts
         SELECT
             asr.subreddit_name
             , slo.subreddit_id
@@ -161,6 +159,12 @@ WITH
             -- , asr.users_l7
             -- , asr.posts_l28
             -- , asr.comments_l28
+
+            -- , nt.rating_short
+            -- , nt.rating_name
+            -- , nt.primary_topic
+            -- , array_to_string(secondary_topics,", ") as secondary_topics
+            -- , array_to_string(mature_themes,", ") as mature_themes_list
 
         FROM `data-prod-165221.all_reddit.all_reddit_subreddits` AS asr
 
@@ -183,14 +187,58 @@ WITH
             AND asr.users_l7 >= min_users_l7
             AND asr.posts_l28 >= min_posts_l28
 
-            -- Thousands of subs have the over_18 flag as null, so we need to account for it
-            AND (
-                slo.over_18 = 'f'
-                OR slo.over_18 IS NULL
-            )
-            AND nt.rating_short != 'X'
+            -- Need COALESCE because thousands of subs have an empty field
+            AND COALESCE(slo.over_18, 'f') = 'f'
 
+            -- For the high-activity subs I'll keep the active flag
             AND acs.active = True
+            -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
+            -- Better to include some in clustering than exclude a sub that was mislabeled
+            -- REMOVE `NOT` to reverse (show only the things we filtered out)
+            --      'askredditespanol' -- rated as X... sigh
+            -- Test edge cases by only looking at subs not rated as E
+            -- AND COALESCE(nt.rating_short, '') NOT IN ('E')
+            AND NOT (
+                (
+                    COALESCE(slo.whitelist_status, '') = 'no_ads'
+                    AND COALESCE(nt.rating_short, '') = 'X'
+                    AND (
+                        COALESCE(nt.primary_topic, '') IN ('Mature Themes and Adult Content', 'Celebrity')
+                        OR 'sex_porn' IN UNNEST(mature_themes)
+                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
+                        OR 'nudity_explicit' IN UNNEST(mature_themes)
+                    )
+                )
+                OR COALESCE(nt.primary_topic, '') = 'Celebrity'
+                OR (
+                    COALESCE(nt.rating_short, '') = 'X'
+                    AND 'nudity_explicit' IN UNNEST(mature_themes)
+                    AND 'nudity_full' IN UNNEST(mature_themes)
+                )
+                OR (
+                    -- r/askredditEspanol doesn't get caught by this because it has a NULL primary_topic
+                    COALESCE(nt.rating_short, 'M') = 'X'
+                    AND COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
+                    AND (
+                        'sex_porn' IN UNNEST(mature_themes)
+                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
+                        OR 'nudity_explicit' IN UNNEST(mature_themes)
+                        OR 'sex_explicit_ref' IN UNNEST(mature_themes)
+                    )
+                )
+                OR (
+                    'sex_porn' IN UNNEST(mature_themes)
+                    AND (
+                        'sex_content_arousal' IN UNNEST(mature_themes)
+                        OR 'nudity_explicit' IN UNNEST(mature_themes)
+                        OR 'sex_ref_regular' IN UNNEST(mature_themes)
+                    )
+                )
+                OR (
+                    COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
+                    AND 'sex_content_arousal' IN UNNEST(mature_themes)
+                )
+            )
     ),
 
     selected_subs AS (
@@ -356,16 +404,46 @@ WITH
 -- ORDER BY users_l7 DESC, posts_l28 DESC, geo.geo_relevant_countries
 -- ;
 
--- Count subreddits for each country
-SELECT
-    geo_relevant_countries
-    -- , rating_name
-    , COUNT( DISTINCT subreddit_id) AS subreddit_count
+-- Count subreddits for each country GEO
+-- SELECT
+--     geo_relevant_countries
+--     -- , rating_name
+--     , COUNT( DISTINCT subreddit_id) AS subreddit_count
 
-FROM subs_selected_by_geo AS geo
-GROUP BY 1
-ORDER BY 1, 2 DESC
+-- FROM subs_selected_by_geo AS geo
+-- GROUP BY 1
+-- ORDER BY 1, 2 DESC
+-- ;
+
+
+-- Test subs count by ACTIVITY
+SELECT
+    COUNT(*) AS row_count
+    , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+FROM subs_selected_by_activity
 ;
+
+-- Check whether r/reggeaton makes the cut by activity...
+-- SELECT
+--     *
+-- FROM subs_selected_by_activity
+-- WHERE 1=1
+--     AND subreddit_name LIKE "regg%"
+
+-- ORDER BY subreddit_name
+-- ;
+
+
+-- Check ACTIVITY subreddits that are not rated as E
+-- SELECT
+--     -- COUNT(*)
+--     *
+-- FROM subs_selected_by_activity
+-- WHERE 1=1
+    -- need to add commented out cols for rating to show up
+    -- AND COALESCE(rating_short, '') NOT IN ('E')
+-- ORDER BY users_l7 DESC, posts_l28 DESC
+-- ;
 
 
 
@@ -389,20 +467,5 @@ ORDER BY 1, 2 DESC
 -- FROM (SELECT DISTINCT * FROM selected_subs)
 
 -- ORDER BY sub_row_number DESC, subreddit_name
--- ;
-
-
--- Test selecting subs by activity
--- SELECT
---     COUNT(*)
---     -- *
--- FROM subs_selected_by_activity
-
--- SELECT
---     -- COUNT(*)
---     *
--- FROM subs_selected_by_activity
--- WHERE subreddit_name LIKE "reg%"
--- ORDER BY subreddit_name
 -- ;
 
