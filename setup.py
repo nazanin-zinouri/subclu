@@ -209,7 +209,7 @@ EXTRAS_REQUIRE = {
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.3.2',
+    version='0.4.0',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',

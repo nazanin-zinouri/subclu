@@ -224,6 +224,7 @@ class MlflowLogger:
             self,
             run_id: str,
             artifact_folder: str,
+            artifact_file: str = None,
             experiment_ids: Union[str, int, List[int]] = None,
             read_function: Union[callable, str] = 'pd_parquet',
             columns: iter = None,
@@ -237,6 +238,9 @@ class MlflowLogger:
         df_v_sub = (
             pd.read_parquet(f"{artifact_uri}/{folder_vect_subs}")
         )
+        artifact_file:
+            if you only want to read a single file in the artifact_folder, pass this value
+
         WARNING! if a folder name is a subset of another name, it's possible that
         GCS will return files that are in the other similar folders.
         TODO(djb) Create a check to make sure that the parent of each file matches
@@ -281,6 +285,10 @@ class MlflowLogger:
 
             path_local_folder = Path(f"{local_path_root}/{full_artifact_folder}")
             path_to_load = path_local_folder
+            # TODO(djb): fix error: when artifact folder is something like:
+            #  'd_ix_to_id/d_ix_to_id.csv',
+            #  then the file won't be saved, instead we'll create a folder that has the file name
+            #   ad we can't download/read the file! hmm:
             info(f"Local folder to download artifact(s):\n  {path_local_folder}")
             Path.mkdir(path_local_folder, exist_ok=True, parents=True)
 
@@ -298,6 +306,10 @@ class MlflowLogger:
                     path_local_folder /
                     f"{blob_.name.split('/')[-1].strip()}"
                 )
+                if artifact_file is not None:
+                    if f_name != artifact_file:
+                        continue
+
                 if str(f_name).endswith('parquet'):
                     l_parquet_files_downloaded.append(f_name)
 
@@ -320,6 +332,20 @@ class MlflowLogger:
                 return read_function(l_parquet_files_downloaded[:n_sample_files], columns=columns)
             except OSError:
                 return read_function(f"{path_to_load}/*.parquet", columns=columns)
+        if read_function == pd.read_csv:
+            print('path to load\n', path_to_load)
+            print('path to TYPE\n', type(path_to_load))
+            print('list of parquet\n', l_parquet_files_downloaded)
+            logging.warning(f"THIS CALL MAY FALL WITH OR JSON CSV FILES!")
+            # try:
+            return read_function(path_to_load / artifact_file)
+            # except OSError:
+            #     return read_function(l_parquet_files_downloaded)
+                # This error might happen if there are non-parquet files in the folder
+                # so we'll append `*.parquet` to try to read parquet files
+                # return read_function(f"{path_to_load}/*.parquet",
+                #                      columns=columns)
+
         elif json.loads != read_function:  # meant for pd.read_parquet
             try:
                 return read_function(path_to_load,
