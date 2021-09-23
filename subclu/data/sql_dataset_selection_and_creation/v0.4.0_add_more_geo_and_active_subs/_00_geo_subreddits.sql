@@ -1,21 +1,26 @@
 -- Create new geo-relevant table that includes subreddits NOT active
 --  Because many i18n-relevant subreddits will NOT be active (they're too small
 --  to make it into the regular table).
+-- TODO: future work. Instead of % of users from a country in a subreddit:
+--   % of users from a country that view the subreddit -- which sureddit(s) have a higher% of views in a country
 -- Based on:
 -- https://github.snooguts.net/reddit/data-science-airflow-etl/blob/master/dags/i18n/sql/geo_sfw_communities.sql
 
-DECLARE active_pt_start DATE DEFAULT '2021-08-24';
-DECLARE active_pt_end DATE DEFAULT '2021-09-07';
+DECLARE active_pt_start DATE DEFAULT '2021-09-06';
+DECLARE active_pt_end DATE DEFAULT '2021-09-20';
 DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and Northern Ireland| of America|";
 
--- Setting to 0.17 instead of 0.4 because some subreddits in LATAM
+-- Setting lower than 0.4 because some subreddits in LATAM
 --  wouldn't show up as relevent b/c their country visits are split between too many countries
-DECLARE min_pct_country NUMERIC DEFAULT 0.15;
+DECLARE min_pct_country NUMERIC DEFAULT 0.16;
+
+-- To test activity filters
+-- DECLARE min_users_geo_l7 NUMERIC DEFAULT 15;
+-- DECLARE min_posts_geo_l28 NUMERIC DEFAULT 5;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210909`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210922`
 AS (
-
 WITH
     -- Get count of all users for each subreddit
     tot_subreddit AS (
@@ -65,6 +70,9 @@ WITH
             , LOWER(s.name) AS subreddit_name
             , s.subreddit_id
             , r.geo_country_code
+            -- Split to remove long official names like:
+            --   Tanzania, United Republic of; Bolivia, Plurinational State of
+            -- Regex replace long names w/o a comma
             , REGEXP_REPLACE(
                 SPLIT(cm.country_name, ', ')[OFFSET(0)],
                 regex_cleanup_country_name_str, ""
@@ -83,8 +91,8 @@ WITH
             SELECT *
             FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
             WHERE dt = DATE(active_pt_end)
-        ) AS s ON
-            LOWER(r.subreddit_name) = LOWER(s.name)
+        ) AS s
+            ON LOWER(r.subreddit_name) = LOWER(s.name)
 
         LEFT JOIN `data-prod-165221.ds_utility_tables.countrycode_region_mapping` AS cm
             ON r.geo_country_code = cm.country_code
@@ -117,6 +125,27 @@ FROM final_geo_output
 -- ===========================
 -- Tests/checks for query
 -- ===
+-- final output COUNT
+-- SELECT
+--     COUNT(*)  AS row_count
+--     , COUNT(DISTINCT subreddit_id)  AS subreddit_unique_count
+--     , COUNT(DISTINCT country_name)  AS country_unique_count
+-- FROM final_geo_output AS geo
+-- LEFT JOIN `data-prod-165221.all_reddit.all_reddit_subreddits` AS asr
+--     ON LOWER(geo.subreddit_name) = asr.subreddit_name
+-- WHERE 1=1
+--     -- country filters
+--     AND (
+--         country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
+--         OR geo_region = 'LATAM'
+--         -- OR country_code IN ('CA', 'GB', 'AU')
+--     )
+--     -- activity filters
+--     AND asr.users_l7 >= min_users_geo_l7
+--     AND asr.posts_l28 >= min_posts_geo_l28
+-- ;
+
+
 -- Check geo_sub
 --   All subreddits appear here
 -- SELECT
@@ -125,7 +154,11 @@ FROM final_geo_output
 -- FROM geo_sub
 -- WHERE 1=1
 --     -- David's filter specific subs
---     AND LOWER(subreddit_name ) IN ('fussball', 'fifa_de', 'borussiadortmund')
+--     AND LOWER(subreddit_name ) IN (
+--         'fussball', 'fifa_de', 'borussiadortmund', 'futbol', 'fcbayern',
+--         'barca', 'realmadrid', 'psg'
+--     )
+--     AND users_country >= 88
 -- ORDER BY subreddit_name, users_country DESC
 -- ;
 
@@ -139,7 +172,7 @@ FROM final_geo_output
 -- FROM filtered_subreddits
 -- WHERE 1=1
 --     -- David's filter specific subs
---     AND LOWER(subreddit_name ) IN ('fussball', 'fifa_de', 'borussiadortmund', 'futbol')
+--     AND LOWER(subreddit_name ) IN ('fussball', 'fifa_de', 'borussiadortmund', 'futbol', 'fcbayern')
 
 -- ORDER BY subreddit_name, users_percent_by_country DESC
 -- ;
@@ -155,7 +188,7 @@ FROM final_geo_output
 --     -- David's filter specific subs
 --     -- AND LOWER(subreddit_name ) IN (
 --     --     'fussball', 'fifa_de', 'borussiadortmund', 'futbol', 'soccer'
---     --     , 'dataisbeautiful'
+--     --     , 'dataisbeautiful', 'fcbayern'
 --     --     )
 --     AND geo_country_code NOT IN ("US", "GB")
 

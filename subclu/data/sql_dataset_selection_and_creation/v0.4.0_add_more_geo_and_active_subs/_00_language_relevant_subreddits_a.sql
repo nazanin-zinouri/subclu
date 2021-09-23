@@ -33,15 +33,14 @@ WITH
                 cm.country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
                 OR cm.region = 'LATAM'
             )
-        -- Order by country name here so that the aggregation sorts the names alphabetically
-        ORDER BY subreddit_name ASC, cm.country_name ASC
         ),
 
     subs_selected_by_geo AS (
         SELECT
             geo.subreddit_id
             , geo.subreddit_name
-            , STRING_AGG(geo.country_name, ', ') AS geo_relevant_countries
+            , STRING_AGG(geo.country_name, ', ' ORDER BY geo.country_name) AS geo_relevant_countries
+            , STRING_AGG(geo.country_code, ', ' ORDER BY geo.country_code) AS geo_relevant_country_codes
             , COUNT(geo.country_code) AS geo_relevant_country_count
 
             -- use for checks but exclude for joins to prevent naming conflicts
