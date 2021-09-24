@@ -6,17 +6,28 @@
 --  over_18="f" set BY THE MODS! So we still might seem some NSFW subreddits
 -- TODO(djb) in v0.3.2 pull we had 3,700 subs; now we want ~10k subs
 -- CREATE TABLE with new selected subreddits for v0.4.0 clustering
-DECLARE partition_date DATE DEFAULT '2021-09-07';
+DECLARE partition_date DATE DEFAULT '2021-09-21';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE min_users_l7 NUMERIC DEFAULT 3100;
-DECLARE min_posts_l28 NUMERIC DEFAULT 115;
+DECLARE min_users_l7 NUMERIC DEFAULT 2300;
+DECLARE min_posts_l28 NUMERIC DEFAULT 90;
+DECLARE min_comments_l28 NUMERIC DEFAULT 2;
 
-DECLARE min_users_geo_l7 NUMERIC DEFAULT 300;
-DECLARE min_posts_geo_l28 NUMERIC DEFAULT 10;
+-- eng-i18n = Canada, UK, Australia
+DECLARE min_users_eng_i18n_l7 NUMERIC DEFAULT 2000;
+DECLARE min_posts_eng_i18n_l28 NUMERIC DEFAULT 80;
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210910`
-AS (
+-- All other i18n countries
+--  From these, only India is expected to have a large number of English-language subreddits
+--  Some i18n subs (like 1fcnuernberg) are only really active once a week b/c of game schedule
+--   so they have few posts, but many comments. Add post + comment filter instead of only post
+DECLARE min_users_geo_l7 NUMERIC DEFAULT 32;
+DECLARE min_posts_geo_l28 NUMERIC DEFAULT 9;
+DECLARE min_posts_plus_comments_geo_l28 NUMERIC DEFAULT 35;
+
+
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210923`
+-- AS (
 
 -- First select subreddits based on geo-relevance
 WITH
@@ -31,13 +42,14 @@ WITH
             , geo2.geo_region AS region
             , ROW_NUMBER() OVER (PARTITION BY subreddit_id, geo_country_code ORDER BY pt desc) as sub_geo_rank_no
         -- This table is a single snapshot, so no need to filter by partition
-        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210909` AS geo2
+        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210922` AS geo2
         WHERE 1=1
             AND (
                 country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
                 OR geo_region = 'LATAM'
+                -- eng-i18n =  Canada, UK, Australia
+                OR geo_country_code IN ('CA', 'GB', 'AU')
             )
-        -- ORDER BY subreddit_name ASC, country_name ASC
     ),
 
     subs_selected_by_geo AS (
@@ -68,21 +80,44 @@ WITH
             WHERE dt = partition_date
         ) AS slo
             ON asr.subreddit_name = LOWER(slo.name)
-        LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
+        LEFT JOIN (
+            SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
+            WHERE pt = partition_date
+        ) AS nt
             ON geo.subreddit_id = nt.subreddit_id
 
         WHERE 1=1
             -- Drop duplicated country names
             AND geo.sub_geo_rank_no = 1
 
-            -- AND DATE(acs._PARTITIONTIME) = partition_date
-            AND nt.pt = partition_date
-
             -- remove quarantine filter, b/c if we score them we might be able to clusters
             --   of subreddits that are similar to previoiusly quarantined subs
             -- AND slo.quarantine = false
-            AND asr.users_l7 >= min_users_geo_l7
-            AND asr.posts_l28 >= min_posts_geo_l28
+
+            -- Apply activity by geo:
+            AND (
+                (
+                    (
+                        country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
+                        OR region = 'LATAM'
+                    )
+                    AND asr.users_l7 >= min_users_geo_l7
+                    AND asr.posts_l28 >= min_posts_geo_l28
+                )
+                OR (
+                    (
+                        country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
+                        OR region = 'LATAM'
+                    )
+                    AND asr.users_l7 >= min_users_geo_l7
+                    AND (asr.posts_l28 + asr.comments_l28) >= min_posts_plus_comments_geo_l28
+                )
+                OR (
+                    country_code IN ('CA', 'GB', 'AU')
+                    AND asr.users_l7 >= min_users_eng_i18n_l7
+                    AND asr.posts_l28 >= min_posts_eng_i18n_l28
+                )
+            )
 
             -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
             -- Better to include some in clustering than exclude a sub that was mislabeled
@@ -132,7 +167,7 @@ WITH
 
         GROUP BY 1, 2
             , 6, 7, 8, 9, 10
-        ORDER BY geo.subreddit_name
+        -- ORDER BY geo.subreddit_name
     ),
 
     ambassador_subs AS (
@@ -142,10 +177,12 @@ WITH
             , slo.subreddit_id
 
         FROM `reddit-employee-datasets.wacy_su.ambassador_subreddits` AS amb
-        LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`             AS slo
-            ON amb.subreddit_name = LOWER(slo.name)
+        LEFT JOIN (
+            SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+            WHERE dt = partition_date
+        ) AS slo
+            ON LOWER(amb.subreddit_name) = LOWER(slo.name)
         WHERE amb.subreddit_name IS NOT NULL
-            AND slo.dt = partition_date
     ),
 
     -- ###############
@@ -187,6 +224,7 @@ WITH
             -- AND slo.quarantine = false
             AND asr.users_l7 >= min_users_l7
             AND asr.posts_l28 >= min_posts_l28
+            AND asr.comments_l28 >= min_comments_l28
 
             -- Need COALESCE because thousands of subs have an empty field
             AND COALESCE(slo.over_18, 'f') = 'f'
@@ -243,10 +281,24 @@ WITH
     ),
 
     -- Here's where we merge all subreddits to cluster: top (no geo), Geo-top, & ambassador subs
+    -- Split into 2 steps:
+    --  1st: get the distinct sub-name & sub-ID
+    --  2nd: get flags for why a sub qualified (join with geo-relevant & ambassador tables)
+    selected_subs_base AS (
+        SELECT
+            COALESCE(top1.subreddit_name, geo1.subreddit_name, amb1.subreddit_name)  AS subreddit_name
+            , COALESCE(top1.subreddit_id, geo1.subreddit_id, amb1.subreddit_id) AS subreddit_id
+
+        FROM subs_selected_by_activity  AS top1
+        FULL OUTER JOIN subs_selected_by_geo  AS geo1
+            ON top1.subreddit_id = geo1.subreddit_id AND top1.subreddit_name = geo1.subreddit_name
+        FULL OUTER JOIN ambassador_subs AS amb1
+            ON top1.subreddit_id = amb1.subreddit_id AND top1.subreddit_name = amb1.subreddit_name
+    ),
     selected_subs AS (
-        SELECT DISTINCT
-            merged.subreddit_name
-            , merged.subreddit_id
+        SELECT
+            sel.subreddit_name
+            , sel.subreddit_id
             , geo.geo_relevant_country_codes
             , geo.geo_relevant_countries
             , geo.geo_relevant_country_count
@@ -259,23 +311,15 @@ WITH
                 WHEN (amb.subreddit_id IS NOT NULL) THEN true
                 ELSE false
                 END AS ambassador_subreddit
-
-        -- Join on itself to find why a subreddit qualified
-        FROM (
-            SELECT
-                COALESCE(top1.subreddit_name, geo1.subreddit_name, amb1.subreddit_name)  AS subreddit_name
-                , COALESCE(top1.subreddit_id, geo1.subreddit_id, amb1.subreddit_id) AS subreddit_id
-
-            FROM subs_selected_by_activity  AS top1
-            FULL OUTER JOIN subs_selected_by_geo  AS geo1
-                ON top1.subreddit_id = geo1.subreddit_id AND top1.subreddit_name = geo1.subreddit_name
-            FULL OUTER JOIN ambassador_subs AS amb1
-                ON top1.subreddit_id = amb1.subreddit_id AND top1.subreddit_name = amb1.subreddit_name
-        ) AS merged
+        -- Join to find why a subreddit qualified
+        FROM (SELECT DISTINCT * FROM selected_subs_base) AS sel
         FULL OUTER JOIN subs_selected_by_geo  AS geo
-            ON merged.subreddit_id = geo.subreddit_id AND merged.subreddit_name = geo.subreddit_name
+            ON sel.subreddit_id = geo.subreddit_id AND sel.subreddit_name = geo.subreddit_name
         FULL OUTER JOIN ambassador_subs AS amb
-            ON merged.subreddit_id = amb.subreddit_id AND merged.subreddit_name = amb.subreddit_name
+            ON sel.subreddit_id = amb.subreddit_id AND sel.subreddit_name = amb.subreddit_name
+
+        -- We can get null IDS if an ambassador subreddit is planned but not created yet
+        WHERE sel.subreddit_id IS NOT NULL
     ),
 
     subreddit_lookup_clean_text_meta AS (
@@ -398,53 +442,70 @@ WITH
     SELECT *
     FROM final_table
     ORDER BY users_l28 DESC, posts_l28 DESC
-)  -- Close CREATE TABLE parens
+-- )  -- Close CREATE TABLE parens
 ;
-
-
--- Export data to google cloud storage (GCS)
--- CHANGE/Update:
---  1) URI date folder
---  2) source table
-EXPORT DATA
-    OPTIONS(
-        uri='gs://i18n-subreddit-clustering/subreddits/top/2021-09-10/*.parquet',
-        format='PARQUET',
-        overwrite=true
-    ) AS
-
-    SELECT
-        sel.*
-    FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210910` AS sel
-    ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
-;
-
 
 -- ==============================
--- Check  final_table
+-- Check  final_table COUNTS
 -- SELECT
 --     COUNT(*)    AS row_count
 --     , COUNT(DISTINCT subreddit_name) AS subreddit_name_count
 --     , COUNT(DISTINCT subreddit_id) AS subreddit_id_count
+--     , SUM(
+--         CASE
+--             WHEN (ambassador_subreddit = true) THEN 1
+--             ELSE 0
+--         END
+--     ) AS ambassador_subreddit_count
+--     , SUM(
+--         CASE
+--             WHEN (geo_relevant_subreddit = true) THEN 1
+--             ELSE 0
+--         END
+--     ) AS geo_relevant_subreddit_count
 -- FROM final_table
+-- ;
+
+
+-- Counts for all tables together
+-- SELECT
+--     (SELECT COUNT(*) FROM geo_subs_custom_raw) AS geo_subs_custom_raw_count
+--     , (SELECT COUNT(*) FROM subs_selected_by_geo) AS subs_selected_by_geo_count
+--     , (SELECT COUNT(*) FROM ambassador_subs) AS ambassador_subs_count  -- Expect 173+
+    -- , (SELECT COUNT(*) FROM subs_selected_by_activity) AS subs_selected_by_activity_count_rows
+    -- , (SELECT COUNT(*) FROM selected_subs_base) AS selected_subs_BASE_count_rows
+    -- , (SELECT COUNT(DISTINCT subreddit_id) FROM selected_subs_base) AS selected_subs_BASE_unique_sub_ids_count
+    -- , (SELECT COUNT(*) FROM selected_subs) AS selected_subs_count_rows
+    -- , (SELECT COUNT(DISTINCT subreddit_id) FROM selected_subs) AS selected_subs_unique_sub_ids_count
+--     , (SELECT COUNT(*) FROM final_table) AS final_table_rows_count
+--     , (SELECT COUNT(DISTINCT subreddit_id) FROM final_table) AS final_table_sub_id_unique_count
+-- ;
+
+-- TODO(djb): Check that all ambassador subs are in
+
+
+-- ==============================
+-- Export data to google cloud storage (GCS)
+-- CHANGE/Update:
+--  1) URI date folder
+--  2) source table
+-- EXPORT DATA
+--     OPTIONS(
+--         uri='gs://i18n-subreddit-clustering/subreddits/top/2021-09-23/*.parquet',
+--         format='PARQUET',
+--         overwrite=true
+--     ) AS
+
+--     SELECT
+--         sel.*
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210910` AS sel
+--     ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 -- ;
 
 
 -- ###############
 -- Tests/CHECKS
 -- ###
--- Counts for all tables together
--- TODO(djb) maybe also add COUNT(DISTINCT subreddit_id) to check dupes
--- SELECT
---     (SELECT COUNT(*) FROM geo_subs_custom_raw) AS geo_subs_custom_raw_count
---     , (SELECT COUNT(*) FROM subs_selected_by_geo) AS subs_selected_by_geo_count
---     , (SELECT COUNT(*) FROM ambassador_subs) AS ambassador_subs_count
---     , (SELECT COUNT(*) FROM subs_selected_by_activity) AS subs_selected_by_activity_count
---     , (SELECT COUNT(*) FROM selected_subs) AS selected_subs_count
---     , (SELECT COUNT(*) FROM final_table) AS final_table_count
--- ;
-
-
 -- Test selecting from subs_selected_by_geo subs
 -- SELECT *
 -- FROM subs_selected_by_geo AS geo
@@ -454,7 +515,8 @@ EXPORT DATA
 -- ORDER BY users_l7 DESC, posts_l28 DESC, geo.geo_relevant_countries
 -- ;
 
--- Count subreddits for each country GEO
+-- Count subreddits for each country GEO COUNTRY GROUPS
+--  Output: 1 row per subreddit
 -- SELECT
 --     geo_relevant_countries
 --     -- , rating_name
@@ -465,7 +527,8 @@ EXPORT DATA
 -- ORDER BY 1, 2 DESC
 -- ;
 
-
+-- TODO(djb): Count subreddits for each country individually
+--  a subreddit can be counted in multiple countries
 -- Test subs count by ACTIVITY
 -- SELECT
 --     COUNT(*) AS row_count
@@ -498,13 +561,105 @@ EXPORT DATA
 
 
 -- ==============================
+-- Check AMBASSADOR subreddits
+--   For some reason we're dropping a few of them, like 'platzreife'
+-- Check ambassadors subs are in base table
+--  platzreife appears here
+-- SELECT
+--     *
+-- FROM selected_subs_base
+-- WHERE 1=1
+--     AND subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
+-- ORDER BY subreddit_name
+-- ;
+
+
+-- Check ambassadors subs are in selected_subs table
+--  platzreife: yes it's also here
+-- SELECT
+--     *
+-- FROM selected_subs
+-- WHERE 1=1
+--     AND subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
+-- ORDER BY subreddit_name
+-- ;
+
+-- Check rows with missing subreddit_id
+-- SELECT
+--     *
+-- FROM selected_subs
+-- WHERE 1=1
+--     AND subreddit_ID IS NULL
+-- ORDER BY subreddit_name
+-- ;
+
+
+-- Check ambassadors subs are in selected_subs table
+--  platzreife: yes it's also here
+-- SELECT
+--     *
+-- FROM selected_subs
+-- WHERE 1=1
+--     AND subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
+-- ORDER BY subreddit_name
+-- ;
+
+-- Try separate join of base tables to see if things are missing there
+-- SELECT
+--     COALESCE(geo.subreddit_name, amb.subreddit_name)  AS subreddit_name
+--     , COALESCE(geo.subreddit_id, amb.subreddit_id) AS subreddit_id
+--     , geo.subreddit_name
+--     , geo.subreddit_id
+--     , geo.geo_relevant_countries
+
+-- FROM ambassador_subs AS amb
+-- FULL OUTER JOIN subs_selected_by_geo AS geo
+--     ON amb.subreddit_name = geo.subreddit_name
+-- WHERE 1=1
+--     AND amb.subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
+-- ORDER BY amb.subreddit_name
+-- ;
+
+-- Join with top subs... why would this cause the sub to get dropped?
+-- SELECT
+--     COALESCE(top.subreddit_name, geo.subreddit_name, amb.subreddit_name)  AS subreddit_name
+--     , COALESCE(top.subreddit_name, geo.subreddit_name, amb.subreddit_id) AS subreddit_id
+--     , geo.subreddit_name
+--     , geo.subreddit_id
+--     , geo.geo_relevant_countries
+--     , top.*
+
+-- FROM ambassador_subs AS amb
+-- FULL OUTER JOIN subs_selected_by_geo AS geo
+--     ON amb.subreddit_name = geo.subreddit_name
+-- FULL OUTER JOIN subs_selected_by_activity AS top
+--     ON amb.subreddit_name = top.subreddit_name
+-- WHERE 1=1
+--     AND amb.subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
+-- ORDER BY amb.subreddit_name
+-- ;
+
+
+-- ==============================
 -- Check selected sub count
---   NOTE that we need to do SELECT DISTINCT to remove duplicates
---   I moved the DISTINCT statement to the query itself so we shouldn't need it here anymore
+--   NOTE that we need to do SELECT DISTINCT on selected_subs_base to remove duplicates
+--   Duplicates can come up when a sub qualifies for multiple reasons
 -- SELECT
 --     COUNT(*)    AS row_count
 --     , COUNT(DISTINCT subreddit_name) AS subreddit_name_count
 --     , COUNT(DISTINCT subreddit_id) AS subreddit_id_count
+--     , SUM(
+--         CASE
+--             WHEN (ambassador_subreddit = true) THEN 1
+--             ELSE 0
+--         END
+--     ) AS ambassador_subreddit_count
+--     , SUM(
+--         CASE
+--             WHEN (geo_relevant_subreddit = true) THEN 1
+--             ELSE 0
+--         END
+--     ) AS geo_relevant_subreddit_count
 -- FROM selected_subs
 -- ;
 
@@ -521,4 +676,6 @@ EXPORT DATA
 --     AND sel.subreddit_name LIKE "vega%"
 -- ORDER BY sub_row_number DESC, subreddit_name
 -- ;
+
+
 
