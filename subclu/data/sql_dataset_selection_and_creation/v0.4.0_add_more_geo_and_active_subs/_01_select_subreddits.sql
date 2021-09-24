@@ -5,6 +5,9 @@
 -- Filter NOTE:
 --  over_18="f" set BY THE MODS! So we still might seem some NSFW subreddits
 -- TODO(djb) in v0.3.2 pull we had 3,700 subs; now we're getting ~19k subs
+-- Notebook with EDA comparing subreddits b/n different versions
+--  https://colab.research.google.com/drive/12GA7u_gWMlTCH4or9AKUm3u5mufMBshV#scrollTo=t2Z6E47Ohgde
+
 -- CREATE TABLE with new selected subreddits for v0.4.0 clustering
 DECLARE partition_date DATE DEFAULT '2021-09-21';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";

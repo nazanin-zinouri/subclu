@@ -5,6 +5,8 @@
 --   % of users from a country that view the subreddit -- which sureddit(s) have a higher% of views in a country
 -- Based on:
 -- https://github.snooguts.net/reddit/data-science-airflow-etl/blob/master/dags/i18n/sql/geo_sfw_communities.sql
+-- Notebook comparing different geo-relevant definitions
+--   https://colab.research.google.com/drive/1dhVcrxnViiJFATQmPoPFI3l5ZqvReDtg#scrollTo=fyQYdk1VH2PX
 
 DECLARE active_pt_start DATE DEFAULT '2021-09-06';
 DECLARE active_pt_end DATE DEFAULT '2021-09-20';
