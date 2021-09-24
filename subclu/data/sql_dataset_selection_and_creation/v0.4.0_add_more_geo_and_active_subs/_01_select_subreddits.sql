@@ -4,14 +4,15 @@
 --    For now, select subs with most views/posts & exclude those where over_18 = f
 -- Filter NOTE:
 --  over_18="f" set BY THE MODS! So we still might seem some NSFW subreddits
--- TODO(djb) in v0.3.2 pull we had 3,700 subs; now we want ~10k subs
+-- TODO(djb) in v0.3.2 pull we had 3,700 subs; now we're getting ~19k subs
 -- CREATE TABLE with new selected subreddits for v0.4.0 clustering
 DECLARE partition_date DATE DEFAULT '2021-09-21';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE min_users_l7 NUMERIC DEFAULT 2300;
+DECLARE min_users_l7 NUMERIC DEFAULT 2000;
 DECLARE min_posts_l28 NUMERIC DEFAULT 90;
-DECLARE min_comments_l28 NUMERIC DEFAULT 2;
+DECLARE min_comments_l28 NUMERIC DEFAULT 3;
+DECLARE min_posts_plus_comments_top_l28 NUMERIC DEFAULT 250;
 
 -- eng-i18n = Canada, UK, Australia
 DECLARE min_users_eng_i18n_l7 NUMERIC DEFAULT 2000;
@@ -26,8 +27,9 @@ DECLARE min_posts_geo_l28 NUMERIC DEFAULT 9;
 DECLARE min_posts_plus_comments_geo_l28 NUMERIC DEFAULT 35;
 
 
--- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210923`
--- AS (
+-- Start CREATE TABLE statement
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924`
+AS (
 
 -- First select subreddits based on geo-relevance
 WITH
@@ -206,31 +208,43 @@ WITH
             -- , array_to_string(mature_themes,", ") as mature_themes_list
 
         FROM `data-prod-165221.all_reddit.all_reddit_subreddits` AS asr
-        LEFT JOIN `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`    AS acs
+        LEFT JOIN (
+            SELECT * FROM `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`
+            WHERE DATE(_PARTITIONTIME) = partition_date
+        ) AS acs
             ON asr.subreddit_name = acs.subreddit_name
-        LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`             AS slo
+        LEFT JOIN (
+            SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+            WHERE dt = partition_date
+        ) AS slo
             ON asr.subreddit_name = LOWER(slo.name)
-        LEFT JOIN `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating` AS nt
+        LEFT JOIN (
+            SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
+            WHERE pt = partition_date
+        ) AS nt
             ON acs.subreddit_id = nt.subreddit_id
 
         WHERE 1=1
             AND DATE(asr.pt) = partition_date
-            AND DATE(acs._PARTITIONTIME) = partition_date
-            AND slo.dt = partition_date
-            AND nt.pt = partition_date
 
             -- remove quarantine filter, b/c if we score them we might be able to clusters
             --   of subreddits that are similar to previoiusly quarantined subs
             -- AND slo.quarantine = false
             AND asr.users_l7 >= min_users_l7
-            AND asr.posts_l28 >= min_posts_l28
-            AND asr.comments_l28 >= min_comments_l28
+            AND (
+                (
+                    asr.posts_l28 >= min_posts_l28
+                    AND asr.comments_l28 >= min_comments_l28
+                )
+                OR ((asr.posts_l28 + asr.comments_l28) >= min_posts_plus_comments_top_l28)
+            )
 
             -- Need COALESCE because thousands of subs have an empty field
             AND COALESCE(slo.over_18, 'f') = 'f'
 
-            -- For the high-activity subs I'll keep the active flag
-            AND acs.active = True
+            -- For the high-activity subs, keep the active flag?
+            -- AND COALESCE(acs.active, False) = True
+
             -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
             -- Better to include some in clustering than exclude a sub that was mislabeled
             -- REMOVE `NOT` to reverse (show only the things we filtered out)
@@ -442,8 +456,9 @@ WITH
     SELECT *
     FROM final_table
     ORDER BY users_l28 DESC, posts_l28 DESC
--- )  -- Close CREATE TABLE parens
+)  -- Close CREATE TABLE parens
 ;
+
 
 -- ==============================
 -- Check  final_table COUNTS
@@ -491,14 +506,14 @@ WITH
 --  2) source table
 -- EXPORT DATA
 --     OPTIONS(
---         uri='gs://i18n-subreddit-clustering/subreddits/top/2021-09-23/*.parquet',
+--         uri='gs://i18n-subreddit-clustering/subreddits/top/2021-09-24/*.parquet',
 --         format='PARQUET',
 --         overwrite=true
 --     ) AS
 
 --     SELECT
 --         sel.*
---     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210910` AS sel
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924` AS sel
 --     ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 -- ;
 
@@ -538,11 +553,15 @@ WITH
 
 
 -- Check whether r/reggeaton makes the cut by activity...
+--  does it make the cut in selected? & final?
 -- SELECT
 --     *
 -- FROM subs_selected_by_activity
+-- FROM selected_subs
+-- FROM final_table
 -- WHERE 1=1
 --     AND subreddit_name LIKE "regg%"
+--     OR subreddit_name LIKE "goodn%"
 
 -- ORDER BY subreddit_name
 -- ;
@@ -603,6 +622,34 @@ WITH
 --     AND subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
 -- ORDER BY subreddit_name
 -- ;
+
+
+-- Most of these other geo-relevant subs don't appear in:
+--   `subs_selected_by_geo` OR `selected_subs`
+--  whyyyy? A: looks like they had too few L7 users &/or too few posts in l28
+-- SELECT
+--     *
+-- -- FROM geo_subs_custom_raw
+-- FROM subs_selected_by_geo
+-- -- FROM selected_subs
+
+-- WHERE 1=1
+--     -- AND subreddit_name IN ('platzreife', 'vegetarischkochen', 'heutelernteich', 'fussball', 'formel1')
+--     AND LOWER(subreddit_name) IN (
+--         '1fcnuernberg'
+--         , 'de_it'
+--         , 'de_podcasts'
+--         , 'kurrent'
+--         , 'luftraum'
+--         , 'samplesize_dach'
+--         , 'spabiergang'
+--         , 'weltraum'
+--         , 'zombey'
+--         )
+-- ORDER BY subreddit_name
+-- ;
+
+
 
 -- Try separate join of base tables to see if things are missing there
 -- SELECT
@@ -676,6 +723,3 @@ WITH
 --     AND sel.subreddit_name LIKE "vega%"
 -- ORDER BY sub_row_number DESC, subreddit_name
 -- ;
-
-
-
