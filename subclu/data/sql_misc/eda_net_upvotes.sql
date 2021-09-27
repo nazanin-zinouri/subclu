@@ -1,6 +1,6 @@
 -- get total upvotes, downvotes & net_upvotes for a post
 -- For some reason, the `post_lookup` table doesn't do a running count, it only does a snapshot of
---  upvotes in a partition
+--  upvotes in a partition?? but there's a lof ot missing votes
 DECLARE start_date DATE DEFAULT '2021-08-01';
 DECLARE end_date DATE DEFAULT '2021-09-21';
 

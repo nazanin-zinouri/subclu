@@ -434,7 +434,7 @@ GROUP BY 1, 2
 ORDER BY subreddit_name
 ),
 ocr_text_agg AS (
--- WE need to agg the text because one post could have multiple images
+-- We need to agg the text because one post could have multiple images
 SELECT
     ocr.post_id
     , pt

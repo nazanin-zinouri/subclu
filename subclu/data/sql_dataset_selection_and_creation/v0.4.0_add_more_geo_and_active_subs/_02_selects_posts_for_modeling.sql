@@ -13,17 +13,52 @@
 -- * table with latest selected subreddits (e.g., subclu_subreddits_top_no_geo_20210709)
 -- * name of newly created table for exporting
 -- * new GCS folder for new table
--- Create new posts table for v0.4.0 models
+-- TODO(djb): Create new POSTS table for v0.4.0 models
 DECLARE start_date DATE DEFAULT '2021-08-01';
 DECLARE end_date DATE DEFAULT '2021-09-21';
 DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1200;
 
+-- Remove these from OCR text
+DECLARE regex_remove_ocr_str STRING DEFAULT r"\d+[-:,\.]\d+([-:,\.]\d{2,4}){0,1}|\d|[\+\#]|[ur]/|http[s]{0,1}://|www\.|/r/|\.html|reddit|\.com|\.org";
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
-PARTITION BY submit_date
-AS (
+
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+-- PARTITION BY submit_date
+-- AS (
 
 WITH
+    posts_with_language AS (
+        SELECT
+            -- Rank by post-ID + user_id + thing_type (one user can post AND comment)
+            ROW_NUMBER() OVER(
+                PARTITION BY post_id, id, user_id
+                ORDER BY created_timestamp ASC, probability DESC
+            ) AS post_thing_user_row_num
+            , *
+
+        FROM `reddit-protected-data.language_detection.comment_language_v2`
+        WHERE DATE(_PARTITIONTIME) BETWEEN start_date AND end_date
+            AND thing_type = 'post'
+            AND id = post_id
+            -- USE: Remove dupes in language detection table at post OR comment-level
+            -- AND pl.post_thing_user_row_num = 1
+    ),
+    posts_not_removed AS(
+        SELECT
+            -- Use row_number to get the latest edit as row=1
+            ROW_NUMBER() OVER (
+                PARTITION BY post_id
+                ORDER BY endpoint_timestamp DESC, removal_timestamp DESC
+            ) AS row_num
+            , *
+
+        FROM `data-prod-165221.cnc.successful_posts` AS sp
+
+        WHERE sp.dt BETWEEN start_date AND end_date
+            AND sp.removed = 0
+            -- Remove duplicates in successful_post table (multiple rows when a post is removed multiple times)
+            -- AND sp.row_num = 1
+    ),
     geo AS (
         SELECT
             # Keys & IDS
@@ -31,7 +66,7 @@ WITH
             , sp.subreddit_id
             , sp.post_id
             , sp.user_id
-            , sp.uuid
+            -- , sp.uuid
 
             # Meta content
             , sp.submit_date
@@ -40,7 +75,7 @@ WITH
             , sp.removed
             , sp.upvotes
             , sp.comments
-            # , (sp.upvotes - sp.downvotes) AS net_upvotes
+
             , sp.successful
             , sp.app_name
             , sp.post_type
@@ -48,27 +83,33 @@ WITH
             , sp.post_nsfw
 
             -- Meta about subreddit
+            , gs.geo_relevant_countries
+            , gs.geo_relevant_country_codes
+            , gs.geo_relevant_subreddit
+            , gs.ambassador_subreddit
+
             , gs.combined_topic
             , gs.combined_topic_and_rating
-            , gs.rating
-            , gs.rating_version
+            , gs.rating_short
+            , gs.rating_name
+            , gs.primary_topic
+            , gs.secondary_topics
 
         FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924` AS gs
-        -- for testing, keep only a few subreddits
-        # FROM (
-        #     SELECT *
-        #     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924`
-        #     LIMIT 4
-        # ) AS gs
+        LEFT JOIN posts_not_removed AS sp
+            ON gs.subreddit_name = sp.subreddit_name AND gs.subreddit_id = sp.subreddit_id
 
-        LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
-            ON gs.subreddit_name = sp.subreddit_name
+        WHERE 1=1
+            AND sp.row_num = 1
 
-        WHERE sp.dt BETWEEN start_date AND end_date
-            AND sp.removed = 0
+            -- for TESTING, keep only a few subreddits or only geo-relevant subs
+            -- AND (
+            --     gs.ambassador_subreddit = True
+            --     OR gs.geo_relevant_subreddit = True
+            -- )
     ),
 
-    tl_with_meta AS (
+    pl_with_meta AS (
         SELECT
             -- # counts check
             -- COUNT(DISTINCT(tl.id)) AS unique_post_ids
@@ -86,9 +127,12 @@ WITH
             # , geo.endpoint_timestamp
             , geo.submit_date
             , geo.removed
-            , geo.upvotes
+            , geo.upvotes AS upvotes
+            , plo.upvotes    AS upvotes_lookup
+            , plo.downvotes  AS downvotes_lookup
+            , (plo.upvotes - plo.downvotes) AS net_upvotes_lookup
+
             , geo.comments
-            # , geo.net_upvotes
             , geo.successful
             , geo.app_name
             , geo.post_type
@@ -99,8 +143,15 @@ WITH
             -- Meta about subreddit
             , geo.combined_topic
             , geo.combined_topic_and_rating
-            , geo.rating
-            , geo.rating_version
+            , geo.rating_short
+            , geo.rating_name
+            , geo.primary_topic
+            , geo.secondary_topics
+
+            , geo.geo_relevant_countries
+            , geo.geo_relevant_country_codes
+            , geo.geo_relevant_subreddit
+            , geo.ambassador_subreddit
 
             # Language predictions
             , tl.language
@@ -108,130 +159,193 @@ WITH
             , tl.weighted_language
             , tl.weighted_language_probability
 
+            , plo.language_preference AS post_language_preference
+
             -- Text
             -- Wait to do relatively expensive string manipulation until AFTER removing duplicates
             -- , CHAR_LENGTH(tl.text) AS text_len
             -- , array_length(regexp_extract_all(tl.text, r"\b\w+\b")) text_word_count_estimate
+            , plo.flair_text
             , tl.text
 
             -- Metadata to add separately?
             -- , tl.possible_alternatives  # unwieldy field, analyze later
             -- , tl.toxicity
 
-        FROM (
-            SELECT *
-            FROM `reddit-protected-data.language_detection.comment_language_v2`
-            WHERE _PARTITIONTIME BETWEEN TIMESTAMP(start_date) AND TIMESTAMP(end_date)
-                AND thing_type = 'post'
-        ) AS tl
+        FROM posts_with_language AS tl
         INNER JOIN geo
             ON tl.subreddit_id = geo.subreddit_id
                 AND tl.post_id = geo.post_id
                 AND tl.thing_type = geo.noun
                 AND tl.user_id = geo.user_id
+        INNER JOIN (
+            SELECT *
+            FROM `data-prod-165221.ds_v2_postgres_tables.post_lookup`
+            WHERE DATE(_PARTITIONTIME) = end_date
+        ) AS plo
+            ON tl.subreddit_id = plo.subreddit_id AND tl.post_id = plo.post_id
+                AND tl.user_id = plo.author_id
+
+        WHERE 1=1
+            AND tl.post_thing_user_row_num = 1
 
     ),
 
-    tl_unique_with_meta AS (
-        -- Here we remove duplicates from the language-detection table
-        SELECT * EXCEPT (row_num)
-        FROM (
-            SELECT
-                *
-                , ROW_NUMBER() OVER (
-                    PARTITION BY post_id, subreddit_id, user_id
-                    ORDER BY created_timestamp desc
-                ) row_num
-            FROM tl_with_meta
-        )
+    ocr_text_agg AS (
+        -- We need to agg the text because one post could have multiple images
+        SELECT
+            ocr.post_id
+            , pt
+            -- TODO(djb) add regex to strip out numbers
+            , TRIM(REGEXP_REPLACE(STRING_AGG(inferred_text, '. '), regex_remove_ocr_str, ""))  AS ocr_inferred_text_agg_clean
 
-        WHERE row_num = 1
+            , COUNT(media_url) AS ocr_images_in_post_count
+
+        FROM `data-prod-165221.swat_tables.image_ocr_text` AS ocr
+
+        WHERE DATE(ocr.pt) BETWEEN start_date AND end_date
+
+        GROUP BY 1, 2
     ),
 
-    tl_unique_with_meta_top_posts AS (
+    pl_with_meta_top_posts AS (
         -- Here we rank each post in the sub by upvotes & comments
         --   (might try screenviews later, but that wasn't trivial)
+        -- ALSO add OCR text here
         SELECT
-            tl.*
+            pl.* EXCEPT(flair_text, text)
+            , ocr_images_in_post_count
+            , pl.flair_text
+            , pl.text
+            , ocr_inferred_text_agg_clean
 
         FROM (
             SELECT
-                ROW_NUMBER() OVER(PARTITION BY subreddit_name ORDER BY upvotes DESC, comments DESC) AS rank_post_in_sub
+                -- There's something unexpected with the vote count in the `post_lookup` table
+                --  (votes are missing when compared to the UI)
+                --  so first do upvotes and then net upvotes
+                ROW_NUMBER() OVER(
+                    PARTITION BY subreddit_name
+                    ORDER BY upvotes DESC, net_upvotes_lookup DESC, comments DESC
+                ) AS rank_post_in_sub
                 , *
-            FROM tl_unique_with_meta
-        ) AS tl
+            FROM pl_with_meta
+        ) AS pl
+        LEFT JOIN ocr_text_agg AS ocr
+            ON pl.post_id = ocr.post_id
 
-        WHERE
-            tl.rank_post_in_sub <= MAX_POSTS_PER_SUB
+        WHERE 1=1
+            AND pl.rank_post_in_sub <= MAX_POSTS_PER_SUB
+            AND COALESCE(ocr_inferred_text_agg_clean, "") != ""
     )
 
 -- This is the de-duped table used for modeling
 --   Comment this section out if you want to preview with queries below
+--     SELECT
+--         * EXCEPT (text)
+--         , text
+
+--     FROM (
+--         SELECT *
+--         -- Create a new column that cleans up the post_url col for embeddings
+--         -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
+--         , CHAR_LENGTH(text) AS text_len
+--         , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
+--         , CASE
+--             WHEN REGEXP_INSTR(
+--                 post_url,
+--                 ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
+--                 ) > 0 THEN NULL
+--             ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, "https://|www.|/r/|.html", ""), r"/|-|_|\?", " "))
+--             END AS post_url_for_embeddings
+
+--         FROM tl_unique_with_meta_top_posts
+--     )
+-- )  -- close create table parens
+-- ;
+
+
+-- ###############
+-- Tests/CHECKS
+-- ###
+-- Check whether pl_with_meta is unique (should be)
+--  and how many posts per sub overall
+--  This shoud also include FLAIR_TEXT
+SELECT
+    *
+    , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+    , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
+FROM (
     SELECT
-        * EXCEPT (text)
-        , text
-
-    FROM (
-        SELECT *
-        -- Create a new column that cleans up the post_url col for embeddings
-        -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
-        , CHAR_LENGTH(text) AS text_len
-        , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
-        , CASE
-            WHEN REGEXP_INSTR(
-                post_url,
-                ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
-                ) > 0 THEN NULL
-            ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, "https://|www.|/r/|.html", ""), r"/|-|_|\?", " "))
-            END AS post_url_for_embeddings
-
-        FROM tl_unique_with_meta_top_posts
-    )
-)  -- close create table parens
+        COUNT(*)       AS row_count
+        , COUNT(DISTINCT post_id) AS post_unique_count
+        , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+        , COUNT(DISTINCT user_id)   AS user_id_unique
+        , COUNT(flair_text)         AS posts_with_flair_text
+    FROM pl_with_meta
+)
 ;
+-- Results, using only successful_posts
+-- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 1	 20,507,544 	 20,507,544 	 19,218 	 1,067.10
+-- Results, using successful_posts AND inner JOIN with post_lookup:
+--   Looks like we lose ~24 posts in inner join, which should be ok. posts remain unique
+-- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 1	 20,507,520 	 20,507,520 	 19,218 	 1,067.10
 
 
-
--- Check counts in cnc post table
---  Use it to compare against content-language posts.
---    Expect number here to be higher than in content-language (b/c of inner join)
+-- Check counts for top-only.
+--   Here we should only see the topN posts in each subreddit
+--   This will also include FLAIR and OCR text
 -- SELECT
---     COUNT(*)                AS total_rows
---     , COUNT(DISTINCT uuid)  AS uuid_unique
---     , COUNT(DISTINCT post_id)  AS post_id_unique
---     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
---     , COUNT(DISTINCT user_id)  AS user_id_unique
--- FROM geo
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
+--     , (posts_with_ocr_text / post_unique_count)  AS posts_with_ocr_text_pct
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+--         , COUNT(DISTINCT user_id)   AS user_id_unique
+--         , COUNT(flair_text)         AS posts_with_flair_text
+--         , SUM(
+--             CASE WHEN COALESCE(ocr_images_in_post_count, 0) = 0 THEN 0
+--             ELSE 1
+--             END
+--         ) AS posts_with_ocr_text
+--     FROM pl_with_meta_top_posts
+-- )
 -- ;
-
--- Count totals v. unique BEFORE CREATING TABLE, and AFTER joining with language-detection page
--- SELECT
---     COUNT(*)                AS total_rows
---     , COUNT(DISTINCT post_id)  AS post_id_unique
---     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
---     , COUNT(DISTINCT user_id)  AS user_id_unique
--- FROM tl_unique_with_meta
--- ;
-
--- Count totals v. unique BEFORE CREATING TABLE, and AFTER keeping only top posts
--- SELECT
---     COUNT(*)                AS total_rows
---     , COUNT(DISTINCT post_id)  AS post_id_unique
---     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
---     , COUNT(DISTINCT user_id)  AS user_id_unique
--- FROM tl_unique_with_meta_top_posts
--- ;
--- total_rows   post_id_unique  subreddit_id_unique user_id_unique
--- 1,649,929    1,649,929       3,767               811,207
+-- Results, using only successful_posts
+-- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 1	 9,110,979 	 9,110,979 	 19,218 	 474.09
+-- Results, using successful_posts AND inner JOIN with post_lookup:
+--   Again we lose a few posts, but this time it's only ~3 posts
+-- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 1	 9,110,962 	 9,110,962 	 19,218 	 474.08
 
 
--- Preview subs with post rank
+-- ##############################
+-- PREVIEW posts with post rank and other meta
 -- SELECT
 --     rank_post_in_sub
 --     , * EXCEPT(rank_post_in_sub)
--- FROM tl_unique_with_meta_top_posts
--- LIMIT 900
+-- FROM pl_with_meta_top_posts
+
+-- WHERE 1=1
+--     -- add filter to check OCR image content
+--     AND ocr_images_in_post_count IS NOT NULL
+
+--     -- Filters to check non-English posts
+--     AND geo_relevant_countries LIKE '%Germany%'
+
+-- ORDER BY subreddit_id ASC, rank_post_in_sub
+
+-- LIMIT 3500
 -- ;
+
+
 
 -- Count totals v. unique AFTER CREATING TABLE
 -- SELECT
@@ -243,54 +357,15 @@ WITH
 -- ;
 
 
+-- ###############
 -- Export data to google cloud storage (GCS)
+-- ###
+-- Export final table to GCS for modeling
 -- EXPORT DATA OPTIONS(
---   uri='gs://i18n-subreddit-clustering/posts/top/2021-07-16/*.parquet',
+--   uri='gs://i18n-subreddit-clustering/posts/top/2021-09-27/*.parquet',
 --   format='PARQUET',
 --   overwrite=true
 --   ) AS
 -- SELECT * EXCEPT (created_timestamp)
--- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
 -- ;
-
-
------ Scratch CTE to try to get screenviews
--- Simialr functionality that `tl_unique_with_meta_top_posts` tries to do
--- post_screenviews AS (
---     SELECT
---       pdr.post_id
---       , pdr.screenviews
---       , pdr.upvotes
---       , sp.upvotes AS sp_upvotes
---       , pdr.downvotes
---       -- , sp.downvotes
---       , pdr.net_upvotes
---       , LOWER(pdr.subreddit_name) AS subreddit_name
---       , pdr.pt
---       , pdr.rank_post_date
---       , ROW_NUMBER() OVER(PARTITION BY sp.subreddit_name ORDER BY pdr.net_upvotes DESC, pdr.screenviews DESC) AS rank_post_in_sub
---
---     -- Use sub-selection to keep only the latest update for a given post...
---     -- HOWEVER, it looks like each day is independent of each other, so to get totals, we might need to SUM() screenviews?
---     FROM (
---       SELECT
---         *
---         , _PARTITIONTIME AS pt
---         , (upvotes - downvotes) AS net_upvotes
---         , ROW_NUMBER() OVER(PARTITION BY post_id ORDER BY _PARTITIONTIME ASC) AS rank_post_date
---       FROM `data-prod-165221.ds_v2_aggregate_tables.post_daily_reporting`
---       WHERE _PARTITIONTIME BETWEEN TIMESTAMP(start_date) AND TIMESTAMP(end_date)
---     ) AS pdr
---
---     LEFT JOIN `data-prod-165221.cnc.successful_posts` AS sp
---         ON LOWER(pdr.subreddit_name) = sp.subreddit_name
---             AND pdr.post_id = sp.post_id
---
---     WHERE 1=1
---       AND rank_post_date = 1
---       AND sp.dt BETWEEN start_date AND end_date
---       AND sp.removed = 0
---
---       # test using only some subs
---         AND LOWER(sp.subreddit_name) IN ("de", "ich_iel", "bundesliga", "adidasgirls")
--- )
