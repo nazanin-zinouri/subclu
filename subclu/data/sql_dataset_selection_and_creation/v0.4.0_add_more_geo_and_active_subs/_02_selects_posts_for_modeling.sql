@@ -13,6 +13,7 @@
 -- * table with latest selected subreddits (e.g., subclu_subreddits_top_no_geo_20210709)
 -- * name of newly created table for exporting
 -- * new GCS folder for new table
+-- Create new posts table for v0.4.0 models
 DECLARE start_date DATE DEFAULT '2021-08-01';
 DECLARE end_date DATE DEFAULT '2021-09-21';
 DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1200;
@@ -194,63 +195,63 @@ WITH
 -- Check counts in cnc post table
 --  Use it to compare against content-language posts.
 --    Expect number here to be higher than in content-language (b/c of inner join)
-# SELECT
-#     COUNT(*)                AS total_rows
-#     , COUNT(DISTINCT uuid)  AS uuid_unique
-#     , COUNT(DISTINCT post_id)  AS post_id_unique
-#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
-#     , COUNT(DISTINCT user_id)  AS user_id_unique
-# FROM geo
-# ;
+-- SELECT
+--     COUNT(*)                AS total_rows
+--     , COUNT(DISTINCT uuid)  AS uuid_unique
+--     , COUNT(DISTINCT post_id)  AS post_id_unique
+--     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
+--     , COUNT(DISTINCT user_id)  AS user_id_unique
+-- FROM geo
+-- ;
 
 -- Count totals v. unique BEFORE CREATING TABLE, and AFTER joining with language-detection page
-# SELECT
-#     COUNT(*)                AS total_rows
-#     , COUNT(DISTINCT post_id)  AS post_id_unique
-#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
-#     , COUNT(DISTINCT user_id)  AS user_id_unique
-# FROM tl_unique_with_meta
-# ;
+-- SELECT
+--     COUNT(*)                AS total_rows
+--     , COUNT(DISTINCT post_id)  AS post_id_unique
+--     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
+--     , COUNT(DISTINCT user_id)  AS user_id_unique
+-- FROM tl_unique_with_meta
+-- ;
 
 -- Count totals v. unique BEFORE CREATING TABLE, and AFTER keeping only top posts
-# SELECT
-#     COUNT(*)                AS total_rows
-#     , COUNT(DISTINCT post_id)  AS post_id_unique
-#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
-#     , COUNT(DISTINCT user_id)  AS user_id_unique
-# FROM tl_unique_with_meta_top_posts
-# ;
--- total_rows	post_id_unique	subreddit_id_unique	user_id_unique
--- 1,649,929 	1,649,929 	    3,767 	            811,207
+-- SELECT
+--     COUNT(*)                AS total_rows
+--     , COUNT(DISTINCT post_id)  AS post_id_unique
+--     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
+--     , COUNT(DISTINCT user_id)  AS user_id_unique
+-- FROM tl_unique_with_meta_top_posts
+-- ;
+-- total_rows   post_id_unique  subreddit_id_unique user_id_unique
+-- 1,649,929    1,649,929       3,767               811,207
 
 
 -- Preview subs with post rank
-# SELECT
-#     rank_post_in_sub
-#     , * EXCEPT(rank_post_in_sub)
-# FROM tl_unique_with_meta_top_posts
-# LIMIT 900
-# ;
+-- SELECT
+--     rank_post_in_sub
+--     , * EXCEPT(rank_post_in_sub)
+-- FROM tl_unique_with_meta_top_posts
+-- LIMIT 900
+-- ;
 
 -- Count totals v. unique AFTER CREATING TABLE
-# SELECT
-#     COUNT(*)                AS total_rows
-#     , COUNT(DISTINCT post_id)  AS post_id_unique
-#     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
-#     , COUNT(DISTINCT user_id)  AS user_id_unique
-# FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
-# ;
+-- SELECT
+--     COUNT(*)                AS total_rows
+--     , COUNT(DISTINCT post_id)  AS post_id_unique
+--     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
+--     , COUNT(DISTINCT user_id)  AS user_id_unique
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
+-- ;
 
 
 -- Export data to google cloud storage (GCS)
-# EXPORT DATA OPTIONS(
-#   uri='gs://i18n-subreddit-clustering/posts/top/2021-07-16/*.parquet',
-#   format='PARQUET',
-#   overwrite=true
-#   ) AS
-# SELECT * EXCEPT (created_timestamp)
-# FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
-# ;
+-- EXPORT DATA OPTIONS(
+--   uri='gs://i18n-subreddit-clustering/posts/top/2021-07-16/*.parquet',
+--   format='PARQUET',
+--   overwrite=true
+--   ) AS
+-- SELECT * EXCEPT (created_timestamp)
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
+-- ;
 
 
 ----- Scratch CTE to try to get screenviews
