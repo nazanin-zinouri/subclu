@@ -92,6 +92,12 @@ class MlflowLogger:
             'v0.3.2_use_multi_aggregates_test',
             'v0.3.2_use_multi_aggregates',
 
+            # new experiments for v0.4.0 - use VM with GPU that isn't broken for inference!
+            'v0.4.0_use_multi_inference_test',
+            'v0.4.0_use_multi_inference',
+            'v0.4.0_use_multi_aggregates_test',
+            'v0.4.0_use_multi_aggregates',
+
         ]
         for i, exp in enumerate(l_experiments):
             try:
