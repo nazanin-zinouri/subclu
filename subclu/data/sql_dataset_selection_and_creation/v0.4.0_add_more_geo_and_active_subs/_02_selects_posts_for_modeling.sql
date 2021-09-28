@@ -364,13 +364,42 @@ WITH
 
 -- RESULT, filter out spam BUT keep posts that are mod-approved or admin-approved
 --   This gets us back about 3k posts (false-negative for spam?)
---  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_with_ocr_text 	 posts_per_subreddit_mean 	posts_with_flair_text_pct	posts_with_ocr_text_pct
+--  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_with_ocr_text
+--                                                                          posts_per_subreddit_mean 	posts_with_flair_text_pct	posts_with_ocr_text_pct
 --  8,439,672 	 8,439,672 	 19,192 	 3,200,560 	 4,236,245 	 1,631,678 	 439.75 	50.2%	19.3%
 
 
 
 -- ##############################
--- PREVIEW posts with post rank and other meta
+-- Count totals v. unique AFTER CREATING TABLE
+-- SELECT
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
+--     , (posts_with_ocr_text / post_unique_count)  AS posts_with_ocr_text_pct
+--     , (urls_for_embeddings_count / post_unique_count)  AS posts_with_urls_for_embeddings_pct
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+--         , COUNT(DISTINCT user_id)   AS user_id_unique
+--         , COUNT(flair_text)         AS posts_with_flair_text
+--         , COUNTIF(COALESCE(ocr_images_in_post_count, 0) > 0) AS posts_with_ocr_text
+--         , COUNT(post_url_for_embeddings)    AS urls_for_embeddings_count
+
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+-- )
+-- ;
+-- RESULT
+--  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_with_ocr_text 	 urls_for_embeddings_count
+--                                                                                      posts_per_subreddit_mean	posts_with_flair_text_pct	posts_with_ocr_text_pct	posts_with_urls_for_embeddings_pct
+--  8,439,672 	 8,439,672 	 19,192 	 3,200,528 	 4,236,168 	 1,631,692 	 1,214,128 	 439.75 	50.2%	19.3%	14.4%
+
+
+
+-- ##############################
+-- PREVIEW posts with post rank and other meta BEFORE creating table
 -- SELECT
 --     rank_post_in_sub
 --     , * EXCEPT(rank_post_in_sub)
@@ -386,26 +415,6 @@ WITH
 -- ORDER BY subreddit_id ASC, rank_post_in_sub
 
 -- LIMIT 3500
--- ;
-
-
-
--- Count totals v. unique AFTER CREATING TABLE
--- SELECT
---     *
---     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
---     , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
---     , (posts_with_ocr_text / post_unique_count)  AS posts_with_ocr_text_pct
--- FROM (
---     SELECT
---         COUNT(*)       AS row_count
---         , COUNT(DISTINCT post_id) AS post_unique_count
---         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
---         , COUNT(DISTINCT user_id)   AS user_id_unique
---         , COUNT(flair_text)         AS posts_with_flair_text
---         , COUNTIF(COALESCE(ocr_images_in_post_count, 0) > 0) AS posts_with_ocr_text
---     FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
--- )
 -- ;
 
 
