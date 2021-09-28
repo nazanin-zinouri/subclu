@@ -1,4 +1,11 @@
 # GCP Notebooks + ssh setup
+
+## URL Proxy for existing notebooks
+
+Inference for USE:<br>
+7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com
+
+
 ## Create a GCP Notebook
 For this project I'm using GCP notebooks for R&D because they offer self-service scalability & ssh connections that make it easy to integrate with PyCharm for local development & github integration.
 

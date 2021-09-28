@@ -1,0 +1,6 @@
+dataset_name: 'v0.4.0 inputs - Top Subreddits (no Geo) + Geo-relevant subs, comments: TBD'
+bucket_name: 'i18n-subreddit-clustering'
+folder_subreddits_text_and_meta: 'subreddits/top/2021-09-24'
+folder_posts_text_and_meta: 'posts/top/2021-09-27'
+folder_comments_text_and_meta: null  # Haven't pulled comments yet
+
