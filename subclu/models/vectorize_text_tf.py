@@ -17,9 +17,10 @@ import mlflow
 import pandas as pd
 import numpy as np
 # from sklearn.pipeline import Pipeline
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 import tensorflow_hub as hub
+from tensorflow import errors
 
 from .registry_tf_hub import D_MODELS_TF_HUB
 from ..utils import get_project_subfolder
@@ -50,6 +51,9 @@ def vectorize_text_to_embeddings(
         col_comment_id: str = 'comment_id',
         col_text_comment: str = 'comment_body_text',
         col_text_comment_word_count: str = 'comment_text_word_count',
+        cols_index_comment: list = None,
+        local_comms_subfolder_relative: str = 'df_vect_comments',
+        mlflow_comments_folder: str = 'df_vect_comments',
 
         col_subreddit_id: str = 'subreddit_id',
         col_text_subreddit_description: str = 'subreddit_name_title_and_clean_descriptions',
@@ -120,11 +124,15 @@ def vectorize_text_to_embeddings(
     l_cols_comments = [
         'subreddit_name',
         'subreddit_id',
-        'post_id',
-        'comment_id',
+        col_comment_id,
         col_text_comment,
         col_text_comment_word_count,
     ]
+    if col_post_id is not None:
+        # Append post ID only if not None, use this 'hack'
+        #  as a way to process posts with batching
+        # TODO(djb) generalize comments so I can batch them the same way as comments
+        l_cols_comments.append(col_post_id)
     l_cols_subreddits = [
         'subreddit_name',
         'subreddit_id',
@@ -258,7 +266,6 @@ def vectorize_text_to_embeddings(
             # Use this var to track how many comments we've processed
             total_comments_count = 0
             total_time_comms_vect = 0
-            local_comms_subfolder_relative = 'df_vect_comments'
             local_comms_subfolder_full = Path(path_this_model) / local_comms_subfolder_relative
 
             l_comment_files_to_process = list(bucket.list_blobs(prefix=comments_path))[:n_sample_comment_files]
@@ -272,7 +279,7 @@ def vectorize_text_to_embeddings(
                 df_posts.shape
             except (TypeError, UnboundLocalError) as e:
                 logging.warning(f"df_posts missing, so we can't filter comments without a post...\n{e}")
-            for blob in tqdm(l_comment_files_to_process):
+            for blob in tqdm(l_comment_files_to_process, ascii=True):
                 gc.collect()
                 # Use this name to map old files to new files
                 f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
@@ -289,8 +296,9 @@ def vectorize_text_to_embeddings(
                 try:
                     # reduce logging b/c we'll go through 30+ files
                     # info(f"Keep only comments that match posts IDs in df_posts...")
-                    df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
-                    info(f"  {df_comments.shape} <- updated df_comments shape AFTER removing orphan comments (w/o post)")
+                    if df_posts is not None:
+                        df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
+                        info(f"  {df_comments.shape} <- updated df_comments shape AFTER removing orphan comments (w/o post)")
                 except (TypeError, UnboundLocalError) as e:
                     pass
 
@@ -310,7 +318,7 @@ def vectorize_text_to_embeddings(
                     model=model,
                     df=df_comments,
                     col_text=col_text_comment,
-                    cols_index='comment_default_',
+                    cols_index='comment_default_' if cols_index_comment is None else cols_index_comment,
                     lowercase_text=tokenize_lowercase,
                     batch_size=tf_batch_inference_rows,
                     limit_first_n_chars=tf_limit_first_n_chars,
@@ -398,7 +406,7 @@ def vectorize_text_to_embeddings(
             save_df_and_log_to_mlflow(
                 df=df_vect_comments.reset_index(),
                 local_path=path_this_model,
-                name_for_metric_and_artifact_folder='df_vect_comments',
+                name_for_metric_and_artifact_folder=mlflow_comments_folder,
             )
 
     # finish logging total time + end mlflow run
@@ -418,7 +426,7 @@ def get_embeddings_as_df(
         col_embeddings_prefix: Optional[str] = 'embeddings',
         lowercase_text: bool = False,
         batch_size: int = None,
-        limit_first_n_chars: int = 1500,
+        limit_first_n_chars: int = 1100,
         verbose: bool = True,
 ) -> pd.DataFrame:
     """Get output of TF model as a dataframe.
@@ -490,20 +498,36 @@ def get_embeddings_as_df(
         if verbose:
             info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
-        for i in tqdm(iteration_chunks):
-            l_df_embeddings.append(
-                get_embeddings_as_df(
-                    model=model,
-                    df=df.iloc[i * batch_size:(i + 1) * batch_size],
-                    col_text=col_text,
-                    cols_index=cols_index,
-                    col_embeddings_prefix=None,
-                    lowercase_text=lowercase_text,
-                    batch_size=None,
-                    limit_first_n_chars=limit_first_n_chars,
+        for i in tqdm(iteration_chunks, ascii=True, ncols=80, position=0, leave=True):
+            try:
+                l_df_embeddings.append(
+                    get_embeddings_as_df(
+                        model=model,
+                        df=df.iloc[i * batch_size:(i + 1) * batch_size],
+                        col_text=col_text,
+                        cols_index=cols_index,
+                        col_embeddings_prefix=None,
+                        lowercase_text=lowercase_text,
+                        batch_size=None,
+                        limit_first_n_chars=limit_first_n_chars,
+                    )
                 )
-            )
-            gc.collect()
+                gc.collect()
+            except errors.ResourceExhaustedError as e:
+                logging.warning(f"\nResourceExhausted, lowering character limit\n{e}\n")
+                l_df_embeddings.append(
+                    get_embeddings_as_df(
+                        model=model,
+                        df=df.iloc[i * batch_size:(i + 1) * batch_size],
+                        col_text=col_text,
+                        cols_index=cols_index,
+                        col_embeddings_prefix=None,
+                        lowercase_text=lowercase_text,
+                        batch_size=None,
+                        limit_first_n_chars=600,
+                    )
+                )
+                gc.collect()
         if col_embeddings_prefix is not None:
             df_vect = pd.concat(l_df_embeddings, axis=0, ignore_index=False)
             return df_vect.rename(
