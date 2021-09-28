@@ -20,11 +20,13 @@ DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1200;
 
 -- Remove these from OCR text
 DECLARE regex_remove_ocr_str STRING DEFAULT r"\d+[-:,\.]\d+([-:,\.]\d{2,4}){0,1}|\d|[\+\#]|[ur]/|http[s]{0,1}://|www\.|/r/|\.html|reddit|\.com|\.org";
+DECLARE regex_remove_post_url STRING DEFAULT r"http[s]{0,1}://|www.|.html|utm|source=url";
+DECLARE regex_replace_with_space_post_url STRING DEFAULT  r"/u/|/r/|/comments/|/|-|_+|\?|\&utm|\&|=|\+";
 
 
--- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
--- PARTITION BY submit_date
--- AS (
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+PARTITION BY submit_date
+AS (
 
 WITH
     posts_with_language AS (
@@ -75,7 +77,7 @@ WITH
             , sp.removed
             , sp.upvotes
             , sp.comments
-
+            -- , (sp.upvotes - sp.downvotes) AS net_upvotes -- net_upvotes in plo doesn't match GUI
             , sp.successful
             , sp.app_name
             , sp.post_type
@@ -131,6 +133,9 @@ WITH
             , plo.upvotes    AS upvotes_lookup
             , plo.downvotes  AS downvotes_lookup
             , (plo.upvotes - plo.downvotes) AS net_upvotes_lookup
+            , plo.neutered
+            , plo.verdict
+            , plo.content_category
 
             , geo.comments
             , geo.successful
@@ -188,7 +193,14 @@ WITH
 
         WHERE 1=1
             AND tl.post_thing_user_row_num = 1
-
+            -- Filter out spam posts
+            AND (
+                COALESCE(plo.neutered, false) = false
+                OR (
+                    COALESCE(plo.neutered, false) = true
+                    AND COALESCE(plo.verdict, 'None') IN ('mod-approved', 'admin-approved')
+                )
+            )
     ),
 
     ocr_text_agg AS (
@@ -231,38 +243,45 @@ WITH
                 , *
             FROM pl_with_meta
         ) AS pl
-        LEFT JOIN ocr_text_agg AS ocr
+
+        LEFT JOIN (
+            SELECT * FROM ocr_text_agg
+        WHERE COALESCE(ocr_inferred_text_agg_clean, "") != ""
+        ) AS ocr
             ON pl.post_id = ocr.post_id
 
         WHERE 1=1
             AND pl.rank_post_in_sub <= MAX_POSTS_PER_SUB
-            AND COALESCE(ocr_inferred_text_agg_clean, "") != ""
     )
 
--- This is the de-duped table used for modeling
---   Comment this section out if you want to preview with queries below
---     SELECT
---         * EXCEPT (text)
---         , text
+    -- This is the de-duped table used for modeling
+    --   Comment this section out if to run TEST & PREVIEW queries BEFORE creating the table
+    SELECT
+        * EXCEPT (text, ocr_inferred_text_agg_clean)
+        , text
+        , ocr_inferred_text_agg_clean
 
---     FROM (
---         SELECT *
---         -- Create a new column that cleans up the post_url col for embeddings
---         -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
---         , CHAR_LENGTH(text) AS text_len
---         , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
---         , CASE
---             WHEN REGEXP_INSTR(
---                 post_url,
---                 ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
---                 ) > 0 THEN NULL
---             ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, "https://|www.|/r/|.html", ""), r"/|-|_|\?", " "))
---             END AS post_url_for_embeddings
+    FROM (
+        SELECT *
+        -- Create a new column that cleans up the post_url col for embeddings
+        -- Only create it if the link isn't posting to itself (otherwise we're leaking data about the subreddit)
+        , CHAR_LENGTH(text) AS text_len
+        , CHAR_LENGTH(ocr_inferred_text_agg_clean) AS ocr_text_len
+        , array_length(regexp_extract_all(text, r"\b\w+\b")) text_word_count
+        , array_length(regexp_extract_all(ocr_inferred_text_agg_clean, r"\b\w+\b")) ocr_text_word_count
+        , CASE
+            WHEN STARTS_WITH(post_url, 'https://i.redd.it') THEN NULL
+            WHEN STARTS_WITH(post_url, 'https://v.redd.it') THEN NULL
+            WHEN REGEXP_INSTR(
+                post_url,
+                ARRAY_REVERSE(SPLIT(post_id, "_"))[SAFE_OFFSET(0)]
+                ) > 0 THEN NULL
+            ELSE TRIM(REGEXP_REPLACE(REGEXP_REPLACE(post_url, regex_remove_post_url, ""), regex_replace_with_space_post_url, " "))
+        END AS post_url_for_embeddings
 
---         FROM tl_unique_with_meta_top_posts
---     )
--- )  -- close create table parens
--- ;
+        FROM pl_with_meta_top_posts
+    )
+);  -- close CREATE TABLE parens
 
 
 -- ###############
@@ -271,30 +290,41 @@ WITH
 -- Check whether pl_with_meta is unique (should be)
 --  and how many posts per sub overall
 --  This shoud also include FLAIR_TEXT
-SELECT
-    *
-    , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
-    , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
-FROM (
-    SELECT
-        COUNT(*)       AS row_count
-        , COUNT(DISTINCT post_id) AS post_unique_count
-        , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
-        , COUNT(DISTINCT user_id)   AS user_id_unique
-        , COUNT(flair_text)         AS posts_with_flair_text
-    FROM pl_with_meta
-)
-;
--- Results, using only successful_posts
--- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
--- 1	 20,507,544 	 20,507,544 	 19,218 	 1,067.10
--- Results, using successful_posts AND inner JOIN with post_lookup:
+-- SELECT
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+--         , COUNT(DISTINCT user_id)   AS user_id_unique
+--         , COUNT(flair_text)         AS posts_with_flair_text
+--     FROM pl_with_meta
+-- )
+-- ;
+-- RESULT, using only successful_posts
+-- row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 20,507,544 	 20,507,544 	 19,218 	 1,067.10
+
+-- RESULT, using successful_posts AND inner JOIN with post_lookup:
 --   Looks like we lose ~24 posts in inner join, which should be ok. posts remain unique
--- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
--- 1	 20,507,520 	 20,507,520 	 19,218 	 1,067.10
+-- row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 20,507,520 	 20,507,520 	 19,218 	 1,067.10
+
+-- RESULT, after adding flair text
+-- row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_per_subreddit_mean 	posts_with_flair_text_pct
+-- 20,507,520 	 20,507,520 	 19,218 	 5,336,786 	 10,428,807 	 1,067.10 	50.9%
+
+-- RESULT, filter out spam (neutered=false)
+--  We drop around 2.3 million posts that were marked as potential spam
+--  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_per_subreddit_mean 	posts_with_flair_text_pct
+--  18,129,364 	 18,129,364 	 19,191 	 4,890,672 	 9,564,330 	 944.68 	52.8%
 
 
--- Check counts for top-only.
+
+-- Check counts for pl_with_meta_top_posts (TOP ONLY)
 --   Here we should only see the topN posts in each subreddit
 --   This will also include FLAIR and OCR text
 -- SELECT
@@ -309,21 +339,34 @@ FROM (
 --         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
 --         , COUNT(DISTINCT user_id)   AS user_id_unique
 --         , COUNT(flair_text)         AS posts_with_flair_text
---         , SUM(
---             CASE WHEN COALESCE(ocr_images_in_post_count, 0) = 0 THEN 0
---             ELSE 1
---             END
---         ) AS posts_with_ocr_text
+--         , COUNTIF(COALESCE(ocr_images_in_post_count, 0) > 0) AS posts_with_ocr_text
 --     FROM pl_with_meta_top_posts
 -- )
 -- ;
--- Results, using only successful_posts
--- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
--- 1	 9,110,979 	 9,110,979 	 19,218 	 474.09
--- Results, using successful_posts AND inner JOIN with post_lookup:
+-- RESULT, using only successful_posts
+-- row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 9,110,979 	 9,110,979 	 19,218 	 474.09
+
+-- RESULT, using successful_posts AND inner JOIN with post_lookup:
 --   Again we lose a few posts, but this time it's only ~3 posts
--- Row	 row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
--- 1	 9,110,962 	 9,110,962 	 19,218 	 474.08
+-- row_count 	 post_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean
+-- 9,110,962 	 9,110,962 	 19,218 	 474.08
+
+-- RESULT, after adding flair & OCR text
+--  row_count 	 post_unique_count 	 subreddit_unique_count  user_id_unique posts_with_flair_text  posts_with_ocr_text  posts_per_subreddit_mean  posts_with_flair_text_pct	posts_with_ocr_text_pct
+--  9,110,962 	 9,110,962 	 19,218 	 3,400,990 	 4,462,241 	 1,726,455 	 474.08 	49.0%	18.9%
+
+-- RESULT, filter out spam (neutered=false)
+--  We drop around 600k posts when we exclude neutered (spam) posts
+--   Notice that 27 subreddits drop out altogether b/c all their posts are neutered... oh well
+--  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_with_ocr_text 	 posts_per_subreddit_mean 	posts_with_flair_text_pct	posts_with_ocr_text_pct
+--  8,436,715 	 8,436,715 	 19,191 	 3,198,511 	 4,234,715 	 1,630,897 	 439.62 	50.2%	19.3%
+
+-- RESULT, filter out spam BUT keep posts that are mod-approved or admin-approved
+--   This gets us back about 3k posts (false-negative for spam?)
+--  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_with_ocr_text 	 posts_per_subreddit_mean 	posts_with_flair_text_pct	posts_with_ocr_text_pct
+--  8,439,672 	 8,439,672 	 19,192 	 3,200,560 	 4,236,245 	 1,631,678 	 439.75 	50.2%	19.3%
+
 
 
 -- ##############################
@@ -349,12 +392,22 @@ FROM (
 
 -- Count totals v. unique AFTER CREATING TABLE
 -- SELECT
---     COUNT(*)                AS total_rows
---     , COUNT(DISTINCT post_id)  AS post_id_unique
---     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
---     , COUNT(DISTINCT user_id)  AS user_id_unique
--- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210716`
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (posts_with_flair_text / post_unique_count)  AS posts_with_flair_text_pct
+--     , (posts_with_ocr_text / post_unique_count)  AS posts_with_ocr_text_pct
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+--         , COUNT(DISTINCT user_id)   AS user_id_unique
+--         , COUNT(flair_text)         AS posts_with_flair_text
+--         , COUNTIF(COALESCE(ocr_images_in_post_count, 0) > 0) AS posts_with_ocr_text
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+-- )
 -- ;
+
 
 
 -- ###############
