@@ -13,7 +13,8 @@
 -- * table with latest selected subreddits (e.g., subclu_subreddits_top_no_geo_20210709)
 -- * name of newly created table for exporting
 -- * new GCS folder for new table
--- TODO(djb): Create new POSTS table for v0.4.0 models
+
+-- Create new POSTS table for v0.4.0 models
 DECLARE start_date DATE DEFAULT '2021-08-01';
 DECLARE end_date DATE DEFAULT '2021-09-21';
 DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1200;
@@ -208,7 +209,6 @@ WITH
         SELECT
             ocr.post_id
             , pt
-            -- TODO(djb) add regex to strip out numbers
             , TRIM(REGEXP_REPLACE(STRING_AGG(inferred_text, '. '), regex_remove_ocr_str, ""))  AS ocr_inferred_text_agg_clean
 
             , COUNT(media_url) AS ocr_images_in_post_count
@@ -422,7 +422,7 @@ WITH
 -- ###############
 -- Export data to google cloud storage (GCS)
 -- ###
--- Export final table to GCS for modeling
+-- Export POST table to GCS for modeling
 -- EXPORT DATA OPTIONS(
 --   uri='gs://i18n-subreddit-clustering/posts/top/2021-09-27/*.parquet',
 --   format='PARQUET',
@@ -430,4 +430,5 @@ WITH
 --   ) AS
 -- SELECT * EXCEPT (created_timestamp)
 -- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+-- ORDER BY subreddit_id DESC, rank_post_in_sub DESC
 -- ;
