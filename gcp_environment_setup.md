@@ -2,8 +2,26 @@
 
 ## URL Proxy for existing notebooks
 
-Inference for USE:<br>
-7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com
+#### Consoles:
+VM instances in `data-prod` project:
+- https://console.cloud.google.com/compute/instances?project=data-prod-165221
+
+GCP AI notebooks in `data-science` project:
+- https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-science-prod-218515&lastRefresh=1633020573527
+
+GCP spark clusters on `data-science` project:
+- https://console.cloud.google.com/dataproc/clusters?region=us-central1&project=data-science-prod-218515
+
+
+#### Individual VMs:
+Inference for USE:
+- Use for getting embeddings
+- https://7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com/lab
+
+CPU / EDA:
+- Use for Dask cluster, bump to 64 CPUs & 400+ GB RAM)
+- Use for regular EDA: (32 CPUs & ~64 GB RAM)
+- https://1185e8680f9b40ca-dot-us-west1.notebooks.googleusercontent.com/lab?
 
 
 ## Create a GCP Notebook
