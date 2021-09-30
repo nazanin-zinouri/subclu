@@ -2,16 +2,11 @@
 --  when selecting comments for cluster
 
 
-DECLARE start_date DATE DEFAULT '2021-09-18';
-DECLARE end_date DATE DEFAULT '2021-09-21';
-DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 11;
-DECLARE MAX_COMMENTS_PER_POST NUMERIC DEFAULT 8;
-
 -- It looks like the duplicates in successful_post come in 2 flavors:
 --   * comments removed multiple times (still don't know why)
 --   * comments that get 2 (or more) submit events (maybe some weird async thing?)
 -- So using row_number() solves the comment dupe issue
-DECLARE start_date DATE DEFAULT '2021-09-18';
+DECLARE start_date DATE DEFAULT '2021-08-01';
 DECLARE end_date DATE DEFAULT '2021-09-21';
 DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 11;
 DECLARE MAX_COMMENTS_PER_POST NUMERIC DEFAULT 8;
@@ -82,11 +77,14 @@ SELECT
     *
     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
     , (comment_unique_count / subreddit_unique_count) AS comments_per_subreddit_mean
+    , (comment_unique_count / post_unique_count) AS comments_per_post_mean
+
 FROM (
     SELECT
         COUNT(*)       AS row_count
         , COUNT(DISTINCT post_id) AS post_unique_count
         , COUNT(DISTINCT comment_id) AS comment_unique_count
+        -- , COUNTIF(removed=0)        AS comment_not_removed_count  -- only use as check if including all comments
         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
         , COUNT(DISTINCT user_id)   AS user_id_unique
 
@@ -94,6 +92,7 @@ FROM (
     WHERE 1=1
         AND row_num_comment_dupes = 1
 );
+-- === '2021-09-18' to '2021-09-21' ===
 -- RESULT, only filtering sp.removed=0
 --  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 user_id_unique
 --                                                                  posts_per_subreddit_mean 	 comments_per_subreddit_mean
@@ -103,6 +102,9 @@ FROM (
 --  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_per_subreddit_mean 	 comments_per_subreddit_mean
 --  14,849,738 	 796,800 	 14,849,738 	 18,209 	 3,014,466 	 43.76 	 815.52
 
+-- RESULT, after looking at full date range
+--  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_per_subreddit_mean 	 comments_per_subreddit_mean 	 comments_per_post_mean
+--  192,454,697  7,042,396 	 192,454,697 	 19,021 	 10,524,266 	 370.24 	 10,118.01 	 27.33
 
 
 -- ===
