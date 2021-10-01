@@ -512,8 +512,15 @@ def get_embeddings_as_df(
         else:
             series_text = df[col_text].str[:limit_first_n_chars]
 
+        # In tf 2.3.4 it's faster to NOT use a list comprehension
+        #  These seem equivalent:
+        #   - np.array(model(series_text.to_list()))
+        #   - model(series_text.to_list()).numpy()
+        # df_vect = pd.DataFrame(
+        #     np.array([emb.numpy() for emb in model(series_text.to_list())])
+        # )
         df_vect = pd.DataFrame(
-            np.array([emb.numpy() for emb in model(series_text.to_list())])
+            model(series_text.to_list()).numpy()
         )
         if index_output is not None:
             # Remember to reset the index of the output!
