@@ -215,7 +215,7 @@ git config --global user.name "David Bermejo"
 
 
 ## Clone repo to JupyterLab
-The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:
+The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:<br>
 `git clone git@github.snooguts.net:david-bermejo/subreddit_clustering_i18n.git`
 
 After you clone, you can cd to the new folder with the repo & use git CLI as usual.
@@ -296,8 +296,6 @@ Editable makes it easy to continue editing your module and use the updated code 
 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
 
-NOTE: you might need to install it with a `--user` flag in case some of the installed packages create conflicts with native packages
-
 If resolving packages is taking too long, might need to use a flag (in the short term):
 - See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue
 
@@ -324,14 +322,23 @@ pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_
 
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_233]" --use-deprecated=legacy-resolver
 
+
+
+# VM in data-science project
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[inference_4gpus_tf_234]" --use-deprecated=legacy-resolver
+
+
+# ==
 #  For some reason extras don't always work so it's sometimes easier to cd to folder
 cd /home/david.bermejo/repos/subreddit_clustering_i18n
 pip install -e ".[tensorflow232]" --use-deprecated=legacy-resolver
+
+pip install -e ".[inference_4gpus_tf_234]" --use-deprecated=legacy-resolver
 ```
 
-
-Try `--user` install if above steps fail **(don't sudo su)**.
-For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library version 
+### `--user` in case installation doesn't work
+Try `--user` install if above steps fail **(don't use `sudo su` in this case!)**.
+For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library versions 
 ```bash
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --user --use-deprecated=legacy-resolver
 ```
@@ -341,7 +348,65 @@ If all else fails, install tensorflow-text directly:
 pip install "tensorflow-text==2.3.0" --user
 ```
 
+### Creating an `[extra]` set of package requirements
+**NOTE** You may need to create an `extra` set of requirements if you're installing tensorflow libraries that conflict with the VM's baseline libraries. Usually these are:
+- core libraries that pip might try to update
+- Google-API pre-installed libraries that shouldn't be updated
+- Tensorflow pre-installed libraries that shouldn't be updated
 
+`setup.py` example:
+```python
+from setuptools import find_packages, setup
+
+# install_requires gets installed ALWAYS
+INSTALL_REQUIRES = [
+  "mlflow == 1.16.0",
+  "dask[complete] == 2021.6.0",
+]
+
+# extras only get installed when/if they're called explicitly
+EXTRAS_REQUIRE = {
+  "tensorflow_232": [
+    "pyarrow == 4.0.1",
+    "google-api-core == 1.30.0",
+    "tensorflow == 2.3.2",
+    "tensorflow-text == 2.3.0",
+  ],
+  
+  "inference_4gpus_tf_234": [
+    # core preinstalled, VM won't allow it to be over-written
+    "pyarrow == 5.0.0",
+    
+    # GCP preinstalled
+    "google-api-core == 1.31.2",
+    
+    # TF pre-installed
+    "tensorflow == 2.3.4",
+
+    # TF library needed to use USE-multilingual
+    "tensorflow-text == 2.3.0",
+  ],
+}
+
+setup(
+    name='subclu',
+    packages=find_packages(),
+    version='0.4.0',
+    description='A package to identify clusters of subreddits and/or posts',
+    author='david.bermejo@reddit.com',
+    license='',
+    python_requires=">=3.7",
+    install_requires=INSTALL_REQUIRES,
+
+    # Additional groups of dependencies here (e.g. development dependencies).
+    # Users will be able to install these using the "extras" syntax, for example:
+    #   $ pip install sampleproject[dev]
+    extras_require=EXTRAS_REQUIRE,
+)
+```
+
+
+#### Tip:
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
 ```
 %load_ext autoreload
@@ -349,7 +414,7 @@ In jupyter, you can add this magic at the beginning of a notebook to reload edit
 ```
 
 
-### Reference / weird conflicts & venv things
+## Reference / weird conflicts & venv things
 The base installation has some weird numpy conflicts so you may need to install as --user:
 
 I tried creating a conda venv, but the venv for david.bermejo doesn't get shared for the `jupyter` user.
@@ -493,7 +558,7 @@ Thu Jul 29 23:26:53 2021
 `watch` is my favorite command here because it auto-refreshes in a pseudo-dynamic way. After you're done (`Ctrl+C` or `:q`), you go back to your terminal without `stdout` clutter. The `-n` flag is followed by how often (in seconds) you want the call to `nvidia-smi` to happen.
 
 `watch -n 5 nvidia-smi`
-
+`watch -n 4 nvidia-smi`
 
 The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new set of stats ever 10 seconds:
 
