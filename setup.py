@@ -199,6 +199,75 @@ EXTRAS_REQUIRE = {
         "hydra-core == 1.1.0",
     ],
 
+    "inference_4gpus_tf_234": [
+        # Core libraries need to be pinned... otherwise `pip` tries to upgrade them
+        #  and GCP doesn't allow them to be upgraded and creates conflicts
+        "click == 8.0.1",
+        "joblib == 1.0.1",
+        "numpy == 1.19.5",
+        "pyarrow == 5.0.0",
+
+        # Google pre-installed/built-in services
+        #  For some reason, pip wanted to update a bunch of these
+        #  when installing hydra-core
+        "google-api-core == 1.31.2",
+        "google-api-python-client == 2.22.0",
+        "google-apitools == 0.5.31",
+        "google-auth == 1.35.0",
+        "google-auth-httplib2 == 0.1.0",
+        "google-auth-oauthlib == 0.4.6",
+        "google-cloud-aiplatform == 1.1.1",
+        "google-cloud-appengine-logging == 0.1.4",
+        "google-cloud-audit-log == 0.1.1",
+        "google-cloud-bigquery == 2.26.0",
+        "google-cloud-bigquery-storage == 2.8.0",
+        "google-cloud-bigtable == 2.3.3",
+        "google-cloud-build == 2.0.0",
+        "google-cloud-core == 2.0.0",
+        "google-cloud-dataproc == 2.5.0",
+        "google-cloud-datastore == 2.1.6",
+        "google-cloud-dlp == 1.0.0",
+        "google-cloud-firestore == 2.3.2",
+        "google-cloud-kms == 2.6.0",
+        "google-cloud-language == 2.2.2",
+        "google-cloud-logging == 2.6.0",
+        "google-cloud-monitoring == 2.5.0",
+        "google-cloud-pubsub == 1.7.0",
+        "google-cloud-recommendations-ai == 0.2.0",
+        "google-cloud-scheduler == 2.3.2",
+        "google-cloud-spanner == 3.10.0",
+        "google-cloud-speech == 2.9.0",
+        "google-cloud-storage == 1.42.2",
+        "google-cloud-tasks == 2.5.1",
+        "google-cloud-translate == 3.4.0",
+        "google-cloud-videointelligence == 2.3.2",
+        "google-cloud-vision == 2.4.2",
+
+        # TF pre-installed libraries
+        "tensorflow == 2.3.4",
+        "tensorflow-cloud == 0.1.13",
+        "tensorflow-data-validation == 0.26.1",
+        "tensorflow-datasets == 3.0.0",
+        "tensorflow-estimator == 2.3.0",
+        "tensorflow-hub == 0.9.0",
+        "tensorflow-io == 0.15.0",
+        "tensorflow-metadata == 0.26.0",
+        "tensorflow-model-analysis == 0.26.1",
+        "tensorflow-probability == 0.11.0",
+        "tensorflow-serving-api == 2.3.0",
+        "tensorflow-transform == 0.26.0",
+
+        # TF library needed to use USE-multilingual
+        "tensorflow-text == 2.3.0",
+
+        # Use hydra to manage config files
+        "hydra-core == 1.1.0",
+
+        # Graphvis to visualize dask jobs
+        "graphviz >= 0.17",
+
+    ],
+
 }
 
 # Don't do a 'complete' because we might have conflicting requirements between
@@ -220,5 +289,4 @@ setup(
     # Users will be able to install these using the "extras" syntax, for example:
     #   $ pip install sampleproject[dev]
     extras_require=EXTRAS_REQUIRE,
-
 )
