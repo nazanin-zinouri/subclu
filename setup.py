@@ -266,6 +266,9 @@ EXTRAS_REQUIRE = {
         # Graphvis to visualize dask jobs
         "graphviz >= 0.17",
 
+        # dask-cuda to handle multi-GPU VM
+        "dask-cuda == 21.8.0",
+
     ],
 
 }

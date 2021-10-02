@@ -292,13 +292,19 @@ After you've set the remote connection you can use the remote interpreter. The n
 # Install our module in `editable` mode
 After you have the code for this project on your remote, you can install it as a module.
 
-Editable makes it easy to continue editing your module and use the updated code without having to re-install it. This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-import the package.
+`Editable` mode makes it easy to continue editing your module and use the updated code **without having to re-install it**! This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-install or re-import the package. For more info, check this [stack-overflow thread](https://stackoverflow.com/questions/35064426/when-would-the-e-editable-option-be-useful-with-pip-install)
 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
 
-If resolving packages is taking too long, might need to use a flag (in the short term):
-- See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue
+In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
+In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
+```
+%load_ext autoreload
+%autoreload 2
+```
 
+If resolving packages is taking too long, might need to use a flag (in the short term):
+- See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue<br>
 `--use-deprecated=legacy-resolver`
 
 
@@ -403,14 +409,6 @@ setup(
     #   $ pip install sampleproject[dev]
     extras_require=EXTRAS_REQUIRE,
 )
-```
-
-
-#### Tip:
-In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
-```
-%load_ext autoreload
-%autoreload 2
 ```
 
 
@@ -557,8 +555,13 @@ Thu Jul 29 23:26:53 2021
 
 `watch` is my favorite command here because it auto-refreshes in a pseudo-dynamic way. After you're done (`Ctrl+C` or `:q`), you go back to your terminal without `stdout` clutter. The `-n` flag is followed by how often (in seconds) you want the call to `nvidia-smi` to happen.
 
-`watch -n 5 nvidia-smi`
-`watch -n 4 nvidia-smi`
+For example, one of these:
+```
+watch -n 5 nvidia-smi
+watch -n 4 nvidia-smi
+watch -n 3 nvidia-smi
+```
+
 
 The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new set of stats ever 10 seconds:
 
