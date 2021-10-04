@@ -295,7 +295,7 @@ WITH
 
 
 
--- Counts for final table
+-- Counts for final table (before materializing it)
 -- SELECT
 --     *
 --     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
@@ -394,31 +394,6 @@ WITH
 --  1,888,913 	 246,068 	 1,888,913 	 2,373 	 103.7 	 796.0 	 7.7
 
 
--- Counts for AFTER dropping dupes from language detection table
--- SELECT
---     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
---     , COUNT(DISTINCT post_id) AS post_id_unique_count
---     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
---     , COUNT(*)        AS total_rows
--- FROM tl_unique_with_meta
--- ;
-
--- Counts AFTER selecting only top comments
--- SELECT
---     COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
---     , COUNT(DISTINCT post_id) AS post_id_unique_count
---     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
---     , COUNT(*)        AS total_rows
--- FROM tl_unique_with_meta_top_comments
--- ;
--- when 20 posts, 10 char min, 10 comments / post:
--- subreddit_id_unique_count    post_id_unique_count    comment_id_unique_count total_rows
--- 12                           14                      70                      70
-
--- when 20 posts, 11 char min, 9 comments / post:
--- subreddit_id_unique_count    post_id_unique_count    comment_id_unique_count total_rows
--- 12                           14                      41                      41
-
 
 -- Check counts in cnc post table
 --  Use it to compare against content-language posts.
@@ -434,39 +409,43 @@ WITH
 -- ;
 
 
+-- ==============================
 -- check counts AFTER creating the table
+-- ===
 -- SELECT
---     COUNT(*)                AS total_rows
---     , COUNT(DISTINCT post_id)  AS post_id_unique
---     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
---     , COUNT(DISTINCT user_id)  AS user_id_unique
--- FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210716`
--- ;
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (comment_unique_count / subreddit_unique_count) AS comments_per_subreddit_mean
+--     , (comment_unique_count / post_unique_count) AS comments_per_post_mean
+
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT comment_id) AS comment_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20211004`
+-- );
+-- RESULT, numbers match the numbers before materializing table
+--   Query complete (8.9 sec elapsed, 1.2 GB processed)
+--  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean 	 comments_per_subreddit_mean 	 comments_per_post_mean
+--  39,901,968 	 7,038,219 	 39,901,968 	 19,020 	 370.0 	 2,097.9 	 5.7
 
 
+
+-- ==============================
 -- Export data to google cloud storage (GCS)
--- EXPORT DATA OPTIONS(
---   uri='gs://i18n-subreddit-clustering/comments/top/2021-07-16/*.parquet',
---   format='PARQUET',
---   overwrite=true
---   ) AS
+-- ===
+-- Update checklist:
+--   - URI folder location
+--   - source table name
+-- EXPORT DATA OPTIONS (
+--     uri='gs://i18n-subreddit-clustering/comments/top/2021-10-04/*.parquet',
+--     format='PARQUET',
+--     overwrite=true
+-- ) AS
 -- SELECT * EXCEPT (created_timestamp)
--- FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20210716`
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20211004`
+-- ORDER BY subreddit_name ASC
 -- ;
-
-
-
--- Find users with lots of posts, as proxy to investigate bots
--- SELECT
---     user_id
---     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
---     , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
---     , COUNT(DISTINCT post_id) AS post_id_unique_count
-
--- FROM tl_unique_with_meta
--- GROUP BY user_id
--- ORDER BY comment_id_unique_count DESC
-
--- LIMIT 100
--- ;
-

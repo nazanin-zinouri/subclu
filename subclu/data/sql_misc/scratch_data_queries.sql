@@ -557,3 +557,19 @@ WHERE slo.dt = (CURRENT_DATE() - 1)
 
 ORDER BY slo.subscribers DESC
 ;
+
+
+-- Find users with lots of posts, as proxy to investigate bots
+-- Used to be part of selecting posts for clustering
+-- SELECT
+--     user_id
+--     , COUNT(DISTINCT comment_id) AS comment_id_unique_count
+--     , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+--     , COUNT(DISTINCT post_id) AS post_id_unique_count
+
+-- FROM tl_unique_with_meta
+-- GROUP BY user_id
+-- ORDER BY comment_id_unique_count DESC
+
+-- LIMIT 100
+-- ;
