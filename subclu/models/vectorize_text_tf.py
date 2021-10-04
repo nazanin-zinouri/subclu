@@ -15,7 +15,7 @@ from typing import Union, List, Optional
 
 import mlflow
 import pandas as pd
-import numpy as np
+# import numpy as np
 # from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
@@ -293,12 +293,15 @@ def vectorize_text_to_embeddings(
                 df_posts.shape
             except (TypeError, UnboundLocalError) as e:
                 logging.warning(f"df_posts missing, so we can't filter comments without a post...\n{e}")
+
+            # TODO(djb): instead of reading each file from GCS, cache them locally first!
             for blob in tqdm(l_comment_files_to_process, ascii=True):
                 gc.collect()
                 # Use this name to map old files to new files
                 f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
                 info(f"Processing: {blob.name}")
 
+                # TODO(djb): instead of reading each file from GCS, cache them locally first!
                 df_comments = pd.read_parquet(
                     path=f"gs://{bucket_name}/{blob.name}",
                     columns=l_cols_comments
