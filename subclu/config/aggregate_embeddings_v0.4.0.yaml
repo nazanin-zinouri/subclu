@@ -1,7 +1,7 @@
 # Use this config to get aggregate embeddings
 defaults:
   - data_text_and_metadata:  v0.4.0_19k_top_subs_and_geo_relevant_2021_09_27
-  - data_embeddings_to_aggregate: TODO:top_subs-2021_07_16-use_muti_lower_case_false
+  - data_embeddings_to_aggregate: v0.4.0_2021-10-04_use_multi_lower_case_false.yaml
   - aggregate_params: default_agg
 
 mlflow_tracking_uri: 'sqlite'
