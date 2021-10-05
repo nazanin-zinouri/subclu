@@ -66,6 +66,8 @@ def vectorize_text_to_embeddings(
 
         n_sample_post_files: int = None,
         n_sample_comment_files: int = None,
+        n_comment_files_slice_start: int = None,
+        n_comment_files_slice_end: int = None,
 
         batch_comment_files: bool = True,
         n_sample_posts: int = None,
@@ -80,6 +82,7 @@ def vectorize_text_to_embeddings(
     - posts_path[col_text_post_url] (TODO: djb)
     - comments_path[col_text_comment]
     """
+    # TODO(djb): is there a way to just log all the inputs to the fxn?
     d_params_to_log = {
         'model_name': model_name,
         'tokenize_lowercase': tokenize_lowercase,
@@ -111,6 +114,8 @@ def vectorize_text_to_embeddings(
 
         'n_sample_post_files': n_sample_post_files,
         'n_sample_comment_files': n_sample_comment_files,
+        'n_comment_files_slice_start': n_comment_files_slice_start,
+        'n_comment_files_slice_end': n_comment_files_slice_end,
 
         'batch_comment_files': batch_comment_files,
         'n_sample_posts': n_sample_posts,
@@ -282,6 +287,25 @@ def vectorize_text_to_embeddings(
             total_time_comms_vect = 0
             local_comms_subfolder_full = Path(path_this_model) / local_comms_subfolder_relative
 
+            # # TODO(djb): check whether list of blobs is sorted alphabetically
+            # #  or force sorting it so that we can apply slices
+            # l_comment_files_raw = list(bucket.list_blobs(prefix=comments_path))
+            # print(f"raw list of files: \n  {l_comment_files_raw}")
+            #
+            # # TODO(djb): blobs can't be sorted, so maybe I should save files to local cache first...
+            # l_comment_files_sorted = sorted(l_comment_files_raw)
+            # print(f"SORTED list of files: \n  {l_comment_files_sorted}")
+            #
+            # if n_comment_files_slice_end is not None:
+            #     if n_comment_files_slice_start is None:
+            #         n_comment_files_slice_start = 0
+            #     l_comment_files_to_process = l_comment_files_sorted[
+            #                                  n_comment_files_slice_start:n_comment_files_slice_end
+            #                                  ]
+            # else:
+            #     l_comment_files_to_process = l_comment_files_sorted[:n_sample_comment_files]
+            # print(f"List of files to process: \n  {l_comment_files_to_process}")
+
             l_comment_files_to_process = list(bucket.list_blobs(prefix=comments_path))[:n_sample_comment_files]
             total_comms_file_count = len(l_comment_files_to_process)
 
@@ -294,8 +318,18 @@ def vectorize_text_to_embeddings(
             except (TypeError, UnboundLocalError) as e:
                 logging.warning(f"df_posts missing, so we can't filter comments without a post...\n{e}")
 
+            if n_comment_files_slice_end is not None:
+                if n_comment_files_slice_start is None:
+                    n_comment_files_slice_start = 0
+
             # TODO(djb): instead of reading each file from GCS, cache them locally first!
-            for blob in tqdm(l_comment_files_to_process, ascii=True):
+            count_comms_files_processed = 1  # count from 1 because slices start at zero
+            for i, blob in enumerate(tqdm(l_comment_files_to_process, ascii=True)):
+                if n_comment_files_slice_end is not None:
+                    if not (n_comment_files_slice_start <= i < n_comment_files_slice_end):
+                        info(f"    -- Skipping file: {blob.name} --")
+                        continue
+
                 gc.collect()
                 # Use this name to map old files to new files
                 f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
@@ -346,7 +380,6 @@ def vectorize_text_to_embeddings(
                     # remove the first 3 characters because they'll always be '. '
                     df_comments[col_comment_text_to_concat] = df_comments[col_comment_text_to_concat].str[2:]
 
-
                 t_start_comms_vect = datetime.utcnow()
                 # Reset index right away so we don't forget to do it later
                 df_vect_comments = get_embeddings_as_df(
@@ -374,12 +407,21 @@ def vectorize_text_to_embeddings(
                     df_single_file_name=f_comment_name_root,
                 )
                 del df_comments
+                # Log partial metrics to mlflow so it's easier to know whether a job is still alive
+                #  or dead
+                count_comms_files_processed = count_comms_files_processed + 1
+                mlflow.log_metrics(
+                    {
+                        local_comms_subfolder_relative: total_comments_count,
+                        'total_comment_files_processed': count_comms_files_processed
+                     }
+                )
                 gc.collect()
 
             mlflow.log_metrics(
                 {local_comms_subfolder_relative: total_comments_count,
                  'vectorizing_time_minutes_comments': total_time_comms_vect,
-                 'total_comment_files_processed': total_comms_file_count
+                 'total_comment_files_processed': count_comms_files_processed
                  }
             )
             # add manual meta file for comms
