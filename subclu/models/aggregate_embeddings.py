@@ -13,6 +13,7 @@ from functools import partial
 # import logging
 from logging import info
 # import os
+import math
 from pathlib import Path
 from typing import Tuple, Union, List
 
@@ -26,7 +27,7 @@ import dask.dataframe
 from dask import dataframe as dd
 import pandas as pd
 import numpy as np
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 # try modin instead of pandas?
 # os.environ["MODIN_ENGINE"] = 'dask'
@@ -279,12 +280,18 @@ class AggregateEmbeddings:
         # - number of days since post was created (more recent posts get more weight)
         # ---
         self._agg_post_aggregates_to_subreddit_level()
+        # TODO(djb): break up (save & log fxn):
+        #    save & log aggregates ASAP - this way I can start working on
+        #    creating clusters w/o having to wait for distances to be computed
+        # TODO(djb): log and save C) before B or A (C is what gives the best outputs)
 
         # ---------------------
         # Calculate subreddit similarity/distance
         # ---
-        self._calculate_subreddit_similarities()
-
+        if self.calculate_similarities:
+            self._calculate_subreddit_similarities()
+        # TODO(djb): break up (save & log fxn):
+        #    in this step only savel & load the similarity subreddits
         self._save_and_log_aggregate_and_similarity_dfs()
 
         # finish logging total time + end mlflow run
@@ -419,13 +426,38 @@ class AggregateEmbeddings:
             info(f"Loading COMMENTS embeddings...")
             if self.n_sample_comments_files is not None:
                 info(f"  Sampling COMMENTS FILES down to: {self.n_sample_comments_files:,.0f}")
-            self.df_v_comments = self.mlf.read_run_artifact(
-                run_id=self.comments_uuid,
-                artifact_folder=self.comments_folder,
-                read_function=self.embeddings_read_fxn,
-                cache_locally=True,
-                n_sample_files=self.n_sample_comments_files,
-            )
+
+            # If we get a list of multiple UUIDs, we need to:
+            #   - load each mlflow UUID df independently
+            #   - concat the two dask-dataframes
+            if isinstance(self.comments_uuid, str):
+                self.df_v_comments = self.mlf.read_run_artifact(
+                    run_id=self.comments_uuid,
+                    artifact_folder=self.comments_folder,
+                    read_function=self.embeddings_read_fxn,
+                    cache_locally=True,
+                    n_sample_files=self.n_sample_comments_files,
+                )
+            else:
+                info(f"  Found {len(self.comments_uuid)} run UUIDs with COMMENT embeddings...")
+                if self.n_sample_comments_files is not None:
+                    n_files_per_run = math.ceil(self.n_sample_comments_files / len(self.comments_uuid))
+                    info(f"    Sampling {n_files_per_run} FILES per run UUID")
+                else:
+                    n_files_per_run = None
+
+                self.df_v_comments = dd.concat(
+                    [
+                        self.mlf.read_run_artifact(
+                            run_id=comm_uuid_,
+                            artifact_folder=self.comments_folder,
+                            read_function=self.embeddings_read_fxn,
+                            cache_locally=True,
+                            n_sample_files=n_files_per_run,
+                        ) for comm_uuid_ in self.comments_uuid
+                    ],
+                    axis=0,
+                )
             try:
                 self.df_v_comments = self.df_v_comments.drop(self.col_subreddit_id, axis=1)
             except KeyError:
@@ -437,6 +469,7 @@ class AggregateEmbeddings:
         #  in another step
         # r_com_raw, c_com_raw = get_dask_df_shape(self.df_v_comments)
         # info(f"  {r_com_raw:10,.0f} | {c_com_raw:4,.0f} <- Raw COMMENTS shape")
+
         # No longer need to use index.get_level_values() b/c I reset_index() before saving
         #  But now need to use .compute() before .isin() b/c dask doesn't work otherwise...
         if self.n_sample_comments_files is not None:
@@ -447,7 +480,7 @@ class AggregateEmbeddings:
                  )
             ]
 
-            if self.n_sample_comments_files <= 4:
+            if self.n_sample_comments_files <= 9:
                 r_com, c_com = get_dask_df_shape(self.df_v_comments)
                 info(f"  {r_com:11,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
 
@@ -1040,7 +1073,7 @@ class AggregateEmbeddings:
             name_for_artifact_folder='d_logged_dfs_subfolders',
         )
 
-        for folder_, df_ in tqdm(d_dfs_to_save.items()):
+        for folder_, df_ in tqdm(d_dfs_to_save.items(), ascii=True, position=0, leave=True):
             info(f"** {folder_} **")
 
             info(f"Saving locally...")

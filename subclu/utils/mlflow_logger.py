@@ -30,7 +30,7 @@ from dask import dataframe as dd
 import mlflow
 from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 
 class MlflowLogger:
@@ -302,7 +302,7 @@ class MlflowLogger:
             l_files_to_download = list(bucket.list_blobs(prefix=full_artifact_folder))
             l_parquet_files_downloaded = list()
             # not all the files in a folder will be parquet files, so we may need to download all files first
-            for blob_ in tqdm(l_files_to_download):
+            for blob_ in tqdm(l_files_to_download, ascii=True, position=0, leave=True):
                 # Skip files that aren't in the same folder as the expected (input) folder
                 parent_folder = blob_.name.split('/')[-2]
                 if artifact_folder != parent_folder:
