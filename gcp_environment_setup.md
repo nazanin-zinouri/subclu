@@ -1,6 +1,7 @@
-# GCP Notebooks + ssh setup
+# GCP AI Notebooks + ssh setup
 
-## URL Proxy for existing notebooks
+## View existing notebooks / Consoles & URL Proxy
+After you've created a notebook VM, you should be able to see it in one of the following consoles:
 
 #### Consoles:
 VM instances in `data-prod` project:
@@ -15,13 +16,16 @@ GCP spark clusters on `data-science` project:
 
 #### Individual VMs:
 Inference for USE:
-- Use for getting embeddings
+- project: data-prod
+- Use for getting embeddings (vectorizing text)
 - https://7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com/lab
 
 CPU / EDA:
+- project: data-prod
 - Use for Dask cluster, bump to 64 CPUs & 400+ GB RAM)
 - Use for regular EDA: (32 CPUs & ~64 GB RAM)
 - https://1185e8680f9b40ca-dot-us-west1.notebooks.googleusercontent.com/lab?
+
 
 
 ## Create a GCP Notebook
