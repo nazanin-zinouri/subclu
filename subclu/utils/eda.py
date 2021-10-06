@@ -51,6 +51,7 @@ def setup_logging(
         log_format: str = 'basic_with_time',
         console_level=logging.INFO,
         file_level=logging.INFO,
+        path_logs: str = 'logs',
         file_root_name: str = None,
         verbose: bool = False
 ) -> None:
@@ -78,14 +79,18 @@ def setup_logging(
 
     # Note: logging.basicConfig won't work inside ipython unless we reload `logging`
     importlib.reload(logging)
-    if file_root_name is not None:
-        path_logs = Path('logs')
-        Path.mkdir(path_logs, parents=False, exist_ok=True)
-        logging.basicConfig(filename=str(path_logs / f'{str_dtm_start}_{file_root_name}.log'),
-                            level=file_level,
-                            format=log_format,
-                            datefmt='%Y-%m-%d %H:%M:%S'
-                            )
+    # if file_root_name is not None:
+    #     path_logs = Path(path_logs)
+    #     Path.mkdir(path_logs, parents=False, exist_ok=True)
+    #     # for some reason file logging isn't working with basicConfig...
+    #     logging.basicConfig(
+    #         level=file_level,
+    #         format=log_format,
+    #         handlers=[
+    #             logging.FileHandler(str(path_logs / f'{str_dtm_start}_{file_root_name}.log')),
+    #         ],
+    #         datefmt='%Y-%m-%d %H:%M:%S'
+    #     )
 
     # Explicitly getLogger in case running inside ipython/jupyter
     logger = logging.getLogger()
@@ -111,6 +116,16 @@ def setup_logging(
 
     # For some reason, sqlalchemy can sometimes be set to the wrong level, so se it back
     logging.getLogger('sqlalchemy.engine').setLevel(logging.WARN)
+
+    # set & add logger for file
+    if file_root_name is not None:
+        path_logs = Path(path_logs)
+        Path.mkdir(path_logs, parents=False, exist_ok=True)
+
+        fileHandler = logging.FileHandler(str(path_logs / f'{str_dtm_start}_{file_root_name}.log'))
+        fileHandler.setLevel(file_level)
+        fileHandler.setFormatter(formatter)
+        logger.addHandler(fileHandler)
 
     if verbose:
         print("Final handlers")
