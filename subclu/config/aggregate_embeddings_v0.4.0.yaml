@@ -2,7 +2,7 @@
 defaults:
   - data_text_and_metadata:  v0.4.0_19k_top_subs_and_geo_relevant_2021_09_27
   - data_embeddings_to_aggregate: v0.4.0_2021-10-04_use_multi_lower_case_false.yaml
-  - aggregate_params: default_agg
+  - aggregate_params: v0.4.0_agg
 
 mlflow_tracking_uri: 'sqlite'
 mlflow_experiment: 'v0.4.0_use_multi_aggregates'  # 'v0.3.2_use_multi_aggregates_test'
