@@ -16,6 +16,7 @@ SQLite Studio might be worth trying (as long as I don't have dozens of dbs to me
 """
 import json
 import logging
+import os
 from logging import info
 import socket
 
@@ -169,13 +170,92 @@ class MlflowLogger:
 
     def set_tag_hostname(self, key: str = 'host_name') -> str:
         """Add host_name as tag so it's easier to track which VM produced model"""
-        mlflow.set_tag(key, self.host_name)
+        if mlflow.active_run() is not None:
+            mlflow.set_tag(key, self.host_name)
         return self.host_name
 
-    def log_param_hostname(self, key: str = 'host_name') -> str:
+    def log_param_hostname(
+            self,
+            key: str = 'host_name',
+            send_to_info: bool = True,
+    ) -> str:
         """Add host_name as tag so it's easier to track which VM produced model"""
-        mlflow.log_param(key, self.host_name)
+        if mlflow.active_run() is not None:
+            mlflow.log_param(key, self.host_name)
+
+        if send_to_info:
+            info(f"{key}: {self.host_name}")
         return self.host_name
+
+    @staticmethod
+    def log_cpu_count(
+            send_to_info: bool = True,
+            param: bool = True,
+            metric: bool = True,
+    ) -> Union[int, None]:
+        """Get the system's CPU & RAM, log it to mlflow and return dict"""
+        try:
+            cpu_count = os.cpu_count()
+            metric_name = 'cpu_count'
+
+            if send_to_info:
+                info(f"{metric_name}: {cpu_count}")
+
+            if mlflow.active_run() is not None:
+                if param:
+                    mlflow.log_param(metric_name, cpu_count)
+                if metric:
+                    mlflow.log_metric(metric_name, cpu_count)
+
+            return cpu_count
+        except Exception as e:
+            logging.error(f"Error logging CPU info\n {e}")
+            return None
+
+    @staticmethod
+    def log_ram_stats(
+            send_to_info: bool = True,
+            param: bool = True,
+            metric: bool = True,
+            only_memory_used: bool = False,
+    ) -> Union[dict, None]:
+        """Log total, active, & used RAM
+        Could be helpful when debugging to identify jobs limited by RAM
+        """
+        try:
+            memory_total, memory_used, memory_free = map(
+                int, os.popen('free -t -m').readlines()[-1].split()[1:]
+            )
+            memory_used_percent = memory_used / memory_total
+            d_ram = {
+                'memory_total': memory_total,
+                'memory_used_percent': memory_used_percent,
+                'memory_used': memory_used,
+                'memory_free': memory_free,
+            }
+
+            if only_memory_used:
+                d_ram = {k: v for k, v in d_ram.items() if '_used' in k}
+
+            if send_to_info:
+                d_ram_pretty_format = {
+                    **{k: f"{v:,.2%}" for k, v in d_ram.items() if '_percent' in k},
+                    **{k: f"{v:,.0f}" for k, v in d_ram.items() if '_percent' not in k},
+                }
+                info(f"RAM stats:\n{d_ram_pretty_format}")
+
+            if mlflow.active_run() is not None:
+                if param:
+                    mlflow.log_params(d_ram)
+                if metric:
+                    mlflow.log_metrics(d_ram)
+            return d_ram
+
+        except Exception as e:
+            logging.error(f"Error logging CPU & RAM info\n {e}")
+            return None
+
+
 
     @staticmethod
     def reset_sqlalchemy_logging() -> None:
@@ -302,7 +382,7 @@ class MlflowLogger:
             l_files_to_download = list(bucket.list_blobs(prefix=full_artifact_folder))
             l_parquet_files_downloaded = list()
             # not all the files in a folder will be parquet files, so we may need to download all files first
-            for blob_ in tqdm(l_files_to_download, ascii=True, position=0, leave=True):
+            for blob_ in tqdm(l_files_to_download, ncols=80, ascii=True, position=0, leave=True):
                 # Skip files that aren't in the same folder as the expected (input) folder
                 parent_folder = blob_.name.split('/')[-2]
                 if artifact_folder != parent_folder:
