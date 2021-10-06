@@ -83,7 +83,7 @@ class AggregateEmbeddings:
             df_v_sub: pd.DataFrame = None,
 
             mlflow_experiment: str = 'use_multilingual_v1_aggregates',
-            run_name: str = None,
+            run_name: str = 'aggregate_embeddings',
             mlflow_tracking_uri: str = 'sqlite',
 
             n_sample_posts_files: float = None,
@@ -101,6 +101,9 @@ class AggregateEmbeddings:
 
             embeddings_read_fxn: callable = dd.read_parquet,
             metadata_read_fxn: callable = pd.read_parquet,
+            calculate_similarites: bool = False,
+            logs_path: str = 'logs/AggregateEmbeddings',
+            unique_checks: bool = False,
             **kwargs
     ):
         """"""
@@ -151,6 +154,16 @@ class AggregateEmbeddings:
         self.embeddings_read_fxn = embeddings_read_fxn
         self.metadata_read_fxn = metadata_read_fxn
 
+        # use as flag to know whether or not to calculate subredit similarities
+        #  Set to False by default -- want to make similarity its own step
+        self.calculate_similarites = calculate_similarites
+
+        # Save logs here
+        self.logs_path = logs_path
+
+        # When sampling, set this to True to compute unique checks
+        self.unique_checks = unique_checks
+
         # Create path to store local run
         self.path_local_model = None
 
@@ -173,6 +186,44 @@ class AggregateEmbeddings:
         self.df_subs_agg_b_similarity = None
         self.df_subs_agg_c_similarity = None
 
+        self.df_subs_agg_a_similarity_pair = None
+        self.df_subs_agg_b_similarity_pair = None
+        self.df_subs_agg_c_similarity_pair = None
+
+    def _init_file_log(self) -> None:
+        """Create a file & FileHandler to log data"""
+        # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
+        if self.logs_path is not None:
+            logger = logging.getLogger()
+
+            path_logs = Path(self.logs_path)
+            Path.mkdir(path_logs, parents=False, exist_ok=True)
+            self.f_log_file = str(
+                path_logs /
+                f"{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}_{self.run_name}.log"
+            )
+
+            self.fileHandler = logging.FileHandler(self.f_log_file)
+            self.fileHandler.setLevel(logging.INFO)
+
+            formatter = logging.Formatter(
+                '%(asctime)s | %(levelname)s | "%(message)s"',
+                '%Y-%m-%d %H:%M:%S'
+            )
+            self.fileHandler.setFormatter(formatter)
+            logger.addHandler(self.fileHandler)
+
+    def _remove_file_logger(self) -> None:
+        """After completing job, remove logging handler to prevent
+        info from other jobs getting logged to the same log file
+        """
+        if self.fileHandler is not None:
+            logger = logging.getLogger()
+            try:
+                logger.removeHandler(self.fileHandler)
+            except Exception as e:
+                logging.warning(f"Can't remove logger\n{e}")
+
     def run_aggregation(self) -> None:
         """Main function to run full aggregation job
 
@@ -183,6 +234,8 @@ class AggregateEmbeddings:
           re-run embeddings process on old posts, only need to update new posts (and give less weight to old posts)
           right?
         """
+        # set & add logger for file
+        self._init_file_log()
         t_start_agg_embed = datetime.utcnow()
         info(f"== Start run_aggregation() method ==")
 
@@ -284,27 +337,44 @@ class AggregateEmbeddings:
         #    save & log aggregates ASAP - this way I can start working on
         #    creating clusters w/o having to wait for distances to be computed
         # TODO(djb): log and save C) before B or A (C is what gives the best outputs)
+        self._save_and_log_aggregate_and_similarity_dfs()
 
         # ---------------------
         # Calculate subreddit similarity/distance
         # ---
-        if self.calculate_similarities:
+        if self.calculate_similarites:
             self._calculate_subreddit_similarities()
-        # TODO(djb): break up (save & log fxn):
-        #    in this step only savel & load the similarity subreddits
-        self._save_and_log_aggregate_and_similarity_dfs()
+
+            self._save_and_log_aggregate_and_similarity_dfs()
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_agg_embed, log_label='Total Agg fxn time', verbose=True)
         mlflow.log_metric('vectorizing_time_minutes',
                           total_fxn_time / timedelta(minutes=1)
                           )
-        mlflow.end_run()
+
         info(f"== COMPLETE run_aggregation() method ==")
-        # return (
-        #     self.df_subs_agg_a, self.df_subs_agg_b, self.df_subs_agg_c,
-        #     self.df_posts_agg_b, self.df_posts_agg_c, None
-        # )
+        # TODO(djb): log file-log to mlflow
+        self._send_log_file_to_mlflow()
+
+        mlflow.end_run()
+        info(f"    Removing fileHandler...")
+        self._remove_file_logger()
+
+    def _send_log_file_to_mlflow(self) -> None:
+        """If log file exists, send it to MLFlow
+        In case a job fails, it's helpful to have this stand-alone method to send the log-file.
+        """
+        if self.f_log_file is not None:
+            try:
+                if mlflow.active_run() is not None:
+                    # TODO(djb): could I add the mlflow UUID as an attribute to this
+                    #  object and reactivate it in case the run was killed?
+                    mlflow.log_artifact(self.f_log_file)
+                else:
+                    info(f"Could NOT log to MLFLow, there's no active run.")
+            except Exception as e:
+                logging.warning(f"Error logging log-file: \n{e}")
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run
@@ -337,8 +407,8 @@ class AggregateEmbeddings:
             'subreddit_desc_folder': self.subreddit_desc_folder,
             'col_subreddit_id': self.col_subreddit_id,
 
-            'frac_sample_posts': self.n_sample_posts_files,
-            'frac_sample_comments': self.n_sample_comments_files,
+            'n_sample_posts_files': self.n_sample_posts_files,
+            'n_sample_comments_files': self.n_sample_comments_files,
 
             'agg_comments_to_post_weight_col': self.agg_comments_to_post_weight_col,
             'agg_post_post_weight': self.agg_post_post_weight,
@@ -384,6 +454,7 @@ class AggregateEmbeddings:
         info(f"  {r_sub:10,.0f} | {c_sub:4,.0f} <- Raw vectorized subreddit description shape")
         if active_run is not None:
             mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
+        info(f"  Unique check for subreddit description...")
         assert (r_sub == self.df_v_sub['subreddit_name'].nunique().compute()), (f"** Index not unique. "
                                                                                 f"Check duplicates df_v_sub **")
 
@@ -416,6 +487,7 @@ class AggregateEmbeddings:
 
         if active_run is not None:
             mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
+        info(f"  Checking that posts are unique...")
         assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), (f"** Post-ID NOT unique. "
                                                                                    f"Check duplicates df_v_posts **")
 
@@ -631,7 +703,7 @@ class AggregateEmbeddings:
         if active_run is not None:
             mlflow.log_metrics({'df_v_com_agg_rows': r_com_agg, 'df_v_com_agg_cols': c_com_agg})
         if self.n_sample_comments_files is not None:
-            if self.n_sample_comments_files <= 9:
+            if all([self.n_sample_comments_files <= 4, self.unique_checks]):
                 logging.warning(f"Checking that index is unique after aggregation... [only when testing]")
                 assert (r_com_agg == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
         info(f"  {r_com_agg:11,.0f} | {c_com_agg:4,.0f} <- df_v_com_agg SHAPE")
@@ -820,7 +892,7 @@ class AggregateEmbeddings:
         info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_b shape after aggregation")
 
         if self.n_sample_comments_files is not None:
-            if self.n_sample_comments_files <= 4:
+            if all([self.n_sample_comments_files <= 4, self.unique_checks]):
                 logging.warning(f"Unique check only applied when sampling/testing")
                 assert (r_agg_posts == self.df_posts_agg_b[self.col_post_id].nunique().compute()), "Index not unique"
 
@@ -903,7 +975,7 @@ class AggregateEmbeddings:
         )  # .sort_index()
 
         if self.n_sample_comments_files is not None:
-            if self.n_sample_comments_files <= 9:
+            if all([self.n_sample_comments_files <= 5, self.unique_checks]):
                 # Only calculate with fewer than 10 files, this might be taking up 30+ minutes!!
                 r_agg_posts, c_agg_posts = get_dask_df_shape(self.df_posts_agg_c, col_len_check=self.col_post_id)
                 info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_c shape after aggregation")
@@ -1066,48 +1138,55 @@ class AggregateEmbeddings:
 
         # create dict to make it easier to reload dataframes logged as artifacts
         # e.g., we should be able to get a list of the expected df subfolders even if we change the name of a folder
-        d_dfs_folders_to_log = {k: k for k in d_dfs_to_save.keys()}
+        d_dfs_folders_to_log = {k: k for k, v in d_dfs_to_save.items() if v is not None}
         mlflow_logger.save_and_log_config(
             config=d_dfs_folders_to_log,
             local_path=self.path_local_model,
             name_for_artifact_folder='d_logged_dfs_subfolders',
         )
 
-        for folder_, df_ in tqdm(d_dfs_to_save.items(), ascii=True, position=0, leave=True):
-            info(f"** {folder_} **")
-
-            info(f"Saving locally...")
+        # Only save dfs that have been created
+        for folder_, df_ in tqdm({k: v for k, v in d_dfs_to_save.items() if v is not None}.items(),
+                                 ascii=True, ncols=80, position=0):
+            # TODO(djb): only save if folder hasn't been created!
             path_sub_local = self.path_local_model / folder_
+            info(f"** {folder_} **")
+            if Path(path_sub_local).exists():
+                info(f"  ** SKIPPING because path already exits **")
+                continue
+            else:
+                info(f"  Saving locally...")
 
             # The assumption is that similarity DFs should be pandas DFs
             #  so we should be safe saving index for them
             if folder_.endswith('_similarity'):
-                info(f"Keeping index intact...")
-                rows_, cols_ = df_.shape
+                info(f"  Keeping index intact...")
                 save_pd_df_to_parquet_in_chunks(
                     df=df_,
                     path=path_sub_local,
                     write_index=True,
                 )
             else:
-                if isinstance(df_, pd.DataFrame):
-                    rows_, cols_ = df_.shape
-                else:
-                    rows_, cols_ = get_dask_df_shape(df_)
                 save_pd_df_to_parquet_in_chunks(
                     df=df_.reset_index(),
                     path=path_sub_local,
                     write_index=False,
                 )
 
-            # for dask dfs, don't try to
-            mlflow.log_metrics(
-                {f"{folder_}-rows": rows_,
-                 f"{folder_}-cols": cols_,
-                 }
-            )
+            if isinstance(df_, pd.DataFrame):
+                info(f"  Logging df shape...")
+                rows_, cols_ = df_.shape
+                mlflow.log_metrics(
+                    {f"{folder_}-rows": rows_,
+                     f"{folder_}-cols": cols_,
+                     }
+                )
+            else:
+                # TODO(djb) run separate job to add dask df shape AFTER df is saved,
+                #   otherwise it takes A LOT of extra compute to get len(df)
+                info(f"  NOT logging shape of dask df to save time & compute")
 
-            info(f"Logging artifact to mlflow...")
+            info(f"  Logging artifact to mlflow...")
             mlflow.log_artifacts(path_sub_local, artifact_path=folder_)
 
         elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()', verbose=True)

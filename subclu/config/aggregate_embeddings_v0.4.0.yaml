@@ -8,3 +8,4 @@ mlflow_tracking_uri: 'sqlite'
 mlflow_experiment: 'v0.4.0_use_multi_aggregates'  # 'v0.3.2_use_multi_aggregates_test'
 n_sample_posts_files: null
 n_sample_comments_files: null
+calculate_similarites: true
