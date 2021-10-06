@@ -202,10 +202,10 @@ class MlflowLogger:
                 info(f"{metric_name}: {cpu_count}")
 
             if mlflow.active_run() is not None:
-                if param:
-                    mlflow.log_param(metric_name, cpu_count)
                 if metric:
                     mlflow.log_metric(metric_name, cpu_count)
+                if param:
+                    mlflow.log_param(metric_name, cpu_count)
 
             return cpu_count
         except Exception as e:
@@ -215,12 +215,16 @@ class MlflowLogger:
     @staticmethod
     def log_ram_stats(
             send_to_info: bool = True,
-            param: bool = True,
+            param: bool = False,
             metric: bool = True,
             only_memory_used: bool = False,
     ) -> Union[dict, None]:
         """Log total, active, & used RAM
         Could be helpful when debugging to identify jobs limited by RAM
+
+        Set param=False by default because we want to call this fxn multiple times
+        and mlflow returns an error if we try to set the value of a param more
+        than one time.
         """
         try:
             memory_total, memory_used, memory_free = map(
@@ -245,14 +249,14 @@ class MlflowLogger:
                 info(f"RAM stats:\n{d_ram_pretty_format}")
 
             if mlflow.active_run() is not None:
-                if param:
-                    mlflow.log_params(d_ram)
                 if metric:
                     mlflow.log_metrics(d_ram)
+                if param:
+                    mlflow.log_params(d_ram)
             return d_ram
 
         except Exception as e:
-            logging.error(f"Error logging CPU & RAM info\n {e}")
+            logging.error(f"Error logging RAM info\n {e}")
             return None
 
 
