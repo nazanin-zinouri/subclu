@@ -23,6 +23,26 @@ OPTIONS (
 )
 ;
 
+-- Check table counts
+-- SELECT
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (comment_unique_count / subreddit_unique_count) AS comments_per_subreddit_mean
+--     , (comment_unique_count / post_unique_count) AS comments_per_post_mean
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT comment_id) AS comment_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+--
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_v0040_embeddings_comments`
+-- );
+-- Results
+-- Query complete (11.2 sec elapsed, 1.2 GB processed)
+--  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean 	 comments_per_subreddit_mean 	 comments_per_post_mean
+--  39,901,968 	 7,038,219 	 39,901,968 	 19,020 	 370.04 	 2,097.90 	 5.67
+
 
 -- Embeddings created when we pre-process the text to lowercase before running through USE
 -- I haven't run this job, so we can't create this table yet.
