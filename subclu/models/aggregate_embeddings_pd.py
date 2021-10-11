@@ -9,14 +9,14 @@ from datetime import datetime, timedelta
 import gc
 import logging
 from logging import info
-# import os
+import math
 from pathlib import Path
 from typing import Tuple, Union, List
 
 import mlflow
 import pandas as pd
 import numpy as np
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 # try modin instead of pandas?
 # os.environ["MODIN_ENGINE"] = 'dask'
@@ -48,9 +48,9 @@ class AggregateEmbeddings:
     def __init__(
             self,
             bucket_name: str = 'i18n-subreddit-clustering',
-            folder_meta_subreddits: str = 'subreddits/de/2021-06-16',
-            folder_meta_comments: str = 'comments/de/2021-06-16',
-            folder_meta_posts: str = 'posts/de/2021-06-16',
+            folder_subreddits_text_and_meta: str = 'subreddits/de/2021-06-16',
+            folder_comments_text_and_meta: str = 'comments/de/2021-06-16',
+            folder_posts_text_and_meta: str = 'posts/de/2021-06-16',
 
             posts_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
             posts_folder: str = 'df_vect_posts',
@@ -63,7 +63,7 @@ class AggregateEmbeddings:
             col_comment_id: str = 'comment_id',
             col_text_comment_word_count: str = 'comment_text_word_count',
             col_comment_text_len: str = 'comment_text_len',
-            min_comment_text_len: int = 11,
+            min_comment_text_len: int = 5,
             df_v_comments: pd.DataFrame = None,
 
             subreddit_desc_uuid: str = 'db7a4d8aff04420eb4229d6499055e04',
@@ -72,11 +72,11 @@ class AggregateEmbeddings:
             df_v_sub: pd.DataFrame = None,
 
             mlflow_experiment: str = 'use_multilingual_v1_aggregates',
-            run_name: str = None,
+            run_name: str = 'aggregate_embeddings_pd',
             mlflow_tracking_uri: str = 'sqlite',
 
-            n_sample_posts: int = None,
-            n_sample_comments: int = None,
+            n_sample_posts_files: float = None,
+            n_sample_comments_files: float = None,
 
             agg_comments_to_post_weight_col: str = 'comment_text_len',
             agg_post_post_weight: int = 70,
@@ -87,12 +87,19 @@ class AggregateEmbeddings:
             df_subs_meta: pd.DataFrame = None,
             df_posts_meta: pd.DataFrame = None,
             df_comments_meta: pd.DataFrame = None,
+
+            # embeddings_read_fxn: callable = dd.read_parquet,
+            # metadata_read_fxn: callable = pd.read_parquet,
+            calculate_similarites: bool = False,
+            logs_path: str = 'logs/AggregateEmbeddings',
+            unique_checks: bool = False,
+            **kwargs
     ):
         """"""
         self.bucket_name = bucket_name
-        self.folder_meta_subreddits = folder_meta_subreddits
-        self.folder_meta_comments = folder_meta_comments
-        self.folder_meta_posts = folder_meta_posts
+        self.folder_subreddits_text_and_meta = folder_subreddits_text_and_meta
+        self.folder_comments_text_and_meta = folder_comments_text_and_meta
+        self.folder_posts_text_and_meta = folder_posts_text_and_meta
 
         self.mlflow_experiment = mlflow_experiment
         self.run_name = run_name
@@ -109,6 +116,7 @@ class AggregateEmbeddings:
         self.comments_folder = comments_folder
         self.col_comment_id = col_comment_id
         self.col_text_comment_word_count = col_text_comment_word_count
+        self.col_comment_text_len = col_comment_text_len
         self.min_comment_text_len = min_comment_text_len
 
         self.df_v_sub = df_v_sub
@@ -116,8 +124,8 @@ class AggregateEmbeddings:
         self.subreddit_desc_folder = subreddit_desc_folder
         self.col_subreddit_id = col_subreddit_id
 
-        self.n_sample_posts = n_sample_posts
-        self.n_sample_comments = n_sample_comments
+        self.n_sample_posts_files = n_sample_posts_files
+        self.n_sample_comments_files = n_sample_comments_files
 
         # use pre-loaded metadata if running in interactive mode
         self.df_subs_meta = df_subs_meta
@@ -131,6 +139,19 @@ class AggregateEmbeddings:
         self.agg_post_comment_weight = agg_post_comment_weight
         self.agg_post_subreddit_desc_weight = agg_post_subreddit_desc_weight
         self.agg_post_to_subreddit_weight_col = agg_post_to_subreddit_weight_col
+
+        # self.embeddings_read_fxn = embeddings_read_fxn
+        # self.metadata_read_fxn = metadata_read_fxn
+
+        # use as flag to know whether or not to calculate subredit similarities
+        #  Set to False by default -- want to make similarity its own step
+        self.calculate_similarites = calculate_similarites
+
+        # Save logs here
+        self.logs_path = logs_path
+
+        # When sampling, set this to True to compute unique checks
+        self.unique_checks = unique_checks
 
         # Create path to store local run
         self.path_local_model = None
