@@ -175,7 +175,45 @@ class AggregateEmbeddings:
         self.df_subs_agg_b_similarity = None
         self.df_subs_agg_c_similarity = None
 
-    def run_aggregation(self) -> Tuple[pd.DataFrame]:
+        self.df_subs_agg_a_similarity_pair = None
+        self.df_subs_agg_b_similarity_pair = None
+        self.df_subs_agg_c_similarity_pair = None
+
+    def _init_file_log(self) -> None:
+        """Create a file & FileHandler to log data"""
+        # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
+        if self.logs_path is not None:
+            logger = logging.getLogger()
+
+            path_logs = Path(self.logs_path)
+            Path.mkdir(path_logs, parents=False, exist_ok=True)
+            self.f_log_file = str(
+                path_logs /
+                f"{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}_{self.run_name}.log"
+            )
+
+            self.fileHandler = logging.FileHandler(self.f_log_file)
+            self.fileHandler.setLevel(logging.INFO)
+
+            formatter = logging.Formatter(
+                '%(asctime)s | %(levelname)s | "%(message)s"',
+                '%Y-%m-%d %H:%M:%S'
+            )
+            self.fileHandler.setFormatter(formatter)
+            logger.addHandler(self.fileHandler)
+
+    def _remove_file_logger(self) -> None:
+        """After completing job, remove logging handler to prevent
+        info from other jobs getting logged to the same log file
+        """
+        if self.fileHandler is not None:
+            logger = logging.getLogger()
+            try:
+                logger.removeHandler(self.fileHandler)
+            except Exception as e:
+                logging.warning(f"Can't remove logger\n{e}")
+
+    def run_aggregation(self) -> None:
         """Main function to run full aggregation job
 
         TODO(djb): Should I try to emulate fit, fit_transform, & transform methods from sklearn for this class?
