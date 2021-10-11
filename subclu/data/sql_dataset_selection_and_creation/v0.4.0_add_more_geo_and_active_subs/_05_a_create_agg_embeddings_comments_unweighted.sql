@@ -1,6 +1,6 @@
--- Try creating comments with regular (unweighted) AVG to reduce memory load
+-- NOTE: this query runs out of memory in BigQuery
+-- Here we tried with regular AVG (unweighted) to reduce memory load
 --  However, this still runs out of memory - even when trying to batch only 10 subreddts
-
 DECLARE subreddit_rank_min NUMERIC DEFAULT 1;
 DECLARE subreddit_rank_max NUMERIC DEFAULT 10;
 
@@ -541,10 +541,12 @@ AS (
         , AVG(embeddings_511) AS embeddings_511
 
     FROM `reddit-employee-datasets.david_bermejo.subclu_v0040_embeddings_comments` AS cem
+    INNER JOIN selected_subreddits AS ss
+        ON cem.subreddit_id = ss.subreddit_id
+
     -- LEFT JOIN weights_for_mean AS w
     --     ON cem.comment_id = w.comment_id
 
     GROUP BY 1, 2
     ORDER BY 1, 2
 ); -- close CREATE TABLE statment
-

@@ -467,7 +467,7 @@ The new pattern is to call the mlflow DB for the current host name:
 mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
 ```
 
-### CPU-based VM with lots of RAM:
+### CPU-based VM with lots of RAM & CPUs:
 ```
 mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-100-2021-04-28-djb-eda-german-subs/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
 ```
