@@ -6,13 +6,11 @@ by functions from `models/vectorize_text.py`
 
 Vectorize text > Aggregate embeddings > Compress embeddings | Cluster posts | Cluster subs
 """
-import logging
 from datetime import datetime, timedelta
 import gc
 from functools import partial
-# import logging
+import logging
 from logging import info
-# import os
 import math
 from pathlib import Path
 from typing import Tuple, Union, List
@@ -83,7 +81,7 @@ class AggregateEmbeddings:
             df_v_sub: pd.DataFrame = None,
 
             mlflow_experiment: str = 'use_multilingual_v1_aggregates',
-            run_name: str = 'aggregate_embeddings',
+            run_name: str = 'aggregate_embeddings_dask',
             mlflow_tracking_uri: str = 'sqlite',
 
             n_sample_posts_files: float = None,
@@ -453,6 +451,7 @@ class AggregateEmbeddings:
                 read_function=self.embeddings_read_fxn,
                 cache_locally=True,
             )
+            # why are we tyring to drop `subreddit_id` all the time? to reduce compute or RAM?
             try:
                 self.df_v_sub = self.df_v_sub.drop(self.col_subreddit_id, axis=1)
             except KeyError:
@@ -497,6 +496,8 @@ class AggregateEmbeddings:
         info(f"  Getting df_v_posts.shape ...")
         r_post, c_post = get_dask_df_shape(self.df_v_posts)
         info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- Raw POSTS shape")
+        # Sampling only works reliably in pandas, it takes forever to compute in dask,
+        #  so we only sample at file-level
 
         if active_run is not None:
             mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})

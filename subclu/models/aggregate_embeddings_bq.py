@@ -9,8 +9,19 @@ https://colab.research.google.com/drive/1JwyZi1dkj5ejdRMgATuePfwAK9CpiKSc#scroll
 def create_embeddings_agg_query(
         embeddings_table: str,
 
+
 ) -> str:
-    """Create query to run on BigQuery to get """
+    """Create query to run on BigQuery to create a new table with aggregated embeddings
+
+    I didn't create parametrized fxn because the raw SQL queries failed at the comment-level
+    See SQL queries here:
+    - data/v0.4.0_add_more_geo_and_active_subs/_05_a_create_agg_embeddings_comments_unweighted.sql
+    - data/v0.4.0_add_more_geo_and_active_subs/_05_b_create_agg_embeddings_comments_weighted.sql
+    """
+    sql_create_agg_table = fr"""
+        {embeddings_table}
+    """
+    return sql_create_agg_table
 
 
 def scratch_test():
