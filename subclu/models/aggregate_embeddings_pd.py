@@ -223,6 +223,8 @@ class AggregateEmbeddings:
           re-run embeddings process on old posts, only need to update new posts (and give less weight to old posts)
           right?
         """
+        # set & add logger for file
+        self._init_file_log()
         t_start_agg_embed = datetime.utcnow()
         info(f"== Start run_aggregation() method ==")
 
@@ -232,6 +234,8 @@ class AggregateEmbeddings:
         self.mlf.add_git_hash_to_active_run()
         self.mlf.set_tag_hostname(key='host_name')
         self.mlf.log_param_hostname(key='host_name')
+        self.mlf.log_cpu_count()
+        self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
         # create local path to store artifacts before logging to mlflow
         self.path_local_model = get_project_subfolder(
@@ -248,6 +252,7 @@ class AggregateEmbeddings:
         # Load raw embeddings
         # ---
         self._load_raw_embeddings()
+        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # Load metadata from files
@@ -258,13 +263,14 @@ class AggregateEmbeddings:
         #   - up votes
         # ---
         self._load_metadata()
+        self.mlf.log_ram_stats(only_memory_used=True)
 
         # Filter out short comments using metadata
         # ---
         if self.min_comment_text_len is not None:
             info(f"{self.min_comment_text_len} <- Removing comments shorter than {self.min_comment_text_len} characters.")
             short_comments_to_remove = self.df_comments_meta[
-                self.df_comments_meta['comment_text_len'] <= self.min_comment_text_len
+                self.df_comments_meta[self.col_comment_text_len] <= self.min_comment_text_len
             ][self.col_comment_id]
 
             self.df_v_comments = (
@@ -282,6 +288,7 @@ class AggregateEmbeddings:
         # - up-votes
         # ---
         self._agg_comments_to_post_level()
+        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # Merge at post-level basic
@@ -290,7 +297,9 @@ class AggregateEmbeddings:
         # Weights by inputs, e.g., 70% post, 20% comments, 10% subreddit description
         # ---
         self._agg_posts_and_comments_to_post_level()
+        self.mlf.log_ram_stats(only_memory_used=True)
         self._agg_posts_comments_and_sub_descriptions_to_post_level()
+        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # TODO(djb): Merge at post-level with subreddit lag
@@ -318,32 +327,53 @@ class AggregateEmbeddings:
         # - number of days since post was created (more recent posts get more weight)
         # ---
         self._agg_post_aggregates_to_subreddit_level()
+        self.mlf.log_ram_stats(only_memory_used=True)
+        # TODO(djb): break up (save & log fxn):
+        #    save & log aggregates ASAP - this way I can start working on
+        #    creating clusters w/o having to wait for distances to be computed
+        # TODO(djb): log and save C) before B or A (C is what gives the best outputs)
+        self._save_and_log_aggregate_and_similarity_dfs()
+        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # Calculate subreddit similarity/distance
         # ---
-        self._calculate_subreddit_similarities()
+        if self.calculate_similarites:
+            self._calculate_subreddit_similarities()
+            self.mlf.log_ram_stats(only_memory_used=True)
 
-        # TODO create dataframes subfolder for local model path
-        # TODO: for each df type, create a subfolder & save it using dask (so we can save to multiple files)
-        #  TODO(djb): when saving a df to parquet, save in multiple files, otherwise
-        #   reading from a single file can take over 1 minute for ~1.2 million rows
-        #   maybe use dask to save dfs?
-        # TODO log dataframes subfolder to mlflow (one call) to preserve subfolder structure?
-        #   i.e., Call mlflow log artifacts on whole subfolder
-        self._save_and_log_aggregate_and_similarity_dfs()
+            self._save_and_log_aggregate_and_similarity_dfs()
+            self.mlf.log_ram_stats(only_memory_used=True)
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_agg_embed, log_label='Total Agg fxn time', verbose=True)
         mlflow.log_metric('vectorizing_time_minutes',
                           total_fxn_time / timedelta(minutes=1)
                           )
-        mlflow.end_run()
+
         info(f"== COMPLETE run_aggregation() method ==")
-        return (
-            self.df_subs_agg_a, self.df_subs_agg_b, self.df_subs_agg_c,
-            self.df_posts_agg_b, self.df_posts_agg_c, None
-        )
+        # TODO(djb): log file-log to mlflow
+        self._send_log_file_to_mlflow()
+
+        mlflow.end_run()
+        info(f"    Removing fileHandler...")
+        self._remove_file_logger()
+
+    def _send_log_file_to_mlflow(self) -> None:
+        """If log file exists, send it to MLFlow
+        In case a job fails, it's helpful to have this stand-alone method to send the log-file.
+        """
+        if self.f_log_file is not None:
+            try:
+                if mlflow.active_run() is not None:
+                    info(f"Logging log-file to mlflow...")
+                    # TODO(djb): could I add the mlflow UUID as an attribute to this
+                    #  object and reactivate it in case the run was killed?
+                    mlflow.log_artifact(self.f_log_file)
+                else:
+                    info(f"Could NOT log to MLFLow, there's no active run.")
+            except Exception as e:
+                logging.warning(f"Error logging log-file: \n{e}")
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run
