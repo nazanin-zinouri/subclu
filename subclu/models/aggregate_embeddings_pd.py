@@ -1073,120 +1073,83 @@ class AggregateEmbeddings:
         #  - C) posts + comments + subreddit description
 
         d_dfs_to_save = {
-            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
-            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
-
-            'df_sub_level_agg_a_post_only': self.df_subs_agg_a,
-            'df_sub_level_agg_a_post_only_similarity': self.df_subs_agg_a_similarity,
-            'df_sub_level_agg_a_post_only_similarity_pair': self.df_subs_agg_a_similarity_pair,
+            'df_sub_level_agg_c_post_comments_and_sub_desc': self.df_subs_agg_c,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity': self.df_subs_agg_c_similarity,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair': self.df_subs_agg_c_similarity_pair,
 
             'df_sub_level_agg_b_post_and_comments': self.df_subs_agg_b,
             'df_sub_level_agg_b_post_and_comments_similarity': self.df_subs_agg_b_similarity,
             'df_sub_level_agg_b_post_and_comments_similarity_pair': self.df_subs_agg_b_similarity_pair,
 
-            'df_sub_level_agg_c_post_comments_and_sub_desc': self.df_subs_agg_c,
-            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity': self.df_subs_agg_c_similarity,
-            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair': self.df_subs_agg_c_similarity_pair,
+            'df_sub_level_agg_a_post_only': self.df_subs_agg_a,
+            'df_sub_level_agg_a_post_only_similarity': self.df_subs_agg_a_similarity,
+            'df_sub_level_agg_a_post_only_similarity_pair': self.df_subs_agg_a_similarity_pair,
+
+            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
+            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
         }
 
         # create dict to make it easier to reload dataframes logged as artifacts
         # e.g., we should be able to get a list of the expected df subfolders even if we change the name of a folder
-        d_dfs_folders_to_log = {k: k for k in d_dfs_to_save.keys()}
+        d_dfs_folders_to_log = {k: k for k, v in d_dfs_to_save.items() if v is not None}
+        info(f"Dictionary of dfs to log & save (only dfs that have been created):\n"
+             f"{d_dfs_folders_to_log}")
         mlflow_logger.save_and_log_config(
             config=d_dfs_folders_to_log,
             local_path=self.path_local_model,
             name_for_artifact_folder='d_logged_dfs_subfolders',
         )
 
-        for folder_, df_ in tqdm(d_dfs_to_save.items()):
-            info(f"** {folder_} **")
+        # Only save dfs that have been created
+        for folder_, df_ in tqdm({k: v for k, v in d_dfs_to_save.items() if v is not None}.items(),
+                                 ascii=True, ncols=80, position=0):
+            t_start_df_ = datetime.utcnow()
 
-            info(f"Saving locally...")
             path_sub_local = self.path_local_model / folder_
+            info(f"** {folder_} **")
+            if Path(path_sub_local).exists():
+                info(f"  ** SKIPPING because path already exits **")
+                continue
+            else:
+                info(f"  Saving locally...")
 
+            # The assumption is that similarity DFs should be pandas DFs
+            #  so we should be safe saving index for them
+            # save_pd_df_to_parquet_in_chunks can handle either pd.dfs OR dd.dfs
             if folder_.endswith('_similarity'):
-                info(f"Keeping index intact...")
-                rows_, cols_ = df_.shape
+                info(f"  Keeping index intact...")
                 save_pd_df_to_parquet_in_chunks(
                     df=df_,
                     path=path_sub_local,
                     write_index=True,
                 )
             else:
-                rows_, cols_ = df_.reset_index().shape
                 save_pd_df_to_parquet_in_chunks(
                     df=df_.reset_index(),
                     path=path_sub_local,
                     write_index=False,
                 )
 
-            mlflow.log_metrics(
-                {f"{folder_}-rows": rows_,
-                 f"{folder_}-cols": cols_,
-                 }
-            )
+            if isinstance(df_, pd.DataFrame):
+                info(f"  Logging df shape...")
+                rows_, cols_ = df_.shape
+                mlflow.log_metrics(
+                    {f"{folder_}-rows": rows_,
+                     f"{folder_}-cols": cols_,
+                     }
+                )
+            else:
+                # TODO(djb) run separate job to add dask df shape AFTER df is saved,
+                #   otherwise it takes A LOT of extra compute to get len(df)
+                info(f"  NOT logging shape of dask df to save time & compute")
 
-            info(f"Logging artifact to mlflow...")
+            info(f"  Logging artifact to mlflow...")
             mlflow.log_artifacts(path_sub_local, artifact_path=folder_)
+            elapsed_time(start_time=t_start_df_, log_label=f"Total for saving & logging ** {folder_} **",
+                         verbose=True)
 
-        elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()', verbose=True)
-
-
-
-
-"""
-Out of memory testing using dask
-
-            # WIP: code from notebook that crashed
-            # mem_usage_mb = job_agg2.df_v_comments.memory_usage(deep=True).sum() / 1048576
-            # info(f"  {mem_usage_mb:6,.1f} MB <- Memory usage")
-            #
-            # if mem_usage_mb < 50:
-            #     target_mb_size = 30
-            # elif 100 <= mem_usage_mb < 500:
-            #     target_mb_size = 40
-            # elif 1000 <= mem_usage_mb < 1000:
-            #     target_mb_size = 60
-            # else:
-            #     target_mb_size = 75
-            #
-            # n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
-            #
-            # info(f"  {n_dask_partitions:6,.0f}\t<- target Dask partitions"
-            #      f"\t {target_mb_size:6,.1f} <- target MB partition size"
-            #      )
-            # l_posts_for_weighted_average = (
-            #     job_agg2.df_v_comments[~mask_single_comments].index.get_level_values('post_id').unique().to_list()
-            # )
-            # ddf_comms_with_weights = (
-            #     dd.from_pandas(
-            #         job_agg2.df_v_comments[~mask_single_comments].reset_index(),
-            #         npartitions=n_dask_partitions,
-            #     )
-            #         .merge(
-            #         dd.from_pandas(
-            #             job_agg2.df_comments_meta[['post_id', job_agg2.agg_comments_to_post_weight_col]],
-            #             npartitions=n_dask_partitions,
-            #         ),
-            #         how='left',
-            #         on=['post_id']
-            #     )
-            # )
-            
-            # ddf_groups = ddf_comms_with_weights.groupby(['post_id'])
-            # __iter__ is not implemented in dask... so we need to explicitly call each group ourselves
-            #  *sigh*...
-            # see: https://github.com/dask/dask/issues/5124#issuecomment-524384571
-            # for id_ in tqdm(l_posts_for_weighted_average):
-            #     df_ = ddf_groups.get_group(id_).compute()
-            #
-            #     d_weighted_mean_agg[id_] = np.average(
-            #         df_[l_embedding_cols],
-            #         weights=np.log(2 + df_[job_agg2.agg_comments_to_post_weight_col]),
-            #         axis=0,
-            #     )
-
-"""
+        elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()',
+                     verbose=True)
 
 
 # def get_groupby_weighted_average(
@@ -1257,9 +1220,6 @@ Out of memory testing using dask
 #             axis=0,
 #         )
 #     df_agg_multi_comments = None
-
-
-
 
 
 #

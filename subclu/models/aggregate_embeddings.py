@@ -1178,6 +1178,7 @@ class AggregateEmbeddings:
 
             # The assumption is that similarity DFs should be pandas DFs
             #  so we should be safe saving index for them
+            # save_pd_df_to_parquet_in_chunks can handle either pd.dfs OR dd.dfs
             if folder_.endswith('_similarity'):
                 info(f"  Keeping index intact...")
                 save_pd_df_to_parquet_in_chunks(
