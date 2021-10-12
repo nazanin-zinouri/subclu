@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Tuple, Union, List
 
 import mlflow
+import dask.dataframe
+from dask import dataframe as dd
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -381,40 +383,28 @@ class AggregateEmbeddings:
         Don't log dfs with meta or raw embeddings! they could be dfs that take up gigs of storage
         """
 
-        self.config_to_log_and_store = {
-            'bucket_name': self.bucket_name,
-            'folder_meta_subreddits': self.folder_meta_subreddits,
-            'folder_meta_comments': self.folder_meta_comments,
-            'folder_meta_posts': self.folder_meta_posts,
-
-            'mlflow_experiment': self.mlflow_experiment,
-            'run_name': self.run_name,
-            'mlflow_tracking_uri': self.mlflow_tracking_uri,
-
-            'posts_uuid': self.posts_uuid,
-            'posts_folder': self.posts_folder,
-            'col_post_id': self.col_post_id,
-            'col_text_post_word_count': self.col_text_post_word_count,
-
-            'comments_uuid': self.comments_uuid,
-            'comments_folder': self.comments_folder,
-            'col_comment_id': self.col_comment_id,
-            'col_text_comment_word_count': self.col_text_comment_word_count,
-            'min_comment_text_len': self.min_comment_text_len,
-
-            'subreddit_desc_uuid': self.subreddit_desc_uuid,
-            'subreddit_desc_folder': self.subreddit_desc_folder,
-            'col_subreddit_id': self.col_subreddit_id,
-
-            'n_sample_posts': self.n_sample_posts,
-            'n_sample_comments': self.n_sample_comments,
-
-            'agg_comments_to_post_weight_col': self.agg_comments_to_post_weight_col,
-            'agg_post_post_weight': self.agg_post_post_weight,
-            'agg_post_comment_weight': self.agg_post_comment_weight,
-            'agg_post_subreddit_desc_weight': self.agg_post_subreddit_desc_weight,
-            'agg_post_to_subreddit_weight_col': self.agg_post_to_subreddit_weight_col,
-        }
+        # TODO(djb): instead of manually logging everything, use vars(self)
+        #  to get all params & filter out:
+        #  - things that start with `df_`
+        #  - things named `mlf` (it's an mlflowLogger object)
+        self.config_to_log_and_store = dict()
+        for k_, v_ in vars(self).items():
+            try:
+                if any([k_.startswith('df_'), k_ == 'mlf']):
+                    continue
+                elif any([isinstance(v_, pd.DataFrame),
+                          isinstance(v_, logging.FileHandler),
+                          isinstance(v_, dict),
+                          isinstance(v_, Path),
+                          ]):
+                    # Ignore dicts and other objects that won't be easy to pickle
+                    # would it be better to only keep things that should be easy to pickle instead?
+                    #  e.g., string, list, numeric, None ?
+                    continue
+                else:
+                    self.config_to_log_and_store[k_] = v_
+            except Exception as e:
+                logging.warning(f"Error logging {k_}:\n  {e}")
 
         mlflow_logger.save_and_log_config(
             self.config_to_log_and_store,

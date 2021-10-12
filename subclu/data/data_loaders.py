@@ -331,7 +331,7 @@ class LoadComments(LoadPosts):
                 # 'weighted_language',
                 # 'weighted_language_probability',
                 # TODO(djb) add it back to SQL query... not sure why it's missing from top/US query
-                # 'comment_text_len',
+                'comment_text_len',
                 'comment_text_word_count',
                 # 'comment_body_text',
             ]
