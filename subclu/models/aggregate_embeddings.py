@@ -104,7 +104,49 @@ class AggregateEmbeddings:
             unique_checks: bool = False,
             **kwargs
     ):
-        """"""
+        """
+
+        Args:
+            bucket_name:
+            folder_subreddits_text_and_meta:
+            folder_comments_text_and_meta:
+            folder_posts_text_and_meta:
+            posts_uuid:
+            posts_folder:
+            col_text_post_word_count:
+            col_post_id:
+            df_v_posts:
+            comments_uuid:
+            comments_folder:
+            col_comment_id:
+            col_text_comment_word_count:
+            col_comment_text_len:
+            min_comment_text_len:
+            df_v_comments:
+            subreddit_desc_uuid:
+            subreddit_desc_folder:
+            col_subreddit_id:
+            df_v_sub:
+            mlflow_experiment:
+            run_name:
+            mlflow_tracking_uri:
+            n_sample_posts_files:
+            n_sample_comments_files:
+            agg_comments_to_post_weight_col:
+            agg_post_post_weight:
+            agg_post_comment_weight:
+            agg_post_subreddit_desc_weight:
+            agg_post_to_subreddit_weight_col:
+            df_subs_meta:
+            df_posts_meta:
+            df_comments_meta:
+            embeddings_read_fxn:
+            metadata_read_fxn:
+            calculate_similarites:
+            logs_path:
+            unique_checks:
+            **kwargs:
+        """
         self.bucket_name = bucket_name
         self.folder_subreddits_text_and_meta = folder_subreddits_text_and_meta
         self.folder_comments_text_and_meta = folder_comments_text_and_meta

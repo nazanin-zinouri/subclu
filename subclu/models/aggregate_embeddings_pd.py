@@ -92,7 +92,7 @@ class AggregateEmbeddings:
 
             # embeddings_read_fxn: callable = dd.read_parquet,
             # metadata_read_fxn: callable = pd.read_parquet,
-            calculate_similarites: bool = False,
+            calculate_similarites: bool = True,
             logs_path: str = 'logs/AggregateEmbeddings',
             unique_checks: bool = False,
             calculate_b_agg_posts_and_comments: bool = False,
@@ -516,6 +516,7 @@ class AggregateEmbeddings:
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_posts = self.df_v_posts.copy()
 
+        info(f"  Getting df_v_posts.shape ...")
         r_post, c_post = self.df_v_posts.shape
         info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- Raw POSTS shape")
         # Sampling only works reliably in pandas, it takes forever to compute in dask,
@@ -638,7 +639,7 @@ class AggregateEmbeddings:
             info(f"Subreddits META pre-loaded")
         info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
 
-        # Use dask to load multiple files in parallel, but the .compute() to conver to
+        # Use dask to load multiple files in parallel, but the .compute() to convert to
         #  single pandas df (in memory)
         if self.df_comments_meta is None:
             info(f"Loading COMMENTS metadata...")
@@ -671,6 +672,7 @@ class AggregateEmbeddings:
                 # .reset_index()  # This reset not needed b/c post-id & comment-id not in index
                 .groupby(self.l_ix_post_level)
                 .mean()
+                .reset_index()
             )
 
         else:
@@ -713,10 +715,12 @@ class AggregateEmbeddings:
             #    - iteratively (recursively?) do a cumulative sum until we reach 500 posts & process
             #      that group of subreddits at the same time
             d_weighted_mean_agg = dict()
-            for sub_ in tqdm(df_comms_with_weights['subreddit_name'].unique()):
+            for sub_ in tqdm(df_comms_with_weights['subreddit_name'].unique(),
+                             ascii=True, ncols=80, position=0, mininterval=4):
                 mask_sub = df_comms_with_weights['subreddit_name'] == sub_
                 try:
-                    for id_, df in tqdm(df_comms_with_weights[mask_sub].groupby('post_id')):
+                    for id_, df in tqdm(df_comms_with_weights[mask_sub].groupby('post_id'),
+                                        ascii=True, ncols=80, position=0, mininterval=3):
                         # TODO(djb): add limit of comments per post
                         #   sort by upvotes (desc) & text len (descending) -> keep only top 20 comments
                         d_weighted_mean_agg[id_] = np.average(
@@ -729,7 +733,7 @@ class AggregateEmbeddings:
                 except MemoryError as me_:
                     try:
                         df_with_error_ids = (
-                            df.drop(l_embedding_cols + [self.col_comment_id], axis=1)
+                            df.drop(self.l_embedding_cols + [self.col_comment_id], axis=1)
                             .drop_duplicates()
                         )
                         logging.error(
@@ -759,11 +763,11 @@ class AggregateEmbeddings:
             df_agg_multi_comments = (
                 df_agg_multi_comments
                 .merge(
-                    self.df_v_comments.index.to_frame(index=False)[l_ix_post_level].drop_duplicates(),
+                    self.df_v_comments[self.l_ix_post_level].drop_duplicates(),
                     how='left',
                     on=['post_id'],
                 )
-                .set_index(l_ix_post_level)
+                .set_index(self.l_ix_post_level)
             )
             assert (len(df_agg_multi_comments) == df_agg_multi_comments.index.nunique()), "Index not unique"
 
@@ -776,8 +780,8 @@ class AggregateEmbeddings:
                     (
                         self.df_v_comments[mask_single_comments]
                         .reset_index()
-                        [l_ix_post_level + l_embedding_cols]
-                        .set_index(l_ix_post_level)
+                        [self.l_ix_post_level + self.l_embedding_cols]
+                        .set_index(self.l_ix_post_level)
                     )
                  ],
                 ignore_index=False,
@@ -786,6 +790,10 @@ class AggregateEmbeddings:
 
         assert (len(self.df_v_com_agg) == self.df_v_com_agg.index.nunique()), "Index not unique"
         info(f"  {self.df_v_com_agg.shape} <- df_v_com_agg shape after aggregation")
+
+        # TODO(djb): delete df_v_com (raw) after getting the agg to free up memory
+        #  there's no point in keeping the comments around after we get the aggregated vector
+        logging.warning(f"  TODO(djb): DELETE df_v_com (raw) to free up memory...")
         elapsed_time(start_time=t_start_agg_comments, log_label='Total comments to post agg loading', verbose=True)
 
     def _calculate_comment_count_per_post(self):
@@ -796,8 +804,10 @@ class AggregateEmbeddings:
         """
         if self.df_comment_count_per_post is None:
             info(f"Getting count of comments per post...")
+            # Index no longer contains post & comment-IDs, so call them directly
+            #  instead of expecting them to be in the Index
             self.df_comment_count_per_post = (
-                self.df_v_comments.index.to_frame(index=False)
+                self.df_v_comments[self.l_ix_comment_level]
                     .groupby(['post_id'], as_index=False)
                     .agg(
                     comment_count=('comment_id', 'count')
@@ -806,7 +816,7 @@ class AggregateEmbeddings:
 
             # add posts with zero comments
             self.df_comment_count_per_post = self.df_comment_count_per_post.merge(
-                self.df_v_posts.index.get_level_values('post_id').to_frame(index=False),
+                self.df_v_posts[['post_id']],
                 how='outer',
                 on=['post_id']
             )
@@ -816,19 +826,30 @@ class AggregateEmbeddings:
                 "4+",
                 self.df_comment_count_per_post['comment_count'].astype(str)
             )
+            self.mask_posts_without_comments = self.df_v_posts['post_id'].isin(
+                self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 0]['post_id']
+            )
+            info(f"  {(~self.mask_posts_without_comments).sum():9,.0f} <- Posts that need weighted average")
 
-            df_counts_summary = value_counts_and_pcts(
-                self.df_comment_count_per_post['comment_count_'],
-                add_col_prefix=False,
-                count_type='posts',
-                reset_index=True,
-                sort_index=True,
-                return_df=True,
-             )
-            info(f"Comments per post summary:\n{df_counts_summary}")
-            info(f"  {(self.df_comment_count_per_post['comment_count'] >= 2).sum():9,.0f}"
-                 f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
-            del df_counts_summary
+            if self.n_sample_comments_files is not None:
+                if self.n_sample_comments_files <= 4:
+                    # only compute for test runs, otherwise it wastes A LOT of compute & TIME
+                    df_counts_summary = value_counts_and_pcts(
+                        self.df_comment_count_per_post['comment_count_'],
+                        add_col_prefix=False,
+                        count_type='posts',
+                        reset_index=True,
+                        sort_index=True,
+                        return_df=True,
+                     )
+                    info(f"Comments per post summary:\n{df_counts_summary}")
+
+                    # Don't compute this now, wait for later when we need to create a mask to get IDs
+                    #  for posts & comments that need to be averaged
+                    # info(f"  {(self.df_comment_count_per_post['comment_count'] >= 2).sum():9,.0f}"
+                    #      f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
+                    del df_counts_summary
+
             gc.collect()
 
     def _agg_posts_and_comments_to_post_level(self):
@@ -841,14 +862,8 @@ class AggregateEmbeddings:
         col_weights = '_col_method_weight_'
 
         t_start_method = datetime.utcnow()
-        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        l_embedding_cols = list(self.df_v_posts.columns)
 
         self._calculate_comment_count_per_post()
-        mask_posts_without_comments = self.df_v_posts.index.get_level_values('post_id').isin(
-            self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 0]['post_id']
-        )
-        info(f"  {(~mask_posts_without_comments).sum():9,.0f} <- Posts that need weighted average")
 
         # Create df with:
         #  - posts with 1+ comments
@@ -858,7 +873,7 @@ class AggregateEmbeddings:
         #    - add new col with input weight
         df_posts_for_weights = pd.concat(
             [
-                self.df_v_posts[~mask_posts_without_comments].assign(
+                self.df_v_posts[~self.mask_posts_without_comments].assign(
                     **{col_weights: self.agg_post_post_weight}
                 ),
                 self.df_v_com_agg.assign(
@@ -868,31 +883,37 @@ class AggregateEmbeddings:
         )
 
         # iterate to get weighted average for each post_id that has comments
+        # TODO(djb): how can I run this groupby in parallel or vectorized? b/c looping will take 4ever
+        #   maybe this is a good place for dask-delayed?
+        # ETA for ~468k posts is 8 minutes
+        #  ETA for 7 million posts: 2.5 hours, just on this aggregation step...
         d_weighted_mean_agg = dict()
-        for id_, df in tqdm(df_posts_for_weights.groupby('post_id')):
+        for id_, df in tqdm(df_posts_for_weights.groupby('post_id'),
+                            ascii=True, ncols=80, position=0, mininterval=3):
             d_weighted_mean_agg[id_] = np.average(
-                df[l_embedding_cols],
+                df[self.l_embedding_cols],
                 weights=df[col_weights],
                 axis=0,
             )
         gc.collect()
         # Convert dict to df so we can reshape to input multi-index
         df_agg_posts_w_comments = pd.DataFrame(d_weighted_mean_agg).T
-        df_agg_posts_w_comments.columns = l_embedding_cols
+        df_agg_posts_w_comments.columns = self.l_embedding_cols
         df_agg_posts_w_comments.index.name = 'post_id'
+        self.df_posts_agg_b = df_agg_posts_w_comments
         info(f"  {df_agg_posts_w_comments.shape} <- df_agg_posts_w_comments.shape (only posts with comments)")
 
-        # Re-append multi-index so it's the same in original and new output
-        df_agg_posts_w_comments = (
+        # Re-append multi-index cols, but DON'T set as index
+        self.df_posts_agg_b = (
             df_agg_posts_w_comments
             .merge(
-                self.df_v_posts.index.to_frame(index=False).drop_duplicates(),
+                # self.df_v_posts.index.to_frame(index=False).drop_duplicates(),
+                self.df_v_posts[self.l_ix_post_level].drop_duplicates(),
                 how='left',
                 on=['post_id'],
             )
-            .set_index(l_ix_post_level)
         )
-        assert (len(df_agg_posts_w_comments) == df_agg_posts_w_comments.index.nunique()), "Index not unique"
+        # assert (len(df_agg_posts_w_comments) == df_agg_posts_w_comments.index.nunique()), "Index not unique"
 
         # Merge into a a single dataframe:
         # - posts w/ multiple comments (already averaged out)
@@ -901,15 +922,18 @@ class AggregateEmbeddings:
         #  adjacent files when we save to multiple dfs
         self.df_posts_agg_b = pd.concat(
             [
-                df_agg_posts_w_comments,
-                self.df_v_posts[mask_posts_without_comments]
+                self.df_posts_agg_b,
+                self.df_v_posts[self.mask_posts_without_comments]
             ],
             ignore_index=False,
             axis=0
-        ).sort_index()
+        )  # .sort_index()
+        # TODO(djb): Is it worth the time to sort the index?
 
         assert (len(self.df_posts_agg_b) == self.df_posts_agg_b.index.nunique()), "Index not unique"
         info(f"  {self.df_posts_agg_b.shape} <- df_posts_agg_b shape after aggregation")
+        del df_agg_posts_w_comments
+        gc.collect()
 
         elapsed_time(start_time=t_start_method, log_label='Total posts & comments agg', verbose=True)
 
@@ -918,74 +942,107 @@ class AggregateEmbeddings:
 
         Single posts = posts where there's only one comment, so we don't need to calculate weights
         """
-        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        info(f"-- Start (df_posts_agg_c) _agg_posts_comments_and_sub_descriptions_to_post_level() method --")
         t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
-        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        l_embedding_cols = list(self.df_v_posts.columns)
 
-        # instead of re-calculating post + comment weights, reuse it
-        if self.df_posts_agg_b is None:
-            self._agg_posts_and_comments_to_post_level()
+        # If we already have df_posts_agg_b, reuse it b/c it's already calculated post + comment weights
+        if self.df_posts_agg_b is not None:
 
-        # In this case we'll always want to average each post with a sub, so no need
-        # to filter out cases that don't need a weight
+            # In this case we'll always want to average each post with a sub, so no need
+            # to filter out posts with zero comments
 
-        # Create df with:
-        #  - all posts that already include weight from comments
-        #    - add new col with input weight
-        #  - subreddit descriptions
-        #    - create new df: one row per post, each row has the embeddings for the sub
-        #    - add new col with input weight
-        #    - TODO: maybe do it within a loop?
-        #        b/c we'll get a lot of copies for same data, but maybe 1 merge function is
-        #        better than thousands of merge calls
-        df_posts_for_weights = pd.concat(
-            [
-                self.df_posts_agg_b.reset_index().assign(
-                    **{col_weights: (self.agg_post_post_weight + self.agg_post_comment_weight)}
-                ),
-                (
-                    self.df_posts_agg_b.index.to_frame(index=False)
-                    .merge(
-                        self.df_v_sub,
-                        how='left',
-                        left_on=['subreddit_name', 'subreddit_id'],
-                        right_index=True,
-                    )
-                ).assign(
-                    **{col_weights: self.agg_post_subreddit_desc_weight}
-                ),
-            ]
-        )
+            # Create df with:
+            #  - all posts that already include weight from comments
+            #    - add new col with input weight
+            #  - subreddit descriptions
+            #    - create new df: one row per post, each row has the embeddings for the sub
+            #    - add new col with input weight
+            df_posts_for_weights = pd.concat(
+                [
+                    # Because B already has weighted averages, sum their weights in a single column
+                    self.df_posts_agg_b.reset_index().assign(
+                        **{col_weights: (self.agg_post_post_weight + self.agg_post_comment_weight)}
+                    ),
+                    (
+                        self.df_posts_agg_b[self.l_ix_post_level]
+                        .merge(
+                            self.df_v_sub,
+                            how='left',
+                            left_on=self.l_ix_sub_level,
+                            right_on=self.l_ix_sub_level,
+                        )
+                    ).assign(
+                        **{col_weights: self.agg_post_subreddit_desc_weight}
+                    ),
+                ]
+            )
+        else:
+            # if we haven't calculated B (posts + comments), create new df with raw values
+            #  to calculate weights
+            self._calculate_comment_count_per_post()
 
-        # iterate to get weighted average for each post_id that has comments
+            # Create df with:
+            #  - posts with 1+ comments
+            #    - add new col with input weight
+            #  - comments for posts
+            #    - one row per post, these are already aggregated
+            #    - add new col with input weight
+            info(f"Create df with weights for weighted-average calculation")
+            df_posts_for_weights = pd.concat(
+                [
+                    self.df_v_posts.assign(
+                        **{col_weights: self.agg_post_post_weight}
+                    ),
+                    self.df_v_com_agg.assign(
+                        **{col_weights: self.agg_post_comment_weight}
+                    ),
+                    # For each post: add one row of subreddit metadata
+                    (
+                        self.df_v_posts[self.l_ix_post_level]
+                        .merge(
+                            self.df_v_sub,
+                            how='left',
+                            left_on=self.l_ix_sub_level,
+                            right_on=self.l_ix_sub_level,
+                        )
+                    ).assign(
+                        **{col_weights: self.agg_post_subreddit_desc_weight}
+                    ),
+                ]
+            )
+
+        info(f"Get weighted average for POST + COMMENT + SUBREDDIT-META")
         d_weighted_mean_agg = dict()
-        for id_, df in tqdm(df_posts_for_weights.groupby('post_id')):
+        for id_, df in tqdm(df_posts_for_weights.groupby('post_id'),
+                            ascii=True, ncols=80, position=0, mininterval=3):
             d_weighted_mean_agg[id_] = np.average(
-                df[l_embedding_cols],
+                df[self.l_embedding_cols],
                 weights=df[col_weights],
                 axis=0,
             )
         gc.collect()
         # Convert dict to df so we can reshape to input multi-index
         df_agg_posts_w_sub = pd.DataFrame(d_weighted_mean_agg).T
-        df_agg_posts_w_sub.columns = l_embedding_cols
+        df_agg_posts_w_sub.columns = self.l_embedding_cols
         df_agg_posts_w_sub.index.name = 'post_id'
+        self.df_posts_agg_c = df_agg_posts_w_sub
         info(f"  {df_agg_posts_w_sub.shape} <- df_agg_posts_w_sub.shape (only posts with comments)")
 
-        # Re-append multi-index so it's the same in original and new output
+        info(f"Re-append multi-index so it's the same in original and new output")
         self.df_posts_agg_c = (
-            df_agg_posts_w_sub
+            self.df_v_posts[self.l_ix_post_level]
             .merge(
-                self.df_v_posts.index.to_frame(index=False).drop_duplicates(),
-                how='left',
+                df_agg_posts_w_sub,
+                how='right',
                 on=['post_id'],
             )
-            .set_index(l_ix_post_level)
-        ).sort_index()
-        assert (len(self.df_posts_agg_c) == self.df_posts_agg_c.index.nunique()), "Index not unique"
+            .sort_values(by=self.l_ix_post_level)
+        )
+        # assert (len(self.df_posts_agg_c) == self.df_posts_agg_c.index.nunique()), "Index not unique"
+        info(f"Check that post-ID is unique...")
+        assert (len(self.df_posts_agg_c) == self.df_posts_agg_c[self.col_post_id].nunique()), "Posts-ID not unique"
 
         info(f"  {self.df_posts_agg_c.shape} <- df_posts_agg_c shape after aggregation")
 
@@ -993,13 +1050,12 @@ class AggregateEmbeddings:
 
     def _agg_post_aggregates_to_subreddit_level(self):
         """Roll up post-level aggregations to subreddit-level"""
-        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        info(f"-- Start _agg_post_aggregates_to_subreddit_level() method --")
         t_start_method = datetime.utcnow()
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
         # l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
-        l_ix_sub_level = ['subreddit_name', 'subreddit_id', ]
-        l_embedding_cols = list(self.df_v_posts.columns)
+        # l_ix_sub_level = ['subreddit_name', 'subreddit_id', ]
 
         if self.agg_post_to_subreddit_weight_col is None:
             info(f"No column to weight comments, simple mean to roll up posts to subreddit-level...")
@@ -1008,33 +1064,36 @@ class AggregateEmbeddings:
             info(f"A - posts only")
             self.df_subs_agg_a = (
                 self.df_v_posts
-                .reset_index()
-                [l_ix_sub_level + l_embedding_cols]
-                .groupby(l_ix_sub_level)
+                [self.l_ix_sub_level + self.l_embedding_cols]
+                .groupby(self.l_ix_sub_level, as_index=False)
                 .mean()
-            ).sort_index()
+                .sort_values(by=self.l_ix_sub_level)
+            )
             info(f"  {self.df_subs_agg_a.shape} <- df_subs_agg_a.shape (only posts)")
 
-            # B - posts + comments
-            info(f"B - posts + comments")
-            self.df_subs_agg_b = (
-                self.df_posts_agg_b
-                .reset_index()
-                [l_ix_sub_level + l_embedding_cols]
-                .groupby(l_ix_sub_level)
-                .mean()
-            ).sort_index()
-            info(f"  {self.df_subs_agg_b.shape} <- df_subs_agg_b.shape (posts + comments)")
+            if self.calculate_b_agg_posts_and_comments:
+                # B - posts + comments
+                info(f"B - posts + comments")
+                self.df_subs_agg_b = (
+                    self.df_posts_agg_b
+                    .reset_index()
+                    [self.l_ix_sub_level + self.l_embedding_cols]
+                    .groupby(self.l_ix_sub_level, as_index=False)
+                    .mean()
+                    .sort_values(by=self.l_ix_sub_level)
+                )
+                info(f"  {self.df_subs_agg_b.shape} <- df_subs_agg_b.shape (posts + comments)")
 
             # C - posts + comments + sub descriptions
             info(f"C - posts + comments + sub descriptions")
             self.df_subs_agg_c = (
                 self.df_posts_agg_c
                 .reset_index()
-                [l_ix_sub_level + l_embedding_cols]
-                .groupby(l_ix_sub_level)
+                [self.l_ix_sub_level + self.l_embedding_cols]
+                .groupby(self.l_ix_sub_level, as_index=False)
                 .mean()
-            ).sort_index()
+                .sort_values(by=self.l_ix_sub_level)
+            )
             info(f"  {self.df_subs_agg_c.shape} <- df_subs_agg_c.shape (posts + comments + sub description)")
 
         else:
@@ -1069,23 +1128,24 @@ class AggregateEmbeddings:
         del _
         gc.collect()
 
-        info(f"B...")
-        ix_b = self.df_subs_agg_b.index.droplevel('subreddit_id')
-        self.df_subs_agg_b_similarity = pd.DataFrame(
-            cosine_similarity(self.df_subs_agg_b.droplevel('subreddit_id', axis='index')),
-            index=ix_b,
-            columns=ix_b,
-        )
-        self.df_subs_agg_b_similarity.columns.name = None
-        self.df_subs_agg_b_similarity.index.name = 'subreddit_name'
-        info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
-        _, self.df_subs_agg_b_similarity_pair = reshape_distances_to_pairwise_bq(
-            df_distance_matrix=self.df_subs_agg_b_similarity,
-            df_sub_metadata=self.df_subs_meta,
-            top_subs_to_keep=20,
-        )
-        del _
-        gc.collect()
+        if self.calculate_b_agg_posts_and_comments:
+            info(f"B...")
+            ix_b = self.df_subs_agg_b.index.droplevel('subreddit_id')
+            self.df_subs_agg_b_similarity = pd.DataFrame(
+                cosine_similarity(self.df_subs_agg_b.droplevel('subreddit_id', axis='index')),
+                index=ix_b,
+                columns=ix_b,
+            )
+            self.df_subs_agg_b_similarity.columns.name = None
+            self.df_subs_agg_b_similarity.index.name = 'subreddit_name'
+            info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
+            _, self.df_subs_agg_b_similarity_pair = reshape_distances_to_pairwise_bq(
+                df_distance_matrix=self.df_subs_agg_b_similarity,
+                df_sub_metadata=self.df_subs_meta,
+                top_subs_to_keep=20,
+            )
+            del _
+            gc.collect()
 
         info(f"C...")
         ix_c = self.df_subs_agg_c.index.droplevel('subreddit_id')
@@ -1109,7 +1169,11 @@ class AggregateEmbeddings:
         elapsed_time(start_time=t_start_method, log_label='Total for _calculate_subreddit_similarities()', verbose=True)
 
     def _save_and_log_aggregate_and_similarity_dfs(self):
-        """use custom function to save dfs in multiple files & log them to mlflow"""
+        """Use custom function to save dfs in multiple files & log them to mlflow
+        This fxn will:
+        - only save dfs that have already been created
+        - will NOT save a df if the target path already exists
+        """
         info(f"-- Start _save_and_log_aggregate_and_similarity_dfs() method --")
         t_start_method = datetime.utcnow()
         # Merged at post-level
@@ -1156,7 +1220,7 @@ class AggregateEmbeddings:
 
         # Only save dfs that have been created
         for folder_, df_ in tqdm({k: v for k, v in d_dfs_to_save.items() if v is not None}.items(),
-                                 ascii=True, ncols=80, position=0):
+                                 ascii=True, ncols=80, position=0, mininterval=3):
             t_start_df_ = datetime.utcnow()
 
             path_sub_local = self.path_local_model / folder_
