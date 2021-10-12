@@ -619,7 +619,7 @@ class AggregateEmbeddings:
             info(f"Loading POSTS metadata...")
             self.df_posts_meta = LoadPosts(
                 bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_posts,
+                folder_path=self.folder_posts_text_and_meta,
                 columns='aggregate_embeddings_',
             ).read_and_apply_transformations()
         else:
@@ -630,8 +630,8 @@ class AggregateEmbeddings:
             info(f"Loading subs metadata...")
             self.df_subs_meta = LoadSubreddits(
                 bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_subreddits,
-                folder_posts=self.folder_meta_posts,
+                folder_path=self.folder_subreddits_text_and_meta,
+                folder_posts=self.folder_posts_text_and_meta,
                 columns=None,
             ).read_apply_transformations_and_merge_post_aggs(df_posts=self.df_posts_meta)
         else:
