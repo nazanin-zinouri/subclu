@@ -324,7 +324,7 @@ class AggregateEmbeddings:
 
             self.df_v_comments = (
                 self.df_v_comments
-                [~(self.df_v_comments.index.get_level_values(self.col_comment_id).isin(short_comments_to_remove))]
+                [~(self.df_v_comments[self.col_comment_id].isin(short_comments_to_remove))]
             )
             info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER removing short comments")
             gc.collect()
@@ -595,7 +595,7 @@ class AggregateEmbeddings:
         # Keep only one column for subreddit-level index
         #  because carrying around name & ID makes some things complicated and can take up a ton of memory
         #  we can always add subreddit_id at the end
-        self.l_ix_sub_level = ['subreddit_name']
+        self.l_ix_sub_level = ['subreddit_name', 'subreddit_id']
         self.l_ix_post_level = self.l_ix_sub_level + [self.col_post_id]
         self.l_ix_comment_level = self.l_ix_post_level + [self.col_comment_id]
         # The assumptions are:
@@ -638,13 +638,16 @@ class AggregateEmbeddings:
             info(f"Subreddits META pre-loaded")
         info(f"  {self.df_subs_meta.shape} <- Raw META subreddit description shape")
 
+        # Use dask to load multiple files in parallel, but the .compute() to conver to
+        #  single pandas df (in memory)
         if self.df_comments_meta is None:
             info(f"Loading COMMENTS metadata...")
             self.df_comments_meta = LoadComments(
                 bucket_name=self.bucket_name,
-                folder_path=self.folder_meta_comments,
+                folder_path=self.folder_comments_text_and_meta,
                 columns='aggregate_embeddings_',
-            ).read_raw()
+                df_format='dask',
+            ).read_raw().compute()
         else:
             info(f"Comments META pre-loaded")
         info(f"  {self.df_comments_meta.shape} <- Raw META COMMENTS shape")
@@ -660,13 +663,13 @@ class AggregateEmbeddings:
         info(f"-- Start _agg_comments_to_post_level() method --")
         gc.collect()
         t_start_agg_comments = datetime.utcnow()
-        l_ix_post_level = ['subreddit_name', 'subreddit_id', 'post_id', ]
+
         if self.agg_comments_to_post_weight_col is None:
             info(f"No column to weight comments, simple mean for comments at post level")
             self.df_v_com_agg = (
                 self.df_v_comments
-                .reset_index()
-                .groupby(l_ix_post_level)
+                # .reset_index()  # This reset not needed b/c post-id & comment-id not in index
+                .groupby(self.l_ix_post_level)
                 .mean()
             )
 
@@ -674,10 +677,9 @@ class AggregateEmbeddings:
             # Check which posts have more than 1 comment.
             # Single comments = comments to posts where there's only one comment, so we don't need to weight
             #  or loop for posts with a single comment
-            l_embedding_cols = list(self.df_v_comments.columns)
 
             self._calculate_comment_count_per_post()
-            mask_single_comments = self.df_v_comments.index.get_level_values('post_id').isin(
+            mask_single_comments = self.df_v_comments['post_id'].isin(
                 self.df_comment_count_per_post[self.df_comment_count_per_post['comment_count'] == 1]['post_id']
             )
             info(f"  {(~mask_single_comments).sum():9,.0f} <- Comments to use for weighted average")
@@ -689,7 +691,7 @@ class AggregateEmbeddings:
             #  to average out
             df_comms_with_weights = (
                 self.df_v_comments[~mask_single_comments]
-                .reset_index()
+                # .reset_index()  # This reset not needed b/c post-id & comment-id not in index
                 .merge(
                     self.df_comments_meta[['post_id', self.agg_comments_to_post_weight_col]],
                     how='left',
@@ -718,7 +720,7 @@ class AggregateEmbeddings:
                         # TODO(djb): add limit of comments per post
                         #   sort by upvotes (desc) & text len (descending) -> keep only top 20 comments
                         d_weighted_mean_agg[id_] = np.average(
-                            df[l_embedding_cols],
+                            df[self.l_embedding_cols],
                             weights=np.log(2 + df[self.agg_comments_to_post_weight_col]),
                             axis=0,
                         )
@@ -746,7 +748,7 @@ class AggregateEmbeddings:
             df_agg_multi_comments = pd.DataFrame(d_weighted_mean_agg).T
             del d_weighted_mean_agg
             gc.collect()
-            df_agg_multi_comments.columns = l_embedding_cols
+            df_agg_multi_comments.columns = self.l_embedding_cols
             df_agg_multi_comments.index.name = 'post_id'
             info(f"  {df_agg_multi_comments.shape} <- df_agg_multi_comments shape, weighted avg only")
 
