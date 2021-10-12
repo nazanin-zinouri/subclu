@@ -104,6 +104,9 @@ EXTRAS_REQUIRE = {
 
         # Use hydra to manage config files
         "hydra-core == 1.1.0",
+
+        # Graphvis to visualize dask jobs
+        "graphviz >= 0.17",
     ],
 
     "pytorch": [
