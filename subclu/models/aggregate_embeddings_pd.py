@@ -419,80 +419,138 @@ class AggregateEmbeddings:
         info(f"-- Start _load_raw_embeddings() method --")
         active_run = mlflow.active_run()
         t_start_read_raw_embeds = datetime.utcnow()
+        # ------------------------
+        # Load and check SUBREDDITS
+        # ---
         if self.df_v_sub is None:
             info(f"Loading subreddit description embeddings...")
             self.df_v_sub = self.mlf.read_run_artifact(
                 run_id=self.subreddit_desc_uuid,
                 artifact_folder=self.subreddit_desc_folder,
                 read_function=pd.read_parquet,
+                cache_locally=True,
             )
         else:
             info(f"Raw subreddit embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_sub = self.df_v_sub.copy()
-        info(f"  {self.df_v_sub.shape} <- Raw vectorized subreddit description shape")
+        r_sub, c_sub = self.df_v_sub.shape
+        info(f"  {r_sub:10,.0f} | {c_sub:,.0f} <- Raw vectorized subreddit description shape")
         if active_run is not None:
-            r_sub, c_sub = self.df_v_sub.shape
             mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
-        assert (len(self.df_v_sub) == self.df_v_sub.index.nunique()), f"** Index not unique. Check duplicates df_v_sub **"
+        info(f"  Unique check for subreddit description...")
+        assert (r_sub == self.df_v_sub[self.col_subreddit_id].nunique()), (f"** Index not unique. "
+                                                                           f"Check duplicates df_v_sub **")
 
+        # ------------------------
+        # Load and check POSTS
+        # ---
         if self.df_v_posts is None:
             info(f"Loading POSTS embeddings...")
+            if self.n_sample_posts_files is not None:
+                info(f"  Sampling POSTS FILES down to: {self.n_sample_posts_files:,.0f}")
+
+            # pd.read_parquet will load all files, if you want to sample, then you need to
+            # dd.read_parquet & compute()
             self.df_v_posts = self.mlf.read_run_artifact(
                 run_id=self.posts_uuid,
                 artifact_folder=self.posts_folder,
-                read_function=pd.read_parquet,
-            )
+                read_function=dd.read_parquet,
+                cache_locally=True,
+                n_sample_files=self.n_sample_posts_files,
+            ).compute()
         else:
             info(f"POSTS embeddings pre-loaded")
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_posts = self.df_v_posts.copy()
 
-        info(f"  {self.df_v_posts.shape} <- Raw POSTS shape")
-        if self.n_sample_posts is not None:
-            if len(self.df_v_posts) > self.n_sample_posts:
-                info(f"  Sampling POSTS down to: {self.n_sample_posts:,.0f}")
-                self.df_v_posts = self.df_v_posts.sample(n=self.n_sample_posts)
-                info(f"  {self.df_v_posts.shape} <- df_posts.shape AFTER sampling")
-            else:
-                info(f"  No need to sample POSTS because sample greater than rows in df_posts")
+        r_post, c_post = self.df_v_posts.shape
+        info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- Raw POSTS shape")
+        # Sampling only works reliably in pandas, it takes forever to compute in dask,
+        #  so we only sample at file-level
         if active_run is not None:
-            r_post, c_post = self.df_v_posts.shape
             mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
-        assert (len(self.df_v_posts) == self.df_v_posts.index.nunique()), f"** Index not unique. Check duplicates df_v_posts **"
+        info(f"  Checking that posts are unique...")
+        assert (r_post == self.df_v_posts[self.col_post_id].nunique()), (f"** Post-ID NOT unique. "
+                                                                         f"Check duplicates df_v_posts **")
 
+        # ------------------------
+        # Load and check COMMENTS
+        # ---
         if self.df_v_comments is None:
             info(f"Loading COMMENTS embeddings...")
-            self.df_v_comments = self.mlf.read_run_artifact(
-                run_id=self.comments_uuid,
-                artifact_folder=self.comments_folder,
-                read_function=pd.read_parquet,
-            )
+            if self.n_sample_comments_files is not None:
+                info(f"  Sampling COMMENTS FILES down to: {self.n_sample_comments_files:,.0f}")
+
+            # If we get a list of multiple UUIDs, we need to:
+            #   - load each mlflow UUID df independently
+            #   - concat the N dataframes
+            if isinstance(self.comments_uuid, str):
+                # It might be faster to load as dask df (because it loads each file in parallel)
+                #  and then call .compute() to convert to a single df
+                self.df_v_comments = self.mlf.read_run_artifact(
+                    run_id=self.comments_uuid,
+                    artifact_folder=self.comments_folder,
+                    read_function=dd.read_parquet,
+                    cache_locally=True,
+                    n_sample_files=self.n_sample_comments_files,
+                ).compute()
+
+            else:
+                info(f"  Found {len(self.comments_uuid)} run UUIDs with COMMENT embeddings...")
+                if self.n_sample_comments_files is not None:
+                    n_files_per_run = math.ceil(self.n_sample_comments_files / len(self.comments_uuid))
+                    info(f"    Sampling {n_files_per_run} FILES per run UUID")
+                else:
+                    n_files_per_run = None
+
+                self.df_v_comments = pd.concat(
+                    [
+                        self.mlf.read_run_artifact(
+                            run_id=comm_uuid_,
+                            artifact_folder=self.comments_folder,
+                            read_function=dd.read_parquet,
+                            cache_locally=True,
+                            n_sample_files=n_files_per_run,
+                        ).compute() for comm_uuid_ in self.comments_uuid
+                    ],
+                    axis=0, ignore_index=False,
+                )
+
         else:
             info(f"COMMENTS embeddings pre-loaded")
             self.df_v_comments = self.df_v_comments.copy()
-        info(f"  {self.df_v_comments.shape} <- Raw COMMENTS shape")
+
+        r_com, c_com = self.df_v_comments.shape
+        info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- Raw COMMENTS shape")
         info(f"  Keep only comments for posts with embeddings")
+        # The index is now empty (it's an integer), so instead call columns directly
         self.df_v_comments = (
             self.df_v_comments
-            [self.df_v_comments.index.get_level_values('post_id').isin(
-                self.df_v_posts.index.get_level_values('post_id').unique()
+            [self.df_v_comments['post_id'].isin(
+                self.df_v_posts['post_id'].unique()
              )]
         )
-        info(f"  {self.df_v_comments.shape} <- COMMENTS shape, after keeping only existing posts")
-
-        if self.n_sample_comments is not None:
-            if len(self.df_v_comments) > self.n_sample_comments:
-                info(f"  Sampling COMMENTS down to: {self.n_sample_comments:,.0f}")
-                self.df_v_comments = self.df_v_comments.sample(n=self.n_sample_comments)
-                info(f"  {self.df_v_comments.shape} <- df_v_comments.shape AFTER sampling")
-            else:
-                info(f"  No need to sample comments because sample greater than rows in df_comments")
+        r_com, c_com = self.df_v_comments.shape
+        info(f"  {r_com:10,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only comments to loaded posts")
 
         if active_run is not None:
-            r_com, c_com = self.df_v_comments.shape
             mlflow.log_metrics({'comments_raw_rows': r_com, 'comments_raw_cols': c_com})
-        assert (len(self.df_v_comments) == self.df_v_comments.index.nunique()), f"** Index not unique. Check duplicates df_v_comments **"
+        assert (r_com == self.df_v_comments[self.col_comment_id].nunique()), (f"** comment-id NOT unique. "
+                                                                              f"Check duplicates df_v_comments **")
+
+        # Set columns for index checking
+        # Keep only one column for subreddit-level index
+        #  because carrying around name & ID makes some things complicated and can take up a ton of memory
+        #  we can always add subreddit_id at the end
+        self.l_ix_sub_level = ['subreddit_name']
+        self.l_ix_post_level = self.l_ix_sub_level + [self.col_post_id]
+        self.l_ix_comment_level = self.l_ix_post_level + [self.col_comment_id]
+        # The assumptions are:
+        # - numeric cols that are not index cols are embeddings cols
+        # - Embedding cols have the same names for all 3 sources
+        self.l_embedding_cols = [c for c in self.df_v_comments.select_dtypes('number').columns if
+                                 c not in [self.col_subreddit_id] + self.l_ix_comment_level]
 
         elapsed_time(start_time=t_start_read_raw_embeds, log_label='Total raw embeddings load', verbose=True)
         gc.collect()
