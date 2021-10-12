@@ -228,6 +228,12 @@ class AggregateEmbeddings:
         self.df_subs_agg_b_similarity_pair = None
         self.df_subs_agg_c_similarity_pair = None
 
+        # only keep the top_n similar subreddits - use to reduce size of table and
+        #  speed up queries
+        self.df_subs_agg_a_similarity_top_pair = None
+        self.df_subs_agg_b_similarity_top_pair = None
+        self.df_subs_agg_c_similarity_top_pair = None
+
     def _init_file_log(self) -> None:
         """Create a file & FileHandler to log data"""
         # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
@@ -856,8 +862,9 @@ class AggregateEmbeddings:
         """roll up post & comment embeddings to post-level
 
         Single posts = posts where there's only one comment, so we don't need to calculate weights
+        [df_posts_agg_b]
         """
-        info(f"-- Start _agg_posts_and_comments_to_post_level() method --")
+        info(f"-- Start _agg_posts_and_comments_to_post_level() method -> [df_posts_agg_b] --")
         # temp column to add averaging weights
         col_weights = '_col_method_weight_'
 
@@ -1108,11 +1115,12 @@ class AggregateEmbeddings:
         """
         info(f"-- Start _calculate_subreddit_similarities() method --")
         t_start_method = datetime.utcnow()
+        n_keep_top = 200
 
         info(f"A...")
-        ix_a = self.df_subs_agg_a.index.droplevel('subreddit_id')
+        ix_a = self.df_subs_agg_a['subreddit_name']
         self.df_subs_agg_a_similarity = pd.DataFrame(
-            cosine_similarity(self.df_subs_agg_a.droplevel('subreddit_id', axis='index')),
+            cosine_similarity(self.df_subs_agg_a[self.l_embedding_cols]),
             index=ix_a,
             columns=ix_a,
         )
@@ -1120,50 +1128,47 @@ class AggregateEmbeddings:
         self.df_subs_agg_a_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_a_similarity.shape} <- df_subs_agg_a_similarity.shape")
 
-        _, self.df_subs_agg_a_similarity_pair = reshape_distances_to_pairwise_bq(
+        self.df_subs_agg_a_similarity_pair, self.df_subs_agg_a_similarity_top_pair = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_a_similarity,
             df_sub_metadata=self.df_subs_meta,
-            top_subs_to_keep=20,
+            top_subs_to_keep=n_keep_top,
         )
-        del _
         gc.collect()
 
         if self.calculate_b_agg_posts_and_comments:
             info(f"B...")
-            ix_b = self.df_subs_agg_b.index.droplevel('subreddit_id')
+            ix_b = self.df_subs_agg_b['subreddit_name']
             self.df_subs_agg_b_similarity = pd.DataFrame(
-                cosine_similarity(self.df_subs_agg_b.droplevel('subreddit_id', axis='index')),
+                cosine_similarity(self.df_subs_agg_b[self.l_embedding_cols]),
                 index=ix_b,
                 columns=ix_b,
             )
             self.df_subs_agg_b_similarity.columns.name = None
             self.df_subs_agg_b_similarity.index.name = 'subreddit_name'
             info(f"  {self.df_subs_agg_b_similarity.shape} <- df_subs_agg_b_similarity.shape")
-            _, self.df_subs_agg_b_similarity_pair = reshape_distances_to_pairwise_bq(
+            self.df_subs_agg_b_similarity_pair, self.df_subs_agg_b_similarity_top_pair = reshape_distances_to_pairwise_bq(
                 df_distance_matrix=self.df_subs_agg_b_similarity,
                 df_sub_metadata=self.df_subs_meta,
-                top_subs_to_keep=20,
+                top_subs_to_keep=n_keep_top,
             )
-            del _
             gc.collect()
 
         info(f"C...")
-        ix_c = self.df_subs_agg_c.index.droplevel('subreddit_id')
+        ix_c = self.df_subs_agg_c['subreddit_name']
         self.df_subs_agg_c_similarity = pd.DataFrame(
-            cosine_similarity(self.df_subs_agg_c.droplevel('subreddit_id', axis='index')),
+            cosine_similarity(self.df_subs_agg_c[self.l_embedding_cols]),
             index=ix_c,
             columns=ix_c,
         )
         self.df_subs_agg_c_similarity.columns.name = None
         self.df_subs_agg_c_similarity.index.name = 'subreddit_name'
         info(f"  {self.df_subs_agg_c_similarity.shape} <- df_subs_agg_c_similarity.shape")
-        _, self.df_subs_agg_c_similarity_pair = reshape_distances_to_pairwise_bq(
+        self.df_subs_agg_c_similarity_pair, self.df_subs_agg_c_similarity_top_pair = reshape_distances_to_pairwise_bq(
             df_distance_matrix=self.df_subs_agg_c_similarity,
             df_sub_metadata=self.df_subs_meta,
             index_name='subreddit_name',
-            top_subs_to_keep=20,
+            top_subs_to_keep=n_keep_top,
         )
-        del _
         gc.collect()
 
         elapsed_time(start_time=t_start_method, log_label='Total for _calculate_subreddit_similarities()', verbose=True)
@@ -1190,21 +1195,25 @@ class AggregateEmbeddings:
         #  - B) posts + comments only
         #  - C) posts + comments + subreddit description
 
+        # TODO(djb): initialize top-pair dfs to None
         d_dfs_to_save = {
             'df_sub_level_agg_c_post_comments_and_sub_desc': self.df_subs_agg_c,
             'df_sub_level_agg_c_post_comments_and_sub_desc_similarity': self.df_subs_agg_c_similarity,
             'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_pair': self.df_subs_agg_c_similarity_pair,
+            'df_sub_level_agg_c_post_comments_and_sub_desc_similarity_top_pair': self.df_subs_agg_c_similarity_top_pair,
+            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
 
             'df_sub_level_agg_b_post_and_comments': self.df_subs_agg_b,
             'df_sub_level_agg_b_post_and_comments_similarity': self.df_subs_agg_b_similarity,
             'df_sub_level_agg_b_post_and_comments_similarity_pair': self.df_subs_agg_b_similarity_pair,
+            'df_sub_level_agg_b_post_and_comments_similarity_top_pair': self.df_subs_agg_b_similarity_top_pair,
+            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
 
             'df_sub_level_agg_a_post_only': self.df_subs_agg_a,
             'df_sub_level_agg_a_post_only_similarity': self.df_subs_agg_a_similarity,
             'df_sub_level_agg_a_post_only_similarity_pair': self.df_subs_agg_a_similarity_pair,
+            'df_sub_level_agg_a_post_only_similarity_top_pair': self.df_subs_agg_a_similarity_top_pair,
 
-            'df_post_level_agg_b_post_and_comments': self.df_posts_agg_b,
-            'df_post_level_agg_c_post_comments_sub_desc': self.df_posts_agg_c,
         }
 
         # create dict to make it easier to reload dataframes logged as artifacts
