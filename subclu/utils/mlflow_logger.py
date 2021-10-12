@@ -378,7 +378,7 @@ class MlflowLogger:
             # TODO(djb): fix error: when artifact folder is something like:
             #  'd_ix_to_id/d_ix_to_id.csv',
             #  then the file won't be saved, instead we'll create a folder that has the file name
-            #   ad we can't download/read the file! hmm:
+            #   and we can't download/read the file! hmm:
             info(f"Local folder to download artifact(s):\n  {path_local_folder}")
             Path.mkdir(path_local_folder, exist_ok=True, parents=True)
 
@@ -436,7 +436,9 @@ class MlflowLogger:
                 # return read_function(f"{path_to_load}/*.parquet",
                 #                      columns=columns)
 
-        elif json.loads != read_function:  # meant for pd.read_parquet
+        elif pd.read_parquet != read_function:  # meant for pd.read_parquet
+            if n_sample_files is not None:
+                logging.warning(f"Loading ALL files to pandas df. File sampleing NOT implemented.")
             try:
                 return read_function(path_to_load,
                                      columns=columns)
