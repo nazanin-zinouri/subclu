@@ -378,7 +378,7 @@ class MlflowLogger:
     def read_run_artifact(
             self,
             run_id: str,
-            artifact_folder: str,
+            artifact_folder: str = None,
             artifact_file: str = None,
             experiment_ids: Union[str, int, List[int]] = None,
             read_function: Union[callable, str] = 'pd_parquet',
@@ -387,6 +387,7 @@ class MlflowLogger:
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             n_sample_files: int = None,
             verbose: bool = False,
+            read_csv_kwargs: dict = None,
     ):
         """
         Example:
@@ -414,10 +415,13 @@ class MlflowLogger:
             elif 'dask_parquet' == read_function:
                 read_function = dd.read_parquet
             elif 'json' == read_function:
-                read_function = json.loads
+                read_function = json.load
 
             else:
                 raise NotImplementedError(f"{read_function} Not implemented...")
+
+        if artifact_file is not None:
+            artifact_file_name_only = artifact_file.split('/')[-1]
 
         # first get a df for all runs
         # logging.info(f"  Getting all runs...")
@@ -429,6 +433,10 @@ class MlflowLogger:
             'artifact_uri'
         ].values[0]
 
+        l_parquet_files_downloaded = list()
+        l_json_files_downloaded = list()
+        l_csv_files_downloaded = list()
+
         if cache_locally:
             storage_client = storage.Client()
 
@@ -436,7 +444,20 @@ class MlflowLogger:
             parsed_uri = artifact_uri.replace('gs://', '').split('/')
             bucket_name = parsed_uri[0]
             artifact_prefix = '/'.join(parsed_uri[1:])
-            full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
+
+            # If we get an artifact file, get the implicit artifact folder from it
+            if (artifact_folder is None) & (artifact_file is not None):
+                split_file = artifact_file.split('/')
+
+                # Check whether file is in top level or in a subfolder
+                if len(split_file) <= 1:
+                    artifact_folder = artifact_uri.split('/')[-1]
+                    full_artifact_folder = artifact_prefix
+                else:
+                    artifact_folder = '/'.join(artifact_file.split('/')[:-1])
+                    full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
+            else:
+                full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
 
             path_local_folder = Path(f"{local_path_root}/{full_artifact_folder}")
             path_to_load = path_local_folder
@@ -448,37 +469,58 @@ class MlflowLogger:
             Path.mkdir(path_local_folder, exist_ok=True, parents=True)
 
             bucket = storage_client.get_bucket(bucket_name)
+            # if artifact_file is None:
+            # If we get a file as input, only download that specific file
+            #  the logic to only download the specific file lives inside the loop, not here
             l_files_to_download = list(bucket.list_blobs(prefix=full_artifact_folder))
-            l_parquet_files_downloaded = list()
+            # else:
+            #     new_prefix = f"{full_artifact_folder}/{artifact_file_name_only}"
+            #     print(f"New prefix: {new_prefix}")
+            #     l_files_to_download = list(bucket.list_blobs(prefix=f"{full_artifact_folder}/{artifact_file_name_only}"))
+
             # not all the files in a folder will be parquet files, so we may need to download all files first
             for blob_ in tqdm(l_files_to_download, ncols=80, ascii=True, position=0, leave=True):
-                # Skip files that aren't in the same folder as the expected (input) folder
                 parent_folder = blob_.name.split('/')[-2]
                 if artifact_folder != parent_folder:
+                    if verbose:
+                        info(f"Skip files that aren't in the same folder as the expected (input) folder")
                     continue
 
-                f_name = (
+                local_absolute_f_name = (
                     path_local_folder /
                     f"{blob_.name.split('/')[-1].strip()}"
                 )
+
                 if artifact_file is not None:
-                    if f_name != artifact_file:
+                    if local_absolute_f_name.name != artifact_file.split('/')[-1].strip():
+                        if verbose:
+                            info(f"Skipping file because it doesn't match artifact_file")
                         continue
 
-                if str(f_name).endswith('parquet'):
-                    l_parquet_files_downloaded.append(f_name)
+                if str(local_absolute_f_name).lower().endswith('parquet'):
+                    l_parquet_files_downloaded.append(local_absolute_f_name)
+                if str(local_absolute_f_name).lower().endswith('json'):
+                    l_json_files_downloaded.append(local_absolute_f_name)
+                if any([str(local_absolute_f_name).lower().endswith(ext_) for ext_ in ['csv', 'txt', 'log']]):
+                    l_csv_files_downloaded.append(local_absolute_f_name)
 
-                if f_name.exists():
-                    pass
-                    # info(f"  {f_name.name} <- File already exists, not downloading")
+                if local_absolute_f_name.exists():
+                    if verbose:
+                        info(f"  {local_absolute_f_name.name} <- File already exists, not downloading")
+
                 else:
-                    blob_.download_to_filename(f_name)
-            info(f"  Parquet files found: {len(l_parquet_files_downloaded[:n_sample_files]):,.0f}")
+                    blob_.download_to_filename(local_absolute_f_name)
+
+            if read_function in [dd.read_parquet, pd.read_parquet]:
+                info(f"  Parquet files found: {len(l_parquet_files_downloaded):5,.0f}")
+                info(f"  Parquet files to use: {len(l_parquet_files_downloaded[:n_sample_files]):5,.0f}")
             if verbose:
-                input_files = ['/'.join(f_.name.split('/')[-2:]) for f_ in l_files_to_download]
-                parquet_files = ['/'.join(str(f_).split('/')[-2:]) for f_ in l_parquet_files_downloaded]
-                info(f"Input files: \n{input_files}")
-                info(f"Parquet files: \n{parquet_files}")
+                input_file_names = ['/'.join(f_.name.split('/')[-2:]) for f_ in l_files_to_download]
+                parquet_file_names = ['/'.join(str(f_).split('/')[-2:]) for f_ in l_parquet_files_downloaded]
+                json_file_names = ['/'.join(str(f_).split('/')[-2:]) for f_ in l_json_files_downloaded]
+                info(f"Parquet files: {len(parquet_file_names)} \n  {parquet_file_names}")
+                info(f"JSON files: {len(json_file_names)} \n  {json_file_names}")
+                info(f"Input files: {len(input_file_names)} \n  {input_file_names}")
         else:
             path_to_load = f"{artifact_uri}/{artifact_folder}"
 
@@ -487,21 +529,15 @@ class MlflowLogger:
                 return read_function(l_parquet_files_downloaded[:n_sample_files], columns=columns)
             except OSError:
                 return read_function(f"{path_to_load}/*.parquet", columns=columns)
-        if read_function == pd.read_csv:
-            print('path to load\n', path_to_load)
-            print('path to TYPE\n', type(path_to_load))
-            print('list of parquet\n', l_parquet_files_downloaded)
-            logging.warning(f"THIS CALL MAY FALL WITH OR JSON CSV FILES!")
-            # try:
-            return read_function(path_to_load / artifact_file)
-            # except OSError:
-            #     return read_function(l_parquet_files_downloaded)
-                # This error might happen if there are non-parquet files in the folder
-                # so we'll append `*.parquet` to try to read parquet files
-                # return read_function(f"{path_to_load}/*.parquet",
-                #                      columns=columns)
 
-        elif pd.read_parquet != read_function:  # meant for pd.read_parquet
+        if read_function == pd.read_csv:
+            if verbose:
+                print('path to load\n', path_to_load)
+                print('path to TYPE\n', type(path_to_load))
+                print('list of CSV\n', l_csv_files_downloaded)
+            return read_function(l_csv_files_downloaded[0], **read_csv_kwargs)
+
+        elif pd.read_parquet == read_function:
             if n_sample_files is not None:
                 logging.warning(f"Loading ALL files to pandas df. File sampleing NOT implemented.")
             try:
@@ -515,6 +551,11 @@ class MlflowLogger:
                 # so we'll append `*.parquet` to try to read parquet files
                 return read_function(f"{path_to_load}/*.parquet",
                                      columns=columns)
+
+        elif json.load == read_function:
+            with open(l_json_files_downloaded[0], 'r') as f_:
+                dict_ = read_function(f_)
+            return dict_
 
         else:
             # load JSON file might be able to use it with other readers, but might
