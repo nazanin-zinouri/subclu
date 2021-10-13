@@ -5,15 +5,20 @@
 DECLARE partition_date DATE DEFAULT '2021-10-09';
 
 WITH
-    verified_subreddits AS (
+    verified_sub_ratings AS (
+        -- Verified means that the algo has converged. BUT IT DOESN'T MEAN ANY HUMAN
+        --  AT REDDIT HAS ACTUALLY LOOKED AT THE RATING OR TOPIC
         select
             subreddit_id
             , verification_time
             , survey_version
             , tag_type
             , status
-        FROM
-        `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsource_verification_status`
+
+        -- New view comes from same cnc_taxonomy_casandra_sync, but should everyone should be able to query
+        -- FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsource_verification_status`
+        FROM `data-prod-165221.cnc.shredded_crowdsource_verification_status`
+
         WHERE
         pt = partition_date
         AND status = 'verified'
@@ -27,6 +32,7 @@ SELECT
 
     -- Rating info
     , vs.status AS verification_status
+    , slo.over_18
     , rating_short
     , rating_name
     , primary_topic
@@ -56,18 +62,23 @@ FROM (
         ON asr.subreddit_name = acs.subreddit_name
 
     LEFT JOIN (
-        SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
+        -- New view should be visible to all, but still comes from cnc_taxonomy_cassandra_sync
+        SELECT * FROM `data-prod-165221.cnc.shredded_crowdsource_topic_and_rating`
+        -- SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
         WHERE pt = partition_date
     ) AS nt
         ON acs.subreddit_id = nt.subreddit_id
-    LEFT JOIN verified_subreddits AS vs
+
+    -- Verified means that the algo has converged. BUT IT DOESN'T MEAN ANY HUMAN
+    --  AT REDDIT HAS ACTUALLY LOOKED AT THE RATING OR TOPIC
+    LEFT JOIN verified_sub_ratings AS vs
         ON vs.subreddit_id = nt.subreddit_id
 
-    -- LEFT JOIN (
-    --     SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-    --     WHERE dt = partition_date
-    -- ) AS slo
-    --     ON asr.subreddit_name = LOWER(slo.name)
+    LEFT JOIN (
+        SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+        WHERE dt = partition_date
+    ) AS slo
+        ON LOWER(asr.subreddit_name) = LOWER(slo.name)
 
 WHERE 1=1
     -- AND acs.activity_7_day > 1
