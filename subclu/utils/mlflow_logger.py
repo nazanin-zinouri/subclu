@@ -310,6 +310,71 @@ class MlflowLogger:
             experiment_ids = [d['experiment_id'] for d in self.list_experiment_meta()]
         return mlflow.search_runs(experiment_ids, output_format='pandas')
 
+    def list_run_artifacts(
+            self,
+            run_id: str,
+            artifact_folder: str = None,
+            experiment_ids: Union[str, int, List[int]] = None,
+            verbose: bool = False,
+    ):
+        """list artifacts for a run in GCS"""
+        # first get a df for all runs
+        # logging.info(f"  Getting all runs...")
+        df_all_runs = self.search_all_runs(experiment_ids=experiment_ids)
+
+        # Then get the URI for the specific run we want
+        artifact_uri = df_all_runs.loc[
+            df_all_runs['run_id'] == run_id,
+            'artifact_uri'
+        ].values[0]
+
+        # initialize GCS client
+        storage_client = storage.Client()
+
+        # Extract bucket name & prefix from artifact URI
+        parsed_uri = artifact_uri.replace('gs://', '').split('/')
+        bucket_name = parsed_uri[0]
+        artifact_prefix = '/'.join(parsed_uri[1:])
+        # this root is expected to be: '<experiment_id>/<uuid>/artifacts'
+        root_artifact_prefix = '/'.join(parsed_uri[-3:])
+
+        if artifact_folder is not None:
+            full_artifact_folder = f"{artifact_prefix}/{artifact_folder}"
+        else:
+            full_artifact_folder = f"{artifact_prefix}"
+
+        bucket = storage_client.get_bucket(bucket_name)
+        l_files_to_check = list(bucket.list_blobs(prefix=full_artifact_folder))
+        if verbose:
+            info(f"{len(l_files_to_check):6,.0f} <- Artifacts to check count")
+
+        # Find only the top-level files & folders
+        l_files_and_folders_top_level = list()
+        l_files_and_folders_clean = list()
+        for blob_ in l_files_to_check:
+            b_name = blob_.name
+            # parent_folders_1_2_3 = '/'.join(b_name.split('/')[-4:-1])
+
+            if root_artifact_prefix in b_name:
+                l_files_and_folders_clean.append(b_name)
+            else:
+                if verbose:
+                    info(f"Skip files that aren't in the run's artifacts folder")
+                continue
+
+            # first get the directory/path AFTER the /artifacts
+            keys_after_root = b_name.split(f"{root_artifact_prefix}/")[-1]
+            # Then append ONLY the first path or file
+            l_files_and_folders_top_level.append(keys_after_root.strip().split('/')[0])
+
+        # Convert the list to a set b/c we'll have dupes when multiple files are in a subfolder
+        l_files_and_folders_top_level = set(l_files_and_folders_top_level)
+        l_files_and_folders_top_level = sorted(l_files_and_folders_top_level)
+
+        info(f"{len(l_files_and_folders_clean):6,.0f} <- Artifacts clean count")
+        info(f"{len(l_files_and_folders_top_level):6,.0f} <- Artifacts & folders at TOP LEVEL clean count")
+        return l_files_and_folders_top_level
+
     def read_run_artifact(
             self,
             run_id: str,
