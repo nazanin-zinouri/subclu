@@ -92,6 +92,11 @@ def test_app(cfg: DictConfig) -> None:
         for f_ in l_logs:
             mlflow.log_artifact(str(f_))
 
+        # Log hydra config outputs
+        path_hydra_config = cwd / '.hydra'
+        if path_hydra_config.is_dir():
+            mlflow.log_artifacts(str(path_hydra_config), 'hydra')
+
         log.info(f"{datetime.utcnow().strftime('%Y-%m-%d_%H:%M:%S')} | END task {cfg.task}")
         mlflow.end_run()
 
