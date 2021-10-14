@@ -1,0 +1,12 @@
+defaults:
+  # use joblib to run jobs in parallel
+  - override hydra/launcher: joblib
+
+task: 1  # single task
+# multi-run doesn't work here... it only works on CLI
+# task: "range(0, 30, 2)"
+
+hydra:
+  launcher:
+    # override the number of jobs for joblib
+    n_jobs: 10

@@ -62,6 +62,9 @@ EXTRAS_REQUIRE = {
         "pandas == 1.2.4",
         "scikit-learn == 1.0",
 
+        # Test for parallel hydra jobs
+        "hydra-joblib-launcher == 1.1.5",
+
         # Google pre-installed/built-in services
         #  For some reason, pip wanted to update a bunch of these
         #  when installing hydra-core

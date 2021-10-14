@@ -72,6 +72,11 @@ source .venv/bin/activate
 python3 -m pip install -r requirements_laptop.txt
 ```
 
+Then you can run a juypter lab server:
+```bash
+jupyter lab
+```
+
 ### Reloading in jupyter
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code without having to re-import modules.
 ```
