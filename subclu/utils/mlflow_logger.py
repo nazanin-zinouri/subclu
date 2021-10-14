@@ -315,6 +315,7 @@ class MlflowLogger:
             run_id: str,
             artifact_folder: str = None,
             experiment_ids: Union[str, int, List[int]] = None,
+            only_top_level: bool = True,
             verbose: bool = False,
     ):
         """list artifacts for a run in GCS"""
@@ -373,7 +374,10 @@ class MlflowLogger:
 
         info(f"{len(l_files_and_folders_clean):6,.0f} <- Artifacts clean count")
         info(f"{len(l_files_and_folders_top_level):6,.0f} <- Artifacts & folders at TOP LEVEL clean count")
-        return l_files_and_folders_top_level
+        if only_top_level:
+            return l_files_and_folders_top_level
+        else:
+            return l_files_and_folders_clean
 
     def read_run_artifact(
             self,
