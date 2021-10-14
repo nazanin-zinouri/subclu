@@ -154,3 +154,6 @@ dmypy.json
 ~$*.xl*
 ~$*.doc*
 ~$*.ppt*
+
+# ignore hydra folders from multi-run
+.hydra
