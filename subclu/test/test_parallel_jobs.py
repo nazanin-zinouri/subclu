@@ -9,16 +9,34 @@ https://hydra.cc/docs/tutorials/basic/running_your_app/multi-run
     https://hydra.cc/docs/plugins/ax_sweeper/
 
 https://hydra.cc/docs/tutorials/basic/running_your_app/logging/
-https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/
 
+
+https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/
+When we use Hydra, it changes the CWD for each individual run. If we want to get the logs or outputs
+ from that run, we can use: os.getcwd() to get the CWD.
+
+The logs created by hydra will look like:
+outputs/2019-09-25/15-16-17
+├── .hydra
+│   ├── config.yaml
+│   ├── hydra.yaml
+│   └── overrides.yaml
+└── my_app.log
+
+Where `my_app.log` => the name of the module. So for this module it'll be called:
+`test_parallel_jobs.log`
+To make it generic we might need to glob (*.log) files
 """
 from datetime import datetime
 import logging
 import os
+from pathlib import Path
 import time
 
 import hydra
 from omegaconf import DictConfig
+
+import mlflow
 
 # NOTE: when running from CLI, run script as:
 #  python -m subclu.test.test_parallel_jobs
@@ -43,36 +61,39 @@ def test_app(cfg: DictConfig) -> None:
       We need to add the full path (subclu.test.<module_name>) to prevent relative import errors
     python -m subclu.test.test_parallel_jobs --multirun "task=range(0, 30, 2)"
     """
-    log.info(f"{datetime.utcnow().strftime('%Y-%m-%d_%H:%M:%S')} | START task {cfg.task} - Process ID {os.getpid()}")
+    # We need to set the tracking URI for all runs, otherwise each run could log
+    #  to different local directories which will be a pain to centralize
+    if cfg['mlflow_tracking_uri'].startswith('~'):
+        expanded_path = Path(cfg['mlflow_tracking_uri']).expanduser()
+        mlflow.set_tracking_uri(f"file://{expanded_path}")
+    else:
+        mlflow.set_tracking_uri(cfg['mlflow_tracking_uri'])
 
-    # ===============
-    # CWD
-    # ===
-    """
-    https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/
-    When we use Hydra, it changes the CWD for each individual run. If we want to get the logs or outputs
-     from that run, we can use: os.getcwd() to get the CWD.
-    
-    The logs created by hydra will look like:
-    outputs/2019-09-25/15-16-17
-    ├── .hydra
-    │   ├── config.yaml
-    │   ├── hydra.yaml
-    │   └── overrides.yaml
-    └── my_app.log
+    log.info(f"mlflow tracking URI: {mlflow.get_tracking_uri()}")
+    mlflow.set_experiment(cfg['mlflow_experiment_name'])
 
-    Where `my_app.log` => the name of the module. So for this module it'll be called:
-    `test_parallel_jobs.log`
-    To make it generic we might need to glob (*.log) files
-    """
+    with mlflow.start_run():
+        log.info(f"{datetime.utcnow().strftime('%Y-%m-%d_%H:%M:%S')} | START task {cfg.task} - Process ID {os.getpid()}")
+        cwd = Path(os.getcwd())
+        mlflow.log_params(
+            {
+                'task_num': cfg.task,
+                'current_working_directory': str(cwd),
+             }
+        )
+        log.info(f"Current working directory : {cwd}")
 
-    log.info(f"Current working directory : {os.getcwd()}")
+        # We have to use a custom class wrapper around tqdm to get the logs written to file
+        for i in LogTQDM(range(11), mininterval=.8, ncols=70, position=0, leave=True, ascii=True):
+            time.sleep(.12)
 
-    # We have to use a custom class wrapper around tqdm to get the logs written to file
-    for i in LogTQDM(range(11), mininterval=.8, ncols=70, position=0, leave=True, ascii=True):
-        time.sleep(.12)
+        # find all logs in CWD so we can send them to mlflow
+        l_logs = list(cwd.glob('*.log'))
+        for f_ in l_logs:
+            mlflow.log_artifact(str(f_))
 
-    log.info(f"{datetime.utcnow().strftime('%Y-%m-%d_%H:%M:%S')} | END task {cfg.task}")
+        log.info(f"{datetime.utcnow().strftime('%Y-%m-%d_%H:%M:%S')} | END task {cfg.task}")
+        mlflow.end_run()
 
 
 if __name__ == "__main__":
