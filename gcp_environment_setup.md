@@ -458,7 +458,7 @@ pip install -r base_requirements.txt --use-deprecated=legacy-resolver
 ```
 
 
-# Running mlflow server on GCP
+# Running mlflow-server on GCP
 
 ## Step 1: Run this command in the **GCP Notebok/VM**.
 The new pattern is to call the mlflow DB for the current host name:
