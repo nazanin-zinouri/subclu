@@ -34,6 +34,8 @@ INSTALL_REQUIRES = [
 
     # Use hydra to manage config files
     "hydra-core == 1.1.0",
+    "tqdm == 4.62.3",
+    "hydra-joblib-launcher == 1.1.5",  # To launch parallel hydra jobs
 
     # Visualization
     "seaborn == 0.11.1",
@@ -62,9 +64,6 @@ EXTRAS_REQUIRE = {
         "pandas == 1.2.4",
         "scikit-learn == 1.0",
 
-        # Test for parallel hydra jobs
-        "hydra-joblib-launcher == 1.1.5",
-
         # Google pre-installed/built-in services
         #  For some reason, pip wanted to update a bunch of these
         #  when installing hydra-core
@@ -72,6 +71,7 @@ EXTRAS_REQUIRE = {
         "google-api-python-client == 2.22.0",
         "google-apitools == 0.5.31",
         "google-auth == 1.35.0",
+
     ],
 
     "cpu_eda": [
