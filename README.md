@@ -30,11 +30,11 @@ Note that the required libraries are listed in `setup.py` under `INSTALL_REQUIRE
 
 Editable mode (`--editable` or `-e`) makes it easy to continue editing your module and use the updated code without having to re-install it. This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-import the package.
 
-Example installation in GCP notebooks
+### Example installation in GCP notebooks
 1) Assume sudo for your gcp user
 <br>`sudo su - david.bermejo`
-2) Use pip to install from location that's synced to PyCharm (active development).
-<br>`pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/`
+2) Use pip to install from location that's synced to PyCharm (active development).<br>
+`pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/`
    - If you're installing a superset of requirements add: `[<extra_name>]` at the end of path
 
 ```
@@ -46,6 +46,33 @@ pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[torch]
 ```
 
+### Installing on a laptop/local
+The heavy GPU work won't work on a standard laptop, but you can still install to do some local EDA. **NOTE** that the `[laptop_dev]` requirements includes `jupyterlab`.
+
+Assuming you have `conda` installed, you can use the `Make` file to create a `venv` with the required libraries:<br>
+`make install_requirements`
+
+Otherwise, you'll have to do the steps manually:
+1. Change your directory to my homework directory
+2. Create a virtual environment (venv)
+3. Activate the venv
+4. Install the project's requirements via pip
+
+```bash
+# 1
+cd XXX
+
+# 2
+python3 -m venv .venv
+
+# 3
+source .venv/bin/activate
+
+# 4
+python3 -m pip install -r requirements_laptop.txt
+```
+
+### Reloading in jupyter
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code without having to re-import modules.
 ```
 %load_ext autoreload
