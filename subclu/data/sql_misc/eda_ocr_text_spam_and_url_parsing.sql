@@ -80,3 +80,53 @@ ORDER BY post_id_unique_count DESC, 2
 
 LIMIT 1000
 ;
+
+
+-- ========================
+-- Cleaner query to check OCR text from r/de
+-- ===
+--  use it to check how well the system does at extracting
+--  text for non-English languages
+DECLARE start_date DATE DEFAULT '2021-10-09';
+DECLARE end_date DATE DEFAULT '2021-10-11';
+
+WITH ocr_text_agg AS (
+        -- We need to agg the text because one post could have multiple images
+        SELECT
+            ocr.post_id
+            , COUNT(media_url) AS ocr_images_in_post_count
+            , TRIM(STRING_AGG(inferred_text, '. '))  AS ocr_inferred_text_agg
+            , pt
+
+        FROM `data-prod-165221.swat_tables.image_ocr_text` AS ocr
+
+        WHERE DATE(ocr.pt) BETWEEN start_date AND end_date
+
+        GROUP BY post_id, pt
+    )
+
+
+SELECT
+    slo.subreddit_id
+    , slo.name AS subreddit_name
+    , plo.upvotes
+    , ocr.*
+
+FROM ocr_text_agg AS ocr
+INNER JOIN (
+        SELECT *
+        FROM `data-prod-165221.ds_v2_postgres_tables.post_lookup`
+        WHERE DATE(_PARTITIONTIME) = end_date
+    ) AS plo
+    ON ocr.post_id = plo.post_id
+INNER JOIN (
+        SELECT *
+        FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+        WHERE DATE(dt) = end_date
+    ) AS slo
+    ON plo.subreddit_id = slo.subreddit_id
+
+WHERE LOWER(slo.name) = 'de'
+
+ORDER BY upvotes DESC
+;
