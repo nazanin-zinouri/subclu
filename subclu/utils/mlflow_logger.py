@@ -98,6 +98,8 @@ class MlflowLogger:
             'v0.4.0_use_multi_inference',
             'v0.4.0_use_multi_aggregates_test',
             'v0.4.0_use_multi_aggregates',
+            'v0.4.0_use_multi_clustering_test',
+            'v0.4.0_use_multi_clustering',
 
         ]
         for i, exp in enumerate(l_experiments):
