@@ -11,7 +11,6 @@ INSTALL_REQUIRES = [
     #  weird conflicts might need to pin different versions for each VM, though
     # google VM pins
     "jinja2 <= 2.11.3",
-    "markupsafe <= 1.1.1",
     "pydantic <= 1.8.2",
 
     # DS/ML core
@@ -54,10 +53,11 @@ EXTRAS_REQUIRE = {
     ],
 
     "latop_dev": [
-        "ipython <= 7.28.0",
-        "jupyterlab <= 3.1.18",
         "click == 8.0.1",
+        "ipython <= 7.28.0",
         "joblib == 1.0.1",
+        "jupyterlab <= 3.1.18",
+        "markupsafe <= 1.1.1",
 
         "numpy == 1.19.5",
         "pyarrow == 5.0.0",
@@ -77,6 +77,7 @@ EXTRAS_REQUIRE = {
     "cpu_eda": [
         "ipython == 7.22.0",
         "jupyterlab == 1.2.16",
+        "markupsafe <= 1.1.1",
         "pyarrow == 3.0.0",
 
         # pre-installed google libraries
@@ -143,6 +144,7 @@ EXTRAS_REQUIRE = {
     "tensorflow_232": [
         "click <= 8.0.1",
         "numpy == 1.19.5",
+        "markupsafe <= 1.1.1",
 
         # TODO(djb): pin TF & google libraries for tf232
         # Google pre-installed/built-in services
@@ -171,8 +173,10 @@ EXTRAS_REQUIRE = {
         # Core libraries need to be pinned... otherwise `pip` tries to upgrade them
         "click == 8.0.1",
         "joblib == 1.0.1",
-        "pyarrow == 4.0.1",
+        "markupsafe <= 1.1.1",
         "numpy == 1.19.5",
+        "pyarrow == 4.0.1",
+
 
         # Google pre-installed/built-in services
         #  For some reason, pip wanted to update a bunch of these
@@ -232,6 +236,7 @@ EXTRAS_REQUIRE = {
         #  and GCP doesn't allow them to be upgraded and creates conflicts
         "click == 8.0.1",
         "joblib == 1.0.1",
+        "markupsafe <= 1.1.1",
         "numpy == 1.19.5",
         "pyarrow == 5.0.0",
 
