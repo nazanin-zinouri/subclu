@@ -1,7 +1,8 @@
 model_key: 'AgglomerativeClustering'  # pull from the clustering_registry
 
-# Pass these kwargs into the model defined by the key in the clustering_registry
-modwl_kwargs:
+# Pass these kwargs to the model defined by the key in the clustering_registry
+model_kwargs:
   n_clusters: 100
   affinity: 'euclidean'
   linkage: 'ward'
+  connectivity: false
