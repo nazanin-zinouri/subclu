@@ -42,6 +42,16 @@ class LoadPosts:
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             df_format: str = 'pandas',
     ):
+        """
+        Args:
+            bucket_name:
+            folder_path:
+            columns:
+            col_new_manual_topic:
+            col_unique_check:
+            local_path_root:
+            df_format:
+        """
         self.bucket_name = bucket_name
         self.folder_path = folder_path
         self.col_new_manual_topic = col_new_manual_topic
@@ -156,7 +166,7 @@ class LoadPosts:
             df['weighted_language_top'] = np.where(
                 df['weighted_language'].isin(['UNKNOWN'] + L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL),
                 df['weighted_language'].replace(D_CLD3_CODE_TO_LANGUAGE_NAME),
-                'Other language'
+                'Other_language'
             )
             df['weighted_language_in_use_multilingual'] = np.where(
                 df['weighted_language'].isin(L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL),
@@ -233,6 +243,7 @@ class LoadSubreddits(LoadPosts):
                 'post_type',            # For post aggs
                 'combined_topic_and_rating',    # Needed for new manual label
                 'text_word_count',      # To get median post word count
+                'text_len',             # Get median text len
             ]
             df_posts = LoadPosts(
                 bucket_name=self.bucket_name,
@@ -353,6 +364,7 @@ def create_sub_level_aggregates(
         col_post_type: str = 'post_type',
         col_word_count: str = 'text_word_count',
         col_total_posts: str = 'total_posts_count',
+        col_text_len: str = 'text_len',
         col_manual_label: str = None,
         col_subreddit_id: str = None,
 ) -> pd.DataFrame:
@@ -401,6 +413,22 @@ def create_sub_level_aggregates(
         False
     )
 
+    # TODO(djb): Get secondary language & append to df_lang_sub
+    df_lang_sub = df_lang_sub.merge(
+        get_subreddit_secondary_language(
+            df_subs=df_lang_sub.reset_index(),
+            l_language_pct_cols=l_cols_language_percent,
+            col_index='subreddit_name',
+            col_2nd_language='secondary_post_language',
+            col_2nd_lang_pct='secondary_post_language_percent',
+            col_language_rank='language_rank',
+            min_pct_limit=0.008,
+        ),
+        how='left',
+        left_index=True,
+        right_index=True,
+    )
+
     # =====================
     # Posts: percentages of post-type + Primary post-type
     # ===
@@ -429,6 +457,13 @@ def create_sub_level_aggregates(
         df_post_type_sub[l_cols_post_type_percent].max(axis=1)
     )
 
+    d_aggregates = {
+        'posts_for_modeling_count': ('post_id', 'nunique'),
+        'post_median_word_count': (col_word_count, 'median'),
+    }
+    if col_text_len in df_posts.columns:
+        d_aggregates['post_median_text_len'] = (col_text_len, 'median')
+
     # Merge the aggregated posts
     df_merged = (
         df_lang_sub
@@ -442,12 +477,7 @@ def create_sub_level_aggregates(
             (
                 df_posts
                 .groupby(col_sub_key)
-                .agg(
-                    **{
-                        'posts_for_modeling_count': ('post_id', 'count'),
-                        'post_median_word_count': (col_word_count, 'median'),
-                    }
-                )
+                .agg(**d_aggregates)
             ),
             left_index=True,
             right_index=True,
@@ -528,6 +558,58 @@ def create_new_manual_topic_column(
         df[col_sub_name].replace(sub_names_to_new_label),
         df[col_prev_label].replace(old_labels_to_new_label)
     )
+
+
+def get_subreddit_secondary_language(
+        df_subs: pd.DataFrame,
+        l_language_pct_cols: iter,
+        col_index: str = 'subreddit_name',
+        col_2nd_language: str = 'secondary_post_language',
+        col_2nd_lang_pct: str = 'secondary_post_language_percent',
+        col_language_rank: str = 'language_rank',
+        min_pct_limit: float = 0.008,
+) -> pd.DataFrame:
+    """Function to get secondary language - this will be helpful for i18n subs that
+    are multilingual
+    """
+    if isinstance(col_index, str):
+        col_index = [col_index]
+
+    return (
+        df_subs
+        [col_index + l_language_pct_cols]
+        .set_index(col_index)
+
+        # When we stack, we take all the language percent columns (wide) and make it long (one row per language)
+        .stack()
+        .reset_index()
+        # We then need to rename the new columns after stacking
+        .rename(columns={'level_1': col_2nd_language,
+                         0: col_2nd_lang_pct,
+                         })
+        # We need to clean the column names back into language names
+        .assign(
+            **{col_2nd_language: lambda x: x[col_2nd_language].str.replace('_posts_percent', '')}
+        )
+
+        # Filter out languages that are not meaningful because they're not common or b/c
+        #  the subreddit has no posts of that language
+        .query(
+            f"{col_2nd_language} != 'Other_language' & {col_2nd_language} != 'UNKNOWN' & {col_2nd_lang_pct} > 0.0001"
+        )
+        # Rank the remaining languages
+        .assign(
+            **{col_language_rank: lambda x: x.groupby(col_index)[col_2nd_lang_pct].rank(method='first',
+                                                                                        ascending=False),
+               },
+        )
+        # Keep only languages that are rank=2 and meet the minimum percent
+        .query(f"{col_language_rank} == 2 & {col_2nd_lang_pct} > {min_pct_limit}")
+        .sort_values(by=['subreddit_name', 'language_rank'], ascending=[True, True])
+        .set_index(col_index)
+        .drop('language_rank', axis=1)
+    )
+
 
 #
 # ~ fin
