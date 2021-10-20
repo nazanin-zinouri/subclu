@@ -13,8 +13,6 @@ import tensorflow_hub as hub
 from .vectorize_text_tf import save_df_and_log_to_mlflow, get_embeddings_as_df
 
 
-
-
 @dask.delayed
 def save_embeddings_as_df_delayed(
         model_url: str,
