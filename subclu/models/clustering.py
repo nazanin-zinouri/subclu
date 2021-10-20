@@ -7,11 +7,13 @@ from logging import info
 import os
 from pathlib import Path
 
+import mlflow
 import hydra
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig
 
-import mlflow
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import Normalizer
 
 # NOTE: when running from CLI, run script as:
 #  python -m subclu.test.test_parallel_jobs
@@ -42,7 +44,7 @@ def culster_embeddings(cfg: DictConfig) -> object:
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
         mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
         mlflow_run_name=cfg.get('mlflow_run_name', 'embedding_clustering'),
-        pipeline_dict=cfg.get('pipeline_dict', None),
+        pipeline_dict=cfg.get('pipeline', None),
         logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
     )
 
@@ -102,6 +104,9 @@ class ClusterEmbeddings:
         self.path_local_model = None
         self.logs_path = logs_path
 
+        # pipe to store model
+        self.pipe = None
+
         # use pre-loaded metadata if running in interactive mode
         # self.df_subs_meta = df_subs_meta
         # self.df_posts_meta = df_posts_meta
@@ -115,9 +120,19 @@ class ClusterEmbeddings:
 
     def run_clustering(self):
         """"""
-        with mlflow.start_run():
+        info(f"== Start run_aggregation() method ==")
+
+        info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
+        self.mlf.set_experiment(self.mlflow_experiment_name)
+
+        with mlflow.start_run(run_name=self.mlflow_run_name):
             log.info(
                 f"=== START CLUSTERING - Process ID {os.getpid()}")
+            self.mlf.add_git_hash_to_active_run()
+            self.mlf.set_tag_hostname(key='host_name')
+            self.mlf.log_param_hostname(key='host_name')
+            self.mlf.log_cpu_count()
+            self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
             # hydra takes care of creating a custom working directory
             print(f"Current working directory : {os.getcwd()}")
@@ -134,7 +149,9 @@ class ClusterEmbeddings:
                 info(f"  Local model saving directory: {self.path_local_model}")
                 self._init_file_log()
 
-            # TODO(djb): load clustering algo
+            # Log configuration so we can replicate run
+            self._create_and_log_config()
+
             log.info(f"Loading clustering model...")
             cls = D_MODELS_CLUSTERING[self.dict_clustering_algo['model_key']](
                 **self.dict_clustering_algo['model_kwargs']
@@ -151,8 +168,21 @@ class ClusterEmbeddings:
 
             # TODO(djb): create pipeline with pre-processing steps
             #  e.g., normalize text &/or apply SVD
+            if self.pipeline_dict is not None:
+                log.info(f"Checking custom pipeline configs...")
+                if self.pipeline_dict.get('normalize_inputs_for_cosine_distance', False):
+                    self.pipe = Pipeline([
+                        ('normalize', Normalizer(norm='l2')),
+                        ('cluster', cls)
+                    ])
+            else:
+                self.pipe = Pipeline([
+                    ('cluster', cls)
+                ])
+            log.info(f"Pipeline to train: \n {self.pipe}")
 
             # TODO(djb): Fit clustering algo
+
 
             # TODO(djb): Get predictions for each row
 
@@ -175,6 +205,45 @@ class ClusterEmbeddings:
         if os.getcwd() == get_original_cwd():
             info(f"    Removing fileHandler...")
             self._remove_file_logger()
+
+    def _create_and_log_config(self):
+        """Convert inputs into a dictionary we can save to replicate the run
+
+        Don't log dfs with meta or raw embeddings! they could be dfs that take up gigs of storage
+        """
+
+        # TODO(djb): instead of manually logging everything, use vars(self)
+        #  to get all params & filter out:
+        #  - things that start with `df_`
+        #  - things named `mlf` (it's an mlflowLogger object)
+        self.config_to_log_and_store = dict()
+        for k_, v_ in vars(self).items():
+            try:
+                if any([k_.startswith('df_'), k_ == 'mlf']):
+                    continue
+                elif any([isinstance(v_, pd.DataFrame),
+                          isinstance(v_, logging.FileHandler),
+                          isinstance(v_, dict),
+                          isinstance(v_, Path),
+                          ]):
+                    # Ignore dicts and other objects that won't be easy to pickle
+                    # would it be better to only keep things that should be easy to pickle instead?
+                    #  e.g., string, list, numeric, None ?
+                    continue
+                else:
+                    self.config_to_log_and_store[k_] = v_
+            except Exception as e:
+                logging.warning(f"Error logging {k_}:\n  {e}")
+
+        # log as params to database
+        mlflow.log_params(self.config_to_log_and_store)
+
+        # log as artifact to GCS
+        mlflow_logger.save_and_log_config(
+            self.config_to_log_and_store,
+            local_path=self.path_local_model,
+            name_for_artifact_folder='config',
+        )
 
     def _init_file_log(self) -> None:
         """Create a file & FileHandler to log data"""

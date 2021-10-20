@@ -26,7 +26,8 @@ hydra:
   job_logging:
     formatters:
       simple:
-        format: '`%(asctime)s` | `%(name)s` | `%(levelname)s` | `%(message)s`'
+        # format: '`%(asctime)s` | `%(name)s` | `%(levelname)s` | `%(message)s`'
+        format: '`%(asctime)s` | `%(levelname)s` | `%(message)s`'
   # Change location of logging - by default it might try to create logs in
   #  home/david.bermejo instead of home/jupyter
   #  https://hydra.cc/docs/configure_hydra/workdir/
