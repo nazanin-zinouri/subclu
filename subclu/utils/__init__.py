@@ -64,6 +64,8 @@ def get_project_subfolder(
     # This approach only manually checks 2 levels up from cwd
     p_1_level = path_cwd_original.parents[0]
     p_2_level = path_cwd_original.parents[1]
+    p_3_level = path_cwd_original.parents[2]
+    p_4_level = path_cwd_original.parents[3]
 
     if str(path_cwd_original).endswith(project_root):
         path_project = deepcopy(path_cwd_original)
@@ -71,6 +73,10 @@ def get_project_subfolder(
         path_project = deepcopy(p_1_level)
     elif str(p_2_level).endswith(project_root):
         path_project = deepcopy(p_2_level)
+    elif str(p_3_level).endswith(project_root):
+        path_project = deepcopy(p_3_level)
+    elif str(p_4_level).endswith(project_root):
+        path_project = deepcopy(p_4_level)
     else:
         raise FileNotFoundError(f"Couldn't find project {project_root}"
                                 f" in path: {path_cwd_original}")
