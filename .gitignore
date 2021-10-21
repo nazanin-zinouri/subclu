@@ -157,3 +157,4 @@ dmypy.json
 
 # ignore hydra folders from multi-run
 .hydra
+hydra_runs/
