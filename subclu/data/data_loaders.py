@@ -4,6 +4,7 @@ Utils to load data & apply common ETL/cleanup/aggregations.
 Ideally, call these functions so that new columns have the same definitions
 across different notebooks/experiments.
 """
+import logging
 from logging import info
 from pathlib import Path
 from typing import Dict, Union
@@ -94,7 +95,6 @@ class LoadPosts:
                 'text_word_count',
                 # 'post_url_for_embeddings',
                 # 'text'
-
             ]
         else:
             self.columns = columns
@@ -186,7 +186,10 @@ class LoadPosts:
             )
 
         if self.col_new_manual_topic not in df.columns:
-            df[self.col_new_manual_topic] = create_new_manual_topic_column(df)
+            try:
+                df[self.col_new_manual_topic] = create_new_manual_topic_column(df)
+            except KeyError as e:
+                logging.error(f"Error creating manual topic... {e}")
 
         return df
 
@@ -230,25 +233,34 @@ class LoadSubreddits(LoadPosts):
     def read_apply_transformations_and_merge_post_aggs(
             self,
             df_posts: pd.DataFrame = None,
+            cols_post: Union[iter, str] = 'all_aggs_',
     ) -> pd.DataFrame:
         """Besides loading the sub-data, load post-level data & merge aggregates from post-level"""
         if df_posts is None:
             info(f"Loading df_posts from: {self.folder_posts}")
-            # limit to only cols absolutely needed to save time & RAM
-            l_cols_post_aggs_only = [
-                'subreddit_name',
-                'subreddit_id',
-                'post_id',
-                'weighted_language',    # For language aggs
-                'post_type',            # For post aggs
-                'combined_topic_and_rating',    # Needed for new manual label
-                'text_word_count',      # To get median post word count
-                'text_len',             # Get median text len
-            ]
+            if cols_post == 'all_aggs_':
+                # limit to only cols absolutely needed to save time & RAM
+                cols_post = [
+                    'subreddit_name',
+                    'subreddit_id',
+                    'post_id',
+                    'weighted_language',    # For language aggs
+                    'post_type',            # For post aggs
+                    'combined_topic_and_rating',    # Needed for new manual label
+                    'text_word_count',      # To get median post word count
+                    'text_len',             # Get median text len
+                ]
+            elif cols_post == 'post_count_only_':
+                cols_post = [
+                    'subreddit_name',
+                    'subreddit_id',
+                    'post_id',
+                ]
+
             df_posts = LoadPosts(
                 bucket_name=self.bucket_name,
                 folder_path=self.folder_posts,
-                columns=l_cols_post_aggs_only,
+                columns=cols_post,
             ).read_and_apply_transformations()
 
         info(f"  reading sub-level data & merging with aggregates...")
@@ -272,14 +284,28 @@ class LoadSubreddits(LoadPosts):
             df_subs['subreddit_id_post'],
             df_subs['subreddit_id']
         )
-        df_subs[self.col_new_manual_topic] = np.where(
-            df_subs[self.col_new_manual_topic].isnull(),
-            df_subs[f"{self.col_new_manual_topic}_post"],
-            df_subs[self.col_new_manual_topic]
-        )
-        return df_subs.drop(['subreddit_id_post',
-                             f"{self.col_new_manual_topic}_post"],
-                            axis=1)
+
+        # Remove duplicat cols & co_new_manual_topic
+        if self.col_new_manual_topic in df_subs.columns:
+            try:
+                df_subs[self.col_new_manual_topic] = np.where(
+                    df_subs[self.col_new_manual_topic].isnull(),
+                    df_subs[f"{self.col_new_manual_topic}_post"],
+                    df_subs[self.col_new_manual_topic]
+                )
+            except KeyError:
+                pass
+        l_dupe_cols = [
+            'subreddit_id_post',
+            f"{self.col_new_manual_topic}_post"
+        ]
+        for col_ in l_dupe_cols:
+            try:
+                df_subs = df_subs.drop(col_, axis=1)
+            except KeyError:
+                pass
+
+        return df_subs
 
 
 class LoadComments(LoadPosts):
@@ -376,113 +402,155 @@ def create_sub_level_aggregates(
     # use col manual label & sub ID to append in case we want to merge
     #  with sub metadata that's missing this info
     l_add_extra_cols = list()
-    if col_manual_label is not None:
+    if col_manual_label in df_posts.columns:
         l_add_extra_cols.append(col_manual_label)
-    if col_subreddit_id is not None:
+    if col_subreddit_id in df_posts.columns:
         l_add_extra_cols.append(col_subreddit_id)
 
     # =====================
     # Posts: Detected language percentages + Primary post-language
     # ===
     # We assume that language codes have been converted to language names already
-    df_lang_sub = get_language_by_sub_wide(
-        df_posts,
-        col_sub_name=col_sub_key,
-        col_lang_weighted=col_language,
-        col_total_posts=col_total_posts,
-    )
-    # Only keep the percent cols, not the counts
-    df_lang_sub = df_lang_sub.rename(
-        columns={c: c.replace('_percent', '_posts_percent') for c in df_lang_sub.columns}
-    )
-    l_cols_language_percent = [c for c in df_lang_sub.columns if c.endswith('_posts_percent')]
-    df_lang_sub = df_lang_sub[l_cols_language_percent]
+    if col_language in df_posts.columns:
+        df_lang_sub = get_language_by_sub_wide(
+            df_posts,
+            col_sub_name=col_sub_key,
+            col_lang_weighted=col_language,
+            col_total_posts=col_total_posts,
+        )
+        # Only keep the percent cols, not the counts
+        df_lang_sub = df_lang_sub.rename(
+            columns={c: c.replace('_percent', '_posts_percent') for c in df_lang_sub.columns}
+        )
+        l_cols_language_percent = [c for c in df_lang_sub.columns if c.endswith('_posts_percent')]
+        df_lang_sub = df_lang_sub[l_cols_language_percent]
 
-    # Create new column for predominant language name
-    df_lang_sub['primary_post_language'] = (
-        df_lang_sub[l_cols_language_percent].idxmax(axis=1).str.replace('_posts_percent', '')
-    )
-    # Create new col for predominant language percent
-    df_lang_sub['primary_post_language_percent'] = (
-        df_lang_sub[l_cols_language_percent].max(axis=1)
-    )
-    # Append column with whether predominant language is covered by use-multilingual
-    df_lang_sub['primary_post_language_in_use_multilingual'] = np.where(
-        df_lang_sub['primary_post_language'].isin(L_USE_MULTILINGUAL_LANGUAGE_NAMES),
-        True,
-        False
-    )
+        # Create new column for predominant language name
+        df_lang_sub['primary_post_language'] = (
+            df_lang_sub[l_cols_language_percent].idxmax(axis=1).str.replace('_posts_percent', '')
+        )
+        # Create new col for predominant language percent
+        df_lang_sub['primary_post_language_percent'] = (
+            df_lang_sub[l_cols_language_percent].max(axis=1)
+        )
+        # Append column with whether predominant language is covered by use-multilingual
+        df_lang_sub['primary_post_language_in_use_multilingual'] = np.where(
+            df_lang_sub['primary_post_language'].isin(L_USE_MULTILINGUAL_LANGUAGE_NAMES),
+            True,
+            False
+        )
 
-    # TODO(djb): Get secondary language & append to df_lang_sub
-    df_lang_sub = df_lang_sub.merge(
-        get_subreddit_secondary_language(
-            df_subs=df_lang_sub.reset_index(),
-            l_language_pct_cols=l_cols_language_percent,
-            col_index='subreddit_name',
-            col_2nd_language='secondary_post_language',
-            col_2nd_lang_pct='secondary_post_language_percent',
-            col_language_rank='language_rank',
-            min_pct_limit=0.008,
-        ),
-        how='left',
-        left_index=True,
-        right_index=True,
-    )
+        df_lang_sub = df_lang_sub.merge(
+            get_subreddit_secondary_language(
+                df_subs=df_lang_sub.reset_index(),
+                l_language_pct_cols=l_cols_language_percent,
+                col_index='subreddit_name',
+                col_2nd_language='secondary_post_language',
+                col_2nd_lang_pct='secondary_post_language_percent',
+                col_language_rank='language_rank',
+                min_pct_limit=0.008,
+            ),
+            how='left',
+            left_index=True,
+            right_index=True,
+        )
 
     # =====================
     # Posts: percentages of post-type + Primary post-type
     # ===
-    df_post_type_sub = get_language_by_sub_wide(
-        df_posts,
-        col_sub_name=col_sub_key,
-        col_lang_weighted=col_post_type,
-        col_total_posts=col_total_posts,
-    )
-    # Only keep the percent cols, not the counts
-    suffix_post_type_pct = '_post_type_percent'
-    df_post_type_sub = df_post_type_sub.rename(
-        columns={c: c.replace('_percent', suffix_post_type_pct) for c in df_post_type_sub.columns}
-    )
-    l_cols_post_type_percent = [c for c in df_post_type_sub.columns if c.endswith(suffix_post_type_pct)]
-    df_post_type_sub = df_post_type_sub[l_cols_post_type_percent]
+    if col_post_type in df_posts.columns:
+        df_post_type_sub = get_language_by_sub_wide(
+            df_posts,
+            col_sub_name=col_sub_key,
+            col_lang_weighted=col_post_type,
+            col_total_posts=col_total_posts,
+        )
+        # Only keep the percent cols, not the counts
+        suffix_post_type_pct = '_post_type_percent'
+        df_post_type_sub = df_post_type_sub.rename(
+            columns={c: c.replace('_percent', suffix_post_type_pct) for c in df_post_type_sub.columns}
+        )
+        l_cols_post_type_percent = [c for c in df_post_type_sub.columns if c.endswith(suffix_post_type_pct)]
+        df_post_type_sub = df_post_type_sub[l_cols_post_type_percent]
 
-    # Create new column for predominant post_type
-    #  this way it'll be easier to compare subreddits by post type w/o
-    #  having to check 3 or more columns!
-    df_post_type_sub['primary_post_type'] = (
-        df_post_type_sub[l_cols_post_type_percent].idxmax(axis=1).str.replace(suffix_post_type_pct, '')
-    )
-    # Create new col for predominant language percent
-    df_post_type_sub['primary_post_type_percent'] = (
-        df_post_type_sub[l_cols_post_type_percent].max(axis=1)
-    )
+        # Create new column for predominant post_type
+        #  this way it'll be easier to compare subreddits by post type w/o
+        #  having to check 3 or more columns!
+        df_post_type_sub['primary_post_type'] = (
+            df_post_type_sub[l_cols_post_type_percent].idxmax(axis=1).str.replace(suffix_post_type_pct, '')
+        )
+        # Create new col for predominant language percent
+        df_post_type_sub['primary_post_type_percent'] = (
+            df_post_type_sub[l_cols_post_type_percent].max(axis=1)
+        )
 
     d_aggregates = {
         'posts_for_modeling_count': ('post_id', 'nunique'),
-        'post_median_word_count': (col_word_count, 'median'),
     }
+    if col_word_count in df_posts.columns:
+        d_aggregates['post_median_word_count'] = (col_word_count, 'median')
     if col_text_len in df_posts.columns:
         d_aggregates['post_median_text_len'] = (col_text_len, 'median')
 
     # Merge the aggregated posts
-    df_merged = (
-        df_lang_sub
-        .merge(
-            df_post_type_sub,
-            how='outer',
-            left_index=True,
-            right_index=True,
+    if all([
+        col_language in df_posts.columns,
+        col_post_type in df_posts.columns,
+    ]):
+        df_merged = (
+            df_lang_sub
+            .merge(
+                df_post_type_sub,
+                how='outer',
+                left_index=True,
+                right_index=True,
+            )
+            .merge(
+                (
+                    df_posts
+                    .groupby(col_sub_key)
+                    .agg(**d_aggregates)
+                ),
+                how='outer',
+                left_index=True,
+                right_index=True,
+            )
         )
-        .merge(
-            (
-                df_posts
-                .groupby(col_sub_key)
-                .agg(**d_aggregates)
-            ),
-            left_index=True,
-            right_index=True,
+    elif (col_language in df_posts.columns) & (col_post_type not in df_posts.columns):
+        df_merged = (
+            df_lang_sub
+            .merge(
+                (
+                    df_posts
+                    .groupby(col_sub_key)
+                    .agg(**d_aggregates)
+                ),
+                how='outer',
+                left_index=True,
+                right_index=True,
+            )
         )
-    )
+    elif (col_language not in df_posts.columns) & (col_post_type in df_posts.columns):
+        df_merged = (
+            df_post_type_sub
+            .merge(
+                (
+                    df_posts
+                    .groupby(col_sub_key)
+                    .agg(**d_aggregates)
+                ),
+                how='outer',
+                left_index=True,
+                right_index=True,
+            )
+        )
+    else:
+        df_merged = (
+            df_posts
+            .groupby(col_sub_key)
+            .agg(**d_aggregates)
+        )
+
     if 0 == len(l_add_extra_cols):
         return df_merged
     else:
