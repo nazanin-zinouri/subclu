@@ -256,7 +256,9 @@ class MlflowLogger:
                 if metric:
                     mlflow.log_metrics(d_ram)
                 if param:
-                    mlflow.log_params(d_ram)
+                    # Total memory is the only thing that is a param
+                    #  the others are metrics
+                    mlflow.log_param('memory_total', d_ram['memory_total'])
             return d_ram
 
         except Exception as e:

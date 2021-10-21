@@ -46,7 +46,9 @@ def culster_embeddings(cfg: DictConfig) -> object:
         dict_clustering_algo=cfg['clustering_algo'],
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
         mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
-        mlflow_run_name=cfg.get('mlflow_run_name', 'embedding_clustering'),
+        mlflow_run_name=(
+            f"{cfg.get('mlflow_run_name', 'embedding_clustering')}-{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
+        ),
         pipeline_config=cfg.get('pipeline', None),
         logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
     )
@@ -65,6 +67,7 @@ class ClusterEmbeddings:
             self,
             dict_data_embeddings_to_cluster: dict,
             dict_clustering_algo: dict,
+            embeddings_to_cluster: str = 'df_sub_level_agg_c_post_comments_and_sub_desc',
             mlflow_tracking_uri: str = 'sqlite',
             mlflow_experiment_name: str = 'v0.4.0_use_multi_clustering_test',
             mlflow_run_name: str = 'embedding_clustering',
@@ -75,6 +78,8 @@ class ClusterEmbeddings:
         """"""
         self.dict_data_embeddings_to_cluster = dict_data_embeddings_to_cluster
         self.dict_clustering_algo = dict_clustering_algo
+
+        self.embeddings_to_cluster = embeddings_to_cluster
 
         self.mlflow_experiment_name = mlflow_experiment_name
         self.mlflow_run_name = mlflow_run_name
@@ -141,12 +146,16 @@ class ClusterEmbeddings:
             log.info(f"Loading embeddings...")
             df_embeddings = self.mlf.read_run_artifact(
                 run_id=self.dict_data_embeddings_to_cluster['run_uuid'],
-                artifact_folder=self.dict_data_embeddings_to_cluster['df_sub_level_agg_c_post_comments_and_sub_desc'],
+                artifact_folder=self.dict_data_embeddings_to_cluster[self.embeddings_to_cluster],
                 read_function='pd_parquet',
                 cache_locally=True,
             )
-            log.info(f"{df_embeddings.shape} <- df_embeddings SHAPE")
-
+            r_, c_ = df_embeddings.shape
+            log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
+            mlflow.log_metrics(
+                {'input_embeddings-n_rows': r_,
+                 'input_embeddings-n_cols': c_}
+            )
 
             # TODO(djb): Fit clustering algo
 
