@@ -16,18 +16,20 @@ SQLite Studio might be worth trying (as long as I don't have dozens of dbs to me
 """
 import json
 import logging
-import os
 from logging import info
-import socket
-
-import joblib
-import pandas as pd
+import os
 from pathlib import Path
+import socket
 import subprocess
 from typing import List, Union
 
+import joblib
+import pandas as pd
+import yaml
+
 from google.cloud import storage
 from dask import dataframe as dd
+from omegaconf import DictConfig, OmegaConf
 import mlflow
 from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
@@ -607,10 +609,11 @@ def save_and_log_config(
     info(f"  Saving config to local path...")
     f_joblib = Path(local_path) / f'{name_for_artifact_folder}.gz'
     f_json = Path(local_path) / f'{name_for_artifact_folder}.json'
+    f_yaml = Path(local_path) / f'{name_for_artifact_folder}.yaml'
 
     joblib.dump(config, f_joblib)
 
-    info(f"  Logging config to mlflow...")
+    info(f"  Logging config to mlflow with joblib...")
     mlflow.log_artifact(str(f_joblib), name_for_artifact_folder)
 
     try:
@@ -619,7 +622,28 @@ def save_and_log_config(
         mlflow.log_artifact(str(f_json), name_for_artifact_folder)
 
     except Exception as e:
-        logging.warning(f"Could not save config to JSON. \n{e}")
+        logging.warning(f"  Could not save config to JSON. \n{e}")
+
+    try:
+        info(f"  Logging config to mlflow with YAML...")
+        with open(str(f_yaml), 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+        mlflow.log_artifact(str(f_yaml), name_for_artifact_folder)
+
+    except AttributeError:
+        """
+        pyyaml doesn't support some data types, so we fall back to OmegaConf 
+        An omegaconf DictConfig is not compatible with pyyaml, we need to convert it
+        in order to serialize as yaml
+        https://github.com/omry/omegaconf/issues/334#issuecomment-683121428
+        """
+        oc_config = OmegaConf.create(config)
+        try:
+            with open(str(f_yaml), 'w') as f:
+                OmegaConf.save(config=oc_config, f=f)
+            mlflow.log_artifact(str(f_yaml), name_for_artifact_folder)
+        except Exception as e:
+            logging.error(f"    Could not save config to YAML. \n{e}")
 
 
 def save_pd_df_to_parquet_in_chunks(

@@ -6,6 +6,7 @@ import logging
 from logging import info
 import os
 from pathlib import Path
+# from typing import Union
 
 import pandas as pd
 import mlflow
@@ -68,7 +69,7 @@ class ClusterEmbeddings:
             mlflow_run_name: str = 'embedding_clustering',
             pipeline_config: dict = None,
             logs_path: str = 'logs/ClusterEmbeddings',
-            **kwargs
+            # **kwargs
     ):
         """"""
         self.dict_data_embeddings_to_cluster = dict_data_embeddings_to_cluster
@@ -230,14 +231,17 @@ class ClusterEmbeddings:
         self.config_to_log_and_store = dict()
         for k_, v_ in vars(self).items():
             try:
-                if any([k_.startswith('df_'), k_ == 'mlf']):
+                if any([k_.startswith('df_'), k_ == 'mlf', k_ == 'pipeline']):
+                    # skip dataframes & some objects that aren't params
+                    continue
+                elif k_ == 'config_to_log_and_store':
+                    # skip this config file b/c it can lead to weird nested recursion
                     continue
                 elif any([isinstance(v_, pd.DataFrame),
                           isinstance(v_, logging.FileHandler),
-                          isinstance(v_, dict),
                           isinstance(v_, Path),
                           ]):
-                    # Ignore dicts and other objects that won't be easy to pickle
+                    # Ignore some objects that won't be easy to pickle
                     # would it be better to only keep things that should be easy to pickle instead?
                     #  e.g., string, list, numeric, None ?
                     continue
@@ -246,8 +250,15 @@ class ClusterEmbeddings:
             except Exception as e:
                 logging.warning(f"Error logging {k_}:\n  {e}")
 
-        # log as params to database
-        mlflow.log_params(self.config_to_log_and_store)
+        # log as params to mlflow
+        for k, v in self.config_to_log_and_store.items():
+            try:
+                # exclude dicts/ConfDicts from mlflow params, but they should be saved
+                #  in joblib &/or yaml
+                if (v is None) | isinstance(v, (int, float, bool, str)):
+                    mlflow.log_param(k, v)
+            except Exception as e:
+                log.error(f"Error logging {k}:\n  {e}")
 
         # log as artifact to GCS
         mlflow_logger.save_and_log_config(
