@@ -45,7 +45,7 @@ def culster_embeddings(cfg: DictConfig) -> object:
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
         mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
         mlflow_run_name=cfg.get('mlflow_run_name', 'embedding_clustering'),
-        pipeline_dict=cfg.get('pipeline', None),
+        pipeline_config=cfg.get('pipeline', None),
         logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
     )
 
@@ -99,9 +99,9 @@ class ClusterEmbeddings:
 
     def run_clustering(self):
         """"""
-        info(f"== Start run_aggregation() method ==")
+        log.info(f"== Start run_aggregation() method ==")
 
-        info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
+        log.info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
         self.mlf.set_experiment(self.mlflow_experiment_name)
 
         with mlflow.start_run(run_name=self.mlflow_run_name):
@@ -113,19 +113,19 @@ class ClusterEmbeddings:
             self.mlf.log_cpu_count()
             self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
-            # hydra takes care of creating a custom working directory
-            print(f"Current working directory : {os.getcwd()}")
-            print(f"Orig working directory    : {get_original_cwd()}")
             if os.getcwd() != get_original_cwd():
+                # hydra takes care of creating a custom working directory
                 log.info(f"Using hydra's path")
+                print(f"  Current working directory : {os.getcwd()}")
+                print(f"  Orig working directory    : {get_original_cwd()}")
                 self.path_local_model = Path(os.getcwd())
             else:
                 # create local path to store artifacts before logging to mlflow
                 self.path_local_model = get_project_subfolder(
-                    f"data/models/aggregate_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{self.mlflow_run_name}"
+                    f"data/models/cluster_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{self.mlflow_run_name}"
                 )
                 Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
-                info(f"  Local model saving directory: {self.path_local_model}")
+                log.info(f"  Local model saving directory: {self.path_local_model}")
                 self._init_file_log()
 
             # Log configuration so we can replicate run
@@ -168,7 +168,7 @@ class ClusterEmbeddings:
             mlflow.end_run()
 
         if os.getcwd() == get_original_cwd():
-            info(f"    Removing fileHandler...")
+            log.info(f"    Removing fileHandler...")
             self._remove_file_logger()
 
     def _create_pipeline(self):
@@ -289,7 +289,6 @@ class ClusterEmbeddings:
                 logger.removeHandler(self.fileHandler)
             except Exception as e:
                 logging.warning(f"Can't remove logger\n{e}")
-
 
 
 if __name__ == "__main__":
