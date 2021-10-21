@@ -21,9 +21,10 @@ from sklearn.preprocessing import Normalizer
 #  python -m subclu.test.test_parallel_jobs
 # Because otherwise you'll get relative import errors
 from ..utils.tqdm_logger import LogTQDM
+from ..utils import mlflow_logger
 from ..utils.mlflow_logger import MlflowLogger
 from ..utils import get_project_subfolder
-from ..utils import mlflow_logger
+
 
 from .clustering_registry import D_CLUSTER_MODELS, D_CLUSTER_PIPELINE
 
@@ -149,6 +150,11 @@ class ClusterEmbeddings:
 
             # TODO(djb): Fit clustering algo
 
+            # TODO(djb): log pipeline params
+            mlflow_logger.log_pipeline_params(
+                self.pipeline,
+                save_path=self.path_local_model,
+            )
 
             # TODO(djb): Get predictions for each row
 

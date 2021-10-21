@@ -629,7 +629,6 @@ def save_and_log_config(
         with open(str(f_yaml), 'w') as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
         mlflow.log_artifact(str(f_yaml), name_for_artifact_folder)
-
     except AttributeError:
         """
         pyyaml doesn't support some data types, so we fall back to OmegaConf 
@@ -700,6 +699,117 @@ def save_pd_df_to_parquet_in_chunks(
         # Don't log partition size, this might add overhead/time that's a waste
         # info(f"  {df.npartitions:6,.0f}\t<- EXISTING Dask partitions")
         df.to_parquet(path, write_index=write_index)
+
+
+def log_pipeline_params(
+        pipeline,
+        save_path: Union[Path, str] = None,
+        subfolder: str = 'pipeline_params',
+        verbose: bool = True,
+) -> None:
+    """
+    the dunder `__` keys should be the keys for each step of the pipeline
+    e.g.,:
+        'vectorize__ngram_range': (1, 1),
+        'vectorize__norm': 'l2',
+        'vectorize__preprocessor': None,
+        'clf__C': 1.0,
+        'clf__class_weight': None,
+        'clf__fit_intercept': True,
+
+    Items to exclude from logging:
+    - 'cv' (cross fold splits) because those are cv split indices that can be large,
+        not needed for analysis, and might crash mlflow
+    - 'vocabulary_' in case it includes sensitive words/content
+    - 'stop_words' in case it includes sensitive words/tokens
+
+    Instead of tracking vocab & stop_words here, include them as a config
+      keywords and log as a separate parameter.
+    If needed, we can recover stopwords and vocab from vectorizer, but let's reduce
+     the surface area for exposing this data
+
+    Args:
+        pipeline: pipeline object to log
+        verbose: Whether to log to logger (not mlflow) additional info
+        save_path: Path or string-like to save the selected params to log.
+        f_name: Name of the file to save
+        
+    Returns:
+        None
+    """
+    info(f"Logging pipeline params...")
+
+    d_select_params_raw = (
+        {k: v for k, v in pipeline.get_params().items()
+         if all(['__' in k,
+                 '_cv' not in k,         # don't need to keep cross-validation folds
+                 'stop_words' not in k,  # vectorize__stop_words
+                 'vocabulary' not in k,  # vectorize__vocabulary
+                 '_dtype' not in k,      # vectorize sometimes includes dtype, no need to set
+                                         #  & dtype creates problems when serializing to JSON
+                 ])}
+    )
+    d_select_params = d_select_params_raw.copy()  # rename_dict_for_mlflow(d_select_params_raw)
+
+    if save_path is not None:
+        path_subfolder = Path(save_path) / subfolder
+        Path.mkdir(path_subfolder, exist_ok=True, parents=True)
+        info(f"  Saving pipeline params to: {path_subfolder}")
+        try:
+            joblib.dump(d_select_params_raw,
+                        str(path_subfolder / f"{subfolder}.gz")
+                        )
+        except Exception as er:
+            logging.error(f"  Error saving pipeline params to dictionary \n  {er}")
+        try:
+            with open(path_subfolder / f"{subfolder}.json", 'w') as f:
+                json.dump(d_select_params_raw, f)
+        except Exception as er:
+            logging.error(f"  Error saving pipeline params to json \n  {er}")
+
+        try:
+            oc_config = OmegaConf.create(d_select_params_raw)
+            with open(path_subfolder / f"{subfolder}.yaml", 'w') as f:
+                OmegaConf.save(config=oc_config, f=f)
+        except Exception as e:
+            logging.error(f"  Could not save config to YAML. \n{e}")
+
+        logging.info(f"  Logging pipeline params to mlflow...")
+        mlflow.log_artifacts(str(path_subfolder), subfolder)
+
+    # TODO(djb): this step might need to change if we split:
+    #   vectorizing & IDF into separate steps
+    # get vectorizer & model/clf names
+    #   log len of vocab & ngram_range, if available
+    # d_vect_params_raw = dict()
+    # vectorizer_key = 'vectorize'
+    # try:
+    #     d_vect_params_raw['vectorizer__name'] = type(pipeline[vectorizer_key]).__name__
+    #     d_vect_params_raw['vocabulary_len'] = len(pipeline[vectorizer_key].vocabulary_)
+    #     d_vect_params_raw['ngram_range'] = pipeline[vectorizer_key].ngram_range
+    #     d_vect_params_raw['ngram_range_min'] = min(pipeline[vectorizer_key].ngram_range)
+    #     d_vect_params_raw['ngram_range_max'] = max(pipeline[vectorizer_key].ngram_range)
+    #     for k, v in d_vect_params_raw.items():
+    #         try:
+    #             mlflow.log_param(k, v)
+    #         except Exception as e:
+    #             logging.error(f"Error logging param:{k} with value:{v}\n  {e}")
+    # except (KeyError, AttributeError) as e:
+    #     logging.warning(f"Error logging vectorizer params:\n  {e}")
+
+    # Log name for each step so it's easier to compare different configs
+    for tup_ in pipeline.steps:
+        try:
+            step_name = tup_[0]
+            transformer_name = type(tup_[1]).__name__
+            mlflow.log_param(f"pipe-{step_name}_name", transformer_name)
+        except (KeyError, AttributeError) as e:
+            logging.warning(f"Error logging step:\n  {e}")
+
+    for param, val in d_select_params.items():
+        mlflow.log_param(f"_pipe-{param}", val)
+        if verbose:
+            info(f"  {param}: {val}")
 
 
 
