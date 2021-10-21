@@ -7,6 +7,7 @@ from logging import info
 import os
 from pathlib import Path
 
+import pandas as pd
 import mlflow
 import hydra
 from hydra.utils import get_original_cwd
@@ -19,11 +20,11 @@ from sklearn.preprocessing import Normalizer
 #  python -m subclu.test.test_parallel_jobs
 # Because otherwise you'll get relative import errors
 from ..utils.tqdm_logger import LogTQDM
-from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
+from ..utils.mlflow_logger import MlflowLogger
 from ..utils import get_project_subfolder
 from ..utils import mlflow_logger
 
-from .clustering_registry import D_MODELS_CLUSTERING
+from .clustering_registry import D_CLUSTER_MODELS, D_CLUSTER_PIPELINE
 
 
 log = logging.getLogger(__name__)
@@ -50,27 +51,6 @@ def culster_embeddings(cfg: DictConfig) -> object:
 
     cluster.run_clustering()
     return cluster
-    # if cfg['mlflow_tracking_uri'].startswith('~'):
-    #     expanded_path = Path(cfg['mlflow_tracking_uri']).expanduser()
-    #     mlflow.set_tracking_uri(f"file://{expanded_path}")
-    # else:
-    #     mlflow.set_tracking_uri(cfg['mlflow_tracking_uri'])
-    # mlflow.set_tracking_uri(cfg['mlflow_tracking_uri'])
-    #
-    # log.info(f"mlflow tracking URI: {mlflow.get_tracking_uri()}")
-    # mlflow.set_experiment(cfg['mlflow_experiment_name'])
-    #
-    # with mlflow.start_run():
-    #     log.info(f" START task {cfg.task} - Process ID {os.getpid()}")
-    #     cwd = Path(os.getcwd())
-    #
-    #     # Log hydra config outputs
-    #     path_hydra_config = cwd / '.hydra'
-    #     if path_hydra_config.is_dir():
-    #         mlflow.log_artifacts(str(path_hydra_config), 'hydra')
-    #
-    #     log.info(f"{datetime.utcnow().strftime('%Y-%m-%d_%H:%M:%S')} | END task {cfg.task}")
-    #     mlflow.end_run()
 
 
 class ClusterEmbeddings:
@@ -86,7 +66,7 @@ class ClusterEmbeddings:
             mlflow_tracking_uri: str = 'sqlite',
             mlflow_experiment_name: str = 'v0.4.0_use_multi_clustering_test',
             mlflow_run_name: str = 'embedding_clustering',
-            pipeline_dict: dict = None,
+            pipeline_config: dict = None,
             logs_path: str = 'logs/ClusterEmbeddings',
             **kwargs
     ):
@@ -98,14 +78,13 @@ class ClusterEmbeddings:
         self.mlflow_run_name = mlflow_run_name
         self.mlflow_tracking_uri = mlflow_tracking_uri
 
-        self.pipeline_dict = pipeline_dict
-
         # Create path to store local run
         self.path_local_model = None
         self.logs_path = logs_path
 
-        # pipe to store model
-        self.pipe = None
+        # pipeline to store model
+        self.pipeline_config = pipeline_config
+        self.pipeline = None
 
         # use pre-loaded metadata if running in interactive mode
         # self.df_subs_meta = df_subs_meta
@@ -153,9 +132,9 @@ class ClusterEmbeddings:
             self._create_and_log_config()
 
             log.info(f"Loading clustering model...")
-            cls = D_MODELS_CLUSTERING[self.dict_clustering_algo['model_key']](
-                **self.dict_clustering_algo['model_kwargs']
-            )
+            # TODO(djb): create pipeline with pre-processing steps
+            #  e.g., normalize text &/or apply SVD
+            self._create_pipeline()
 
             log.info(f"Loading embeddings...")
             df_embeddings = self.mlf.read_run_artifact(
@@ -166,20 +145,6 @@ class ClusterEmbeddings:
             )
             log.info(f"{df_embeddings.shape} <- df_embeddings SHAPE")
 
-            # TODO(djb): create pipeline with pre-processing steps
-            #  e.g., normalize text &/or apply SVD
-            if self.pipeline_dict is not None:
-                log.info(f"Checking custom pipeline configs...")
-                if self.pipeline_dict.get('normalize_inputs_for_cosine_distance', False):
-                    self.pipe = Pipeline([
-                        ('normalize', Normalizer(norm='l2')),
-                        ('cluster', cls)
-                    ])
-            else:
-                self.pipe = Pipeline([
-                    ('cluster', cls)
-                ])
-            log.info(f"Pipeline to train: \n {self.pipe}")
 
             # TODO(djb): Fit clustering algo
 
@@ -205,6 +170,52 @@ class ClusterEmbeddings:
         if os.getcwd() == get_original_cwd():
             info(f"    Removing fileHandler...")
             self._remove_file_logger()
+
+    def _create_pipeline(self):
+        """Create pipeline with steps from pipeline config
+
+        When adding steps at the beginning of pipeline, we need to add them from last to first.
+
+        Full pipeline would look something like this:
+        pipe_full = Pipeline([
+            ('normalize', Normalizer(norm='l2')),
+            ('reduce', TruncatedSVD(n_components=50)),
+            ('cluster', AgglomerativeClustering(n_clusters=30, affinity='euclidean', connectivity=False)),
+        ])
+        """
+        cls = D_CLUSTER_MODELS[self.dict_clustering_algo['model_name']](
+            **self.dict_clustering_algo['model_kwargs']
+        )
+        # start with only the clustering algo
+        self.pipeline = Pipeline([
+            ('cluster', cls)
+        ])
+
+        # Then add other steps if set in the config
+        #  Start with latest step first (reduce first, normalize last)
+        l_pipe_steps_to_check = ['reduce', 'normalize']
+        if self.pipeline_config is not None:
+            log.info(f"Checking custom pipeline config...\n  {self.pipeline_config}")
+
+            for step_ in l_pipe_steps_to_check:
+                if self.pipeline_config.get(step_, dict()).get('add_step', False):
+                    log.info(f"  Adding step: {step_}")
+                    trf_name = self.pipeline_config[step_]['name']
+                    trf_kwargs = self.pipeline_config[step_].get('kwargs_', None)
+
+                    # Check if we have custom kwargs for this step:
+                    if trf_kwargs is not None:
+                        transformer_ = D_CLUSTER_PIPELINE[step_][trf_name](
+                            **trf_kwargs
+                        )
+                    else:
+                        transformer_ = D_CLUSTER_PIPELINE[step_][trf_name]()
+
+                    self.pipeline.steps.insert(
+                        0,
+                        (step_, transformer_),
+                    )
+        log.info(f"  Pipeline to train:\n  {self.pipeline}")
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run

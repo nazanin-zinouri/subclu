@@ -1,4 +1,4 @@
-model_key: 'AgglomerativeClustering'  # pull from the clustering_registry
+model_name: 'AgglomerativeClustering'  # pull from the clustering_registry
 
 # Pass these kwargs to the model defined by the key in the clustering_registry
 model_kwargs:

@@ -14,9 +14,16 @@ mlflow_experiment_name: 'v0.4.0_use_multi_clustering'  # 'v0.4.0_use_multi_clust
 #  Needed for AgglomerativeClustering and other clustering algos that
 #  are limited to euclidean distance
 pipeline:
-  normalize_inputs_for_cosine_distance: true
-  apply_svd: false
-  svd_dimensions: 50
+  normalize:
+    add_step: true
+    name: Normalizer
+    kwargs:
+      norm: l2
+  reduce:
+    add_step: false
+    name: TruncatedSVD
+    kwargs:
+      n_components: 50
 
 # Change n_jobs(parallel jobs) & logging for hydra itself
 hydra:
