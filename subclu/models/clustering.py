@@ -3,7 +3,6 @@ Module to cluster embeddings that have already been aggregated
 """
 from datetime import datetime
 import logging
-from logging import info
 import os
 from pathlib import Path
 # from typing import Union
@@ -44,6 +43,7 @@ def culster_embeddings(cfg: DictConfig) -> object:
     cluster = ClusterEmbeddings(
         dict_data_embeddings_to_cluster=cfg['data_embeddings_to_cluster'],
         dict_clustering_algo=cfg['clustering_algo'],
+        embeddings_to_cluster=cfg['embeddings_to_cluster'],
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
         mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
         mlflow_run_name=(
@@ -120,27 +120,11 @@ class ClusterEmbeddings:
             self.mlf.log_cpu_count()
             self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
-            if os.getcwd() != get_original_cwd():
-                # hydra takes care of creating a custom working directory
-                log.info(f"Using hydra's path")
-                print(f"  Current working directory : {os.getcwd()}")
-                print(f"  Orig working directory    : {get_original_cwd()}")
-                self.path_local_model = Path(os.getcwd())
-            else:
-                # create local path to store artifacts before logging to mlflow
-                self.path_local_model = get_project_subfolder(
-                    f"data/models/cluster_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{self.mlflow_run_name}"
-                )
-                Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
-                log.info(f"  Local model saving directory: {self.path_local_model}")
-                self._init_file_log()
+            self._set_path_local_model()
 
-            # Log configuration so we can replicate run
             self._create_and_log_config()
 
-            log.info(f"Loading clustering model...")
-            # TODO(djb): create pipeline with pre-processing steps
-            #  e.g., normalize text &/or apply SVD
+            log.info(f"Creating pipeline...")
             self._create_pipeline()
 
             log.info(f"Loading embeddings...")
@@ -232,6 +216,23 @@ class ClusterEmbeddings:
                         (step_, transformer_),
                     )
         log.info(f"  Pipeline to train:\n  {self.pipeline}")
+
+    def _set_path_local_model(self):
+        """Set where to save artifacts locally for this model"""
+        if os.getcwd() != get_original_cwd():
+            # hydra takes care of creating a custom working directory
+            log.info(f"Using hydra's path")
+            print(f"  Current working directory : {os.getcwd()}")
+            print(f"  Orig working directory    : {get_original_cwd()}")
+            self.path_local_model = Path(os.getcwd())
+        else:
+            # create local path to store artifacts before logging to mlflow
+            self.path_local_model = get_project_subfolder(
+                f"data/models/cluster_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{self.mlflow_run_name}"
+            )
+            Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
+            log.info(f"  Local model saving directory: {self.path_local_model}")
+            self._init_file_log()
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run
