@@ -67,6 +67,7 @@ EXTRAS_REQUIRE = {
         # Google pre-installed/built-in services
         #  For some reason, pip wanted to update a bunch of these
         #  when installing hydra-core
+        "google-cloud-storage >= 1.37.1",
         "google-api-core == 1.31.2",
         "google-api-python-client == 2.22.0",
         "google-apitools == 0.5.31",
