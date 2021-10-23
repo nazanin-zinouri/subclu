@@ -23,6 +23,7 @@ from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import MlflowLogger
 from ..utils import get_project_subfolder
+from ..data.data_loaders import LoadSubreddits, LoadPosts
 
 
 from .clustering_registry import D_CLUSTER_MODELS, D_CLUSTER_PIPELINE
@@ -141,6 +142,12 @@ class ClusterEmbeddings:
                  'input_embeddings-n_cols': c_}
             )
 
+            # TODO(djb): load metadata so we can filter
+            self._load_metadata_for_filtering()
+
+            # TODO(djb) apply filtering
+            # self._apply_filtering()
+
             # TODO(djb): Fit clustering algo
 
             # TODO(djb): log pipeline params
@@ -216,6 +223,23 @@ class ClusterEmbeddings:
                         (step_, transformer_),
                     )
         log.info(f"  Pipeline to train:\n  {self.pipeline}")
+
+    def _load_metadata_for_filtering(self):
+        """Load metadata to filter embeddings"""
+        pass
+        # TODO(djb)
+        # df_subs = LoadSubreddits(
+        #     bucket_name=d_config_text_and_meta['bucket_name'],
+        #     folder_path=d_config_text_and_meta['folder_subreddits_text_and_meta'],
+        #     folder_posts=d_config_text_and_meta['folder_posts_text_and_meta'],
+        #     columns=None,
+        #     col_new_manual_topic=col_manual_labels,
+        # ).read_apply_transformations_and_merge_post_aggs(
+        #     cols_post='post_count_only_',
+        #     df_format='dask',
+        #     read_fxn='dask',
+        #     unique_check=False,
+        # )
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
