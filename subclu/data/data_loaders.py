@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Union
 
 from dask import dataframe as dd
+import dask.array as da
 from google.cloud import storage
 import numpy as np
 import pandas as pd
@@ -42,6 +43,9 @@ class LoadPosts:
             col_unique_check: str = 'post_id',
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             df_format: str = 'pandas',
+            read_fxn: Union[callable, str] = 'dask',
+            unique_check: bool = True,
+            verbose: bool = False,
     ):
         """
         Args:
@@ -60,12 +64,13 @@ class LoadPosts:
 
         self.local_path_root = local_path_root
         self.df_format = df_format
-        if df_format == 'pandas':
-            self.read_fxn = pd.read_parquet
-        elif df_format == 'dask':
+
+        if read_fxn == 'dask':
             self.read_fxn = dd.read_parquet
+        elif read_fxn == 'pandas':
+            self.read_fxn = pd.read_parquet
         else:
-            raise NotImplementedError(f"Format not implemented:  {df_format}")
+            self.read_fxn = read_fxn
 
         if columns == 'aggregate_embeddings_':
             self.columns = [
@@ -99,18 +104,42 @@ class LoadPosts:
         else:
             self.columns = columns
 
+        # unique check only gets computed if the df_format is pandas
+        #  otherwise it's super expensive on 10+ million rows
+        self.unique_check = unique_check
+        self.verbose = verbose
+
     def read_raw(self) -> pd.DataFrame:
         """Read raw files w/o any transformations"""
-        # TODO(djb) locally cache before reading
+        info(f"Reading raw data...")
         self._local_cache()
 
-        df = self.read_fxn(
-            # path=f"gs://{self.bucket_name}/{self.folder_path}",
-            path=self.path_local_folder,
-            columns=self.columns
-        )
+        if self.verbose:
+            info(f"  Read fxn: {self.read_fxn}")
+            info(f"  df format: {self.df_format}")
 
-        if self.df_format == 'pandas':
+        if (self.read_fxn == dd.read_parquet) & (self.df_format == 'pandas'):
+            if self.verbose:
+                info(f"  Reading with dask and converting to pandas...")
+            df = self.read_fxn(
+                # path=f"gs://{self.bucket_name}/{self.folder_path}",
+                path=self.path_local_folder,
+                columns=self.columns,
+            ).compute()
+        else:
+            if self.verbose:
+                info(f"  Reading without .compute(): {self.read_fxn}")
+            df = self.read_fxn(
+                # path=f"gs://{self.bucket_name}/{self.folder_path}",
+                path=self.path_local_folder,
+                columns=self.columns
+            )
+
+        if all([self.df_format == 'pandas', self.unique_check]):
+            if self.verbose:
+                info(f"  Checking ID uniqueness...")
+            # Make this uniqueness check optional b/c it can take
+            #   +10 seconds on 8 million posts
             assert len(df) == df[self.col_unique_check].nunique()
 
         return df
@@ -127,7 +156,7 @@ class LoadPosts:
         self.path_local_folder = Path(f"{self.local_path_root}/{self.folder_path}")
         # need to check the parent folder only:
         artifact_folder = self.folder_path.split('/')[-1]
-        info(f"Local folder to download artifact(s):\n  {self.path_local_folder}")
+        info(f"  Local folder to download artifact(s):\n  {self.path_local_folder}")
         Path.mkdir(self.path_local_folder, exist_ok=True, parents=True)
 
         bucket = storage_client.get_bucket(self.bucket_name)
@@ -150,13 +179,30 @@ class LoadPosts:
 
     def read_and_apply_transformations(self) -> pd.DataFrame:
         """Read & apply all transformations in a single call"""
-        info(f"Reading raw data...")
         df = self.read_raw()
 
         info(f"  Applying transformations...")
         # plotly throws out errors if we try use a col with nulls in a plot
         if 'post_nsfw' in df.columns:
             df['post_nsfw'] = df['post_nsfw'].fillna('unlabeled')
+
+        # Dask is hot garbage when assigning/creating new columns, so
+        # convert dask to pandas before applying transformations
+        l_cols_for_transforming = [
+            'weighted_language',
+            'post_type',
+        ]
+        if isinstance(df, dd.DataFrame):
+            if any([c_ in df.columns for c_ in l_cols_for_transforming]):
+                logging.warning(f"  CONVERTING dask df to pandas")
+                df = df.compute()
+
+        if self.col_new_manual_topic not in df.columns:
+            # TODO(djb): this column isn't used anymore, maybe remove it in the future?
+            try:
+                df[self.col_new_manual_topic] = create_new_manual_topic_column(df)
+            except (KeyError, TypeError) as e:
+                logging.error(f"Error creating manual topic... {e}")
 
         # Start using the list of Languages in USE-multilingual to get a better idea of
         #  other languages, not just German
@@ -173,6 +219,7 @@ class LoadPosts:
                 True,
                 False
             )
+
         if 'post_type' in df.columns:
             df['post_type_agg3'] = np.where(
                 df['post_type'].isin(['text', 'image', 'link']),
@@ -184,12 +231,6 @@ class LoadPosts:
                 df['post_type'],
                 'other'
             )
-
-        if self.col_new_manual_topic not in df.columns:
-            try:
-                df[self.col_new_manual_topic] = create_new_manual_topic_column(df)
-            except KeyError as e:
-                logging.error(f"Error creating manual topic... {e}")
 
         return df
 
@@ -211,6 +252,9 @@ class LoadSubreddits(LoadPosts):
             col_unique_check: str = 'subreddit_name',
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             df_format: str = 'pandas',
+            read_fxn: callable = dd.read_parquet,
+            unique_check: bool = True,
+            verbose: bool = False,
     ) -> None:
         super().__init__(
             bucket_name=bucket_name,
@@ -220,6 +264,9 @@ class LoadSubreddits(LoadPosts):
             col_unique_check=col_unique_check,
             local_path_root=local_path_root,
             df_format=df_format,
+            read_fxn=read_fxn,
+            unique_check=unique_check,
+            verbose=verbose,
         )
         self.folder_posts = folder_posts
         # TODO(djb)
@@ -234,13 +281,17 @@ class LoadSubreddits(LoadPosts):
             self,
             df_posts: pd.DataFrame = None,
             cols_post: Union[iter, str] = 'all_aggs_',
+            df_format: str = 'dask',
+            read_fxn: str = 'dask',
+            unique_check: bool = False,
+            **posts_kwargs,
     ) -> pd.DataFrame:
         """Besides loading the sub-data, load post-level data & merge aggregates from post-level"""
         if df_posts is None:
             info(f"Loading df_posts from: {self.folder_posts}")
             if cols_post == 'all_aggs_':
                 # limit to only cols absolutely needed to save time & RAM
-                cols_post = [
+                cols_post_ = [
                     'subreddit_name',
                     'subreddit_id',
                     'post_id',
@@ -251,17 +302,37 @@ class LoadSubreddits(LoadPosts):
                     'text_len',             # Get median text len
                 ]
             elif cols_post == 'post_count_only_':
-                cols_post = [
+                cols_post_ = [
                     'subreddit_name',
                     'subreddit_id',
                     'post_id',
                 ]
+            else:
+                cols_post_ = cols_post
 
-            df_posts = LoadPosts(
-                bucket_name=self.bucket_name,
-                folder_path=self.folder_posts,
-                columns=cols_post,
-            ).read_and_apply_transformations()
+            # The fastes method seems to be:
+            #  do everything in dask until the last moment
+            if all([df_format == 'dask', cols_post == 'post_count_only_']):
+                df_posts = LoadPosts(
+                    bucket_name=self.bucket_name,
+                    folder_path=self.folder_posts,
+                    columns=cols_post_,
+                    df_format=df_format,
+                    read_fxn=read_fxn,
+                    unique_check=unique_check,
+                    **posts_kwargs,
+                ).read_and_apply_transformations().compute()
+            else:
+                # in case the output is already a pandas df
+                df_posts = LoadPosts(
+                    bucket_name=self.bucket_name,
+                    folder_path=self.folder_posts,
+                    columns=cols_post_,
+                    df_format=df_format,
+                    read_fxn=read_fxn,
+                    unique_check=unique_check,
+                    **posts_kwargs,
+                ).read_and_apply_transformations()
 
         info(f"  reading sub-level data & merging with aggregates...")
         df_subs = (
@@ -324,6 +395,9 @@ class LoadComments(LoadPosts):
             col_unique_check: str = 'comment_id',
             local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
             df_format: str = 'pandas',
+            read_fxn: callable = dd.read_parquet,
+            unique_check: bool = True,
+            verbose: bool = False,
     ) -> None:
         super().__init__(
             bucket_name=bucket_name,
@@ -333,6 +407,9 @@ class LoadComments(LoadPosts):
             col_unique_check=col_unique_check,
             local_path_root=local_path_root,
             df_format=df_format,
+            read_fxn=read_fxn,
+            unique_check=unique_check,
+            verbose=verbose,
         )
         self.folder_posts = folder_posts
 
