@@ -144,9 +144,21 @@ class ClusterEmbeddings:
             self._load_metadata_for_filtering()
 
             # TODO(djb) apply filtering
-            # self._apply_filtering()
+            self._apply_filtering()
 
             # TODO(djb): Fit clustering algo
+            log.info(f"-- Training clustering model --")
+            t_start_model_fit = datetime.utcnow()
+            self.pipeline.fit(
+                df_embeddings[self.l_cols_embeddings]
+            )
+            total_model_fit_time = elapsed_time(
+                start_time=t_start_model_fit,
+                log_label='Model fit() time', verbose=True
+            )
+            mlflow.log_metric('model_fit_time_minutes',
+                              total_model_fit_time / timedelta(minutes=1)
+                              )
 
             # TODO(djb): log pipeline params
             mlflow_logger.log_pipeline_params(
@@ -158,9 +170,16 @@ class ClusterEmbeddings:
 
             # TODO(djb): Save predictions & log to mlflow
 
-            # TODO(djb): Get metrics to compare clusters
+            # TODO(djb): Create, save & log dendrograms
 
-            # TODO(djb): Save clustering algo & log to mlflow
+            # TODO(djb): Get metrics to compare clusters: elbow & "optimal" k's
+
+            # TODO(djb): Get metrics to compare clusters: Silhouette
+
+            # TODO(djb): Get metrics to compare clusters:
+            #  - classification report
+            #  - adjusted metrics (rand index, mutual info)
+            #  - homegeneity
 
             # TODO(djb):
 
@@ -252,6 +271,7 @@ class ClusterEmbeddings:
     def _load_metadata_for_filtering(self):
         """Load metadata to filter embeddings"""
         pass
+        log.warning(f"** Loading metadata NOT IMPLEMENTED! **")
         # TODO(djb)
         # df_subs = LoadSubreddits(
         #     bucket_name=d_config_text_and_meta['bucket_name'],
@@ -265,6 +285,14 @@ class ClusterEmbeddings:
         #     read_fxn='dask',
         #     unique_check=False,
         # )
+
+
+    def _apply_filtering(self):
+        """If we have kwargs for filtering, filter out embeddings
+        example: if a sub only has 2 or 3 posts, then we're not going to trust
+        those embeddings very much.
+        """
+        log.warning(f"** Filtering NOT IMPLEMENTED! **")
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
@@ -369,3 +397,8 @@ class ClusterEmbeddings:
 
 if __name__ == "__main__":
     culster_embeddings()
+
+
+#
+# ~ fin
+#
