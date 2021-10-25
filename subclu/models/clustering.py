@@ -1,29 +1,37 @@
 """
 Module to cluster embeddings that have already been aggregated
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 from pathlib import Path
 # from typing import Union
 
-import pandas as pd
 import mlflow
+import mlflow.sklearn
+from mlflow.models.signature import infer_signature
+
 import hydra
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig
 
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import Normalizer
+# import numpy as np
+import pandas as pd
 
-# NOTE: when running from CLI, run script as:
+from sklearn.pipeline import Pipeline
+
+# NOTE:
+# To avoid relative import errors when running from CLI, run script with:
+#  * -m flag
+#  * no ".py" ending
+# Example:
 #  python -m subclu.test.test_parallel_jobs
-# Because otherwise you'll get relative import errors
-from ..utils.tqdm_logger import LogTQDM
+# from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import MlflowLogger
 from ..utils import get_project_subfolder
-from ..data.data_loaders import LoadSubreddits, LoadPosts
+from ..utils.eda import elapsed_time
+# from ..data.data_loaders import LoadSubreddits, LoadPosts
 
 
 from .clustering_registry import D_CLUSTER_MODELS, D_CLUSTER_PIPELINE
@@ -108,6 +116,7 @@ class ClusterEmbeddings:
     def run_clustering(self):
         """"""
         log.info(f"== Start run_aggregation() method ==")
+        t_start_run_clustering = datetime.utcnow()
 
         log.info(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
         self.mlf.set_experiment(self.mlflow_experiment_name)
@@ -129,18 +138,7 @@ class ClusterEmbeddings:
             self._create_pipeline()
 
             log.info(f"Loading embeddings...")
-            df_embeddings = self.mlf.read_run_artifact(
-                run_id=self.dict_data_embeddings_to_cluster['run_uuid'],
-                artifact_folder=self.dict_data_embeddings_to_cluster[self.embeddings_to_cluster],
-                read_function='pd_parquet',
-                cache_locally=True,
-            )
-            r_, c_ = df_embeddings.shape
-            log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
-            mlflow.log_metrics(
-                {'input_embeddings-n_rows': r_,
-                 'input_embeddings-n_cols': c_}
-            )
+            df_embeddings = self._load_embeddings()
 
             # TODO(djb): load metadata so we can filter
             self._load_metadata_for_filtering()
@@ -171,6 +169,12 @@ class ClusterEmbeddings:
             if path_hydra_config.is_dir():
                 mlflow.log_artifacts(str(path_hydra_config), 'hydra')
 
+            # Finish logging total time + end mlflow run
+            total_fxn_time = elapsed_time(start_time=t_start_run_clustering,
+                                          log_label='Total Clustering fxn time', verbose=True)
+            mlflow.log_metric('vectorizing_time_minutes',
+                              total_fxn_time / timedelta(minutes=1)
+                              )
             log.info(f"=== END clustering ===")
             mlflow.end_run()
 
@@ -223,6 +227,27 @@ class ClusterEmbeddings:
                         (step_, transformer_),
                     )
         log.info(f"  Pipeline to train:\n  {self.pipeline}")
+
+    def _load_embeddings(self):
+        """Load embeddings for clustering"""
+        df_embeddings = self.mlf.read_run_artifact(
+            run_id=self.dict_data_embeddings_to_cluster['run_uuid'],
+            artifact_folder=self.dict_data_embeddings_to_cluster[self.embeddings_to_cluster],
+            read_function='pd_parquet',
+            cache_locally=True,
+        )
+        self.l_ix_subs = ['subreddit_name', 'subreddit_id']
+        self.l_ix_post = ['subreddit_name', 'subreddit_id', 'post_id']
+        self.l_cols_embeddings = [c for c in df_embeddings.columns if c.startswith('embeddings_')]
+
+        r_, c_ = df_embeddings.shape
+        log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
+        mlflow.log_metrics(
+            {'input_embeddings-n_rows': r_,
+             'input_embeddings-n_cols': c_}
+        )
+        return df_embeddings
+
 
     def _load_metadata_for_filtering(self):
         """Load metadata to filter embeddings"""

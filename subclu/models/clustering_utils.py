@@ -19,7 +19,6 @@ import pandas as pd
 from scipy.cluster.hierarchy import dendrogram
 
 
-
 def create_linkage_for_dendrogram(model) -> pd.DataFrame:
     """
     Create linkage matrix from an Sklearn model (e.g., AgglomerativeCluster)
@@ -64,7 +63,11 @@ def fancy_dendrogram(
         dist_fontsize: float = 13,
         **kwargs
 ):
-    """Wrapper around dendogram diagram that adds distances & cut off"""
+    """Wrapper around dendogram diagram that adds distances & cut off
+    TODO(djb): fix orientation right or left:
+        - The axis labels are flipped
+        - The distances are in the wront place
+    """
     if max_d and 'color_threshold' not in kwargs:
         kwargs['color_threshold'] = max_d
 
@@ -91,19 +94,20 @@ def fancy_dendrogram(
 
 def plot_elbow_and_get_k(
         Z: Union[pd.DataFrame, np.ndarray],
-        last_n: int = 500,
+        n_clusters_to_check: int = 600,
         figsize: tuple = (14, 8),
         plot_title: str = 'Cluster Distances & Optimal k',
         xlabel: str = 'Number of clusters (k)',
         ylabel: str = 'Distance',
+        col_optimal_k: str = 'optimal_k_for_interval',
 ) -> pd.DataFrame:
     """Use 'elbow' method to get an optimal value of k-clusters"""
     fig = plt.figure(figsize=figsize)
 
     try:
-        last = Z[-last_n:, 2]
+        last = Z[-n_clusters_to_check:, 2]
     except TypeError:
-        last = Z.to_numpy()[-last_n:, 2]
+        last = Z.to_numpy()[-n_clusters_to_check:, 2]
 
     last_rev = last[::-1]
     idxs = np.arange(1, len(last) + 1)
@@ -117,19 +121,20 @@ def plot_elbow_and_get_k(
         pd.DataFrame(
             {'acceleration': acceleration_rev}
         )
-            .reset_index()
-            .assign(index=lambda x: x['index'] + 2)
-            .rename(columns={'index': 'k'})
+        .reset_index()
+        .assign(index=lambda x: x['index'] + 2)
+        .rename(columns={'index': 'k'})
     )
 
     k_intervals = [
-        (2, 10),
+        # (2, 10),  # This one is so generic it's kind of useless
         (10, 20),
         (20, 50),
         (50, 100),
         (100, 200),
         (200, 300),
-        (300, 500),
+        (300, 400),
+        (400, 600),
     ]
     viridis = cm.get_cmap('viridis', len(k_intervals))
 
@@ -139,7 +144,7 @@ def plot_elbow_and_get_k(
         try:
             df_accel.loc[
                 (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
-                'max_accel_for_k_interval'
+                col_optimal_k
             ] = f"{k_tup_[0]:03d}_to_{k_tup_[1]:03d}"
 
             k_ = df_accel.loc[
@@ -156,7 +161,7 @@ def plot_elbow_and_get_k(
     plt.ylabel(ylabel)
 
     plt.plot(idxs[:-2] + 1, acceleration_rev, label='acceleration')
-    plt.legend()
+    plt.legend(loc=(1.02, 0.42))
     plt.show()
     # TODO(djb): add flag to save it b/c we'll need to save & log it to mlflow
 
