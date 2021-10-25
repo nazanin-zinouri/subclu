@@ -6,7 +6,11 @@ Use config to call specific model
 from sklearn.cluster import KMeans, DBSCAN, OPTICS, AgglomerativeClustering
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import Normalizer
-
+from sklearn.metrics import (
+    classification_report,
+    adjusted_mutual_info_score, adjusted_rand_score,
+    homogeneity_score,
+)
 
 
 D_CLUSTER_PIPELINE = {
@@ -25,6 +29,13 @@ D_CLUSTER_MODELS = {
     'KMeans': KMeans,
     'DBSCAN': DBSCAN,
     'OPTICS': OPTICS,
+}
+
+
+D_CLUSTER_METRICS_WITH_KNOWN_LABELS = {
+    'adjusted_mutual_info_score': adjusted_mutual_info_score,
+    'adjusted_rand_score': adjusted_rand_score,
+    'homogeneity_score': homogeneity_score,
 }
 
 

@@ -12,14 +12,16 @@ import mlflow.sklearn
 from mlflow.models.signature import ModelSignature
 from mlflow.types.schema import Schema, ColSpec
 
+from tqdm import tqdm
 import hydra
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig
 
-# import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
+from scipy.cluster.hierarchy import fcluster
 from sklearn.pipeline import Pipeline
 
 # NOTE:
@@ -33,13 +35,16 @@ from ..utils import mlflow_logger
 from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
-# from ..data.data_loaders import LoadSubreddits, LoadPosts
+from ..data.data_loaders import LoadSubreddits, LoadPosts
 
 from .clustering_utils import (
     create_linkage_for_dendrogram, fancy_dendrogram,
     plot_elbow_and_get_k
 )
-from .clustering_registry import D_CLUSTER_MODELS, D_CLUSTER_PIPELINE
+from .clustering_registry import (
+    D_CLUSTER_MODELS, D_CLUSTER_PIPELINE,
+    D_CLUSTER_METRICS_WITH_KNOWN_LABELS
+)
 
 
 log = logging.getLogger(__name__)
@@ -57,6 +62,7 @@ def culster_embeddings(cfg: DictConfig) -> object:
     cluster = ClusterEmbeddings(
         dict_data_embeddings_to_cluster=cfg['data_embeddings_to_cluster'],
         dict_clustering_algo=cfg['clustering_algo'],
+        dict_data_text_and_metadata=cfg['data_text_and_metadata'],
         embeddings_to_cluster=cfg['embeddings_to_cluster'],
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
         n_sample_embedding_rows=cfg.get('n_sample_embedding_rows', None),
@@ -64,6 +70,7 @@ def culster_embeddings(cfg: DictConfig) -> object:
         mlflow_run_name=(
             f"{cfg.get('mlflow_run_name', 'embedding_clustering')}-{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
         ),
+        dict_filter_embeddings=cfg.get('filter_embeddings', None),
         pipeline_config=cfg.get('pipeline', None),
         logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
     )
@@ -82,18 +89,21 @@ class ClusterEmbeddings:
             self,
             dict_data_embeddings_to_cluster: dict,
             dict_clustering_algo: dict,
+            dict_data_text_and_metadata: dict,
             embeddings_to_cluster: str = 'df_sub_level_agg_c_post_comments_and_sub_desc',
             n_sample_embedding_rows: int = None,
             mlflow_tracking_uri: str = 'sqlite',
             mlflow_experiment_name: str = 'v0.4.0_use_multi_clustering_test',
             mlflow_run_name: str = 'embedding_clustering',
             pipeline_config: dict = None,
+            dict_filter_embeddings: dict = None,
             logs_path: str = 'logs/ClusterEmbeddings',
             # **kwargs
     ):
         """"""
         self.dict_data_embeddings_to_cluster = dict_data_embeddings_to_cluster
         self.dict_clustering_algo = dict_clustering_algo
+        self.dict_data_text_and_metadata = dict_data_text_and_metadata
 
         self.embeddings_to_cluster = embeddings_to_cluster
         self.n_sample_embedding_rows = n_sample_embedding_rows
@@ -110,6 +120,7 @@ class ClusterEmbeddings:
         # pipeline to store model
         self.pipeline_config = pipeline_config
         self.pipeline = None
+        self.dict_filter_embeddings = dict_filter_embeddings
 
         # use pre-loaded metadata if running in interactive mode
         # self.df_subs_meta = df_subs_meta
@@ -149,11 +160,17 @@ class ClusterEmbeddings:
             log.info(f"Loading embeddings...")
             df_embeddings = self._load_embeddings()
 
-            # TODO(djb): load metadata so we can filter
-            self._load_metadata_for_filtering()
+            if self.dict_filter_embeddings is not None:
+                if self.dict_filter_embeddings.get('filter_subreddits', False):
+                    log.info(f"-- Loading data to filter SUBREDDITS")
+                    # TODO(djb): load metadata so we can filter
+                    df_subs = self._load_metadata_for_filtering()
 
-            # TODO(djb) apply filtering
-            self._apply_filtering()
+                    # TODO(djb) apply filtering
+                    df_embeddings = self._apply_filtering(
+                        df_embeddings=df_embeddings,
+                        df_subs=df_subs,
+                    )
 
             # TODO(djb): Fit clustering algo
             log.info(f"-- Training clustering model --")
@@ -183,7 +200,7 @@ class ClusterEmbeddings:
             self._get_linkage_and_optimal_ks()
 
             # TODO(djb): Get predictions for each row (subreddit or post)
-
+            self._get_cluster_labels(df_embeddings=df_embeddings)
             # TODO(djb): Save predictions & log to mlflow
 
             # TODO(djb): Create, save & log dendrograms
@@ -287,32 +304,56 @@ class ClusterEmbeddings:
         )
         return df_embeddings
 
-
-    def _load_metadata_for_filtering(self):
+    def _load_metadata_for_filtering(self) -> pd.DataFrame:
         """Load metadata to filter embeddings"""
         pass
         log.warning(f"** Loading metadata NOT IMPLEMENTED! **")
         # TODO(djb)
-        # df_subs = LoadSubreddits(
-        #     bucket_name=d_config_text_and_meta['bucket_name'],
-        #     folder_path=d_config_text_and_meta['folder_subreddits_text_and_meta'],
-        #     folder_posts=d_config_text_and_meta['folder_posts_text_and_meta'],
-        #     columns=None,
-        #     col_new_manual_topic=col_manual_labels,
-        # ).read_apply_transformations_and_merge_post_aggs(
-        #     cols_post='post_count_only_',
-        #     df_format='dask',
-        #     read_fxn='dask',
-        #     unique_check=False,
-        # )
+        return LoadSubreddits(
+            bucket_name=self.dict_data_text_and_metadata['bucket_name'],
+            folder_path=self.dict_data_text_and_metadata['folder_subreddits_text_and_meta'],
+            folder_posts=self.dict_data_text_and_metadata['folder_posts_text_and_meta'],
+            columns=None,
+            # col_new_manual_topic=col_manual_labels,
+        ).read_apply_transformations_and_merge_post_aggs(
+            cols_post='post_count_only_',
+            df_format='dask',
+            read_fxn='dask',
+            unique_check=False,
+        )
 
-
-    def _apply_filtering(self):
+    def _apply_filtering(
+            self,
+            df_embeddings: pd.DataFrame,
+            df_subs: pd.DataFrame,
+    ) -> pd.DataFrame:
         """If we have kwargs for filtering, filter out embeddings
         example: if a sub only has 2 or 3 posts, then we're not going to trust
         those embeddings very much.
         """
-        log.warning(f"** Filtering NOT IMPLEMENTED! **")
+        log.info(f"** Applying filters... **")
+        col_filter_ = self.dict_filter_embeddings['filter_subreddits']['filter_column']
+        min_value = self.dict_filter_embeddings['filter_subreddits']['minimum_column_value']
+        log.info(f"  {col_filter_} >= {min_value}")
+
+        df_embeddings = (
+            df_subs[self.l_ix_subs + [col_filter_]]
+            .merge(
+                df_embeddings,
+                how='right',
+                on=self.l_ix_subs,
+            )
+        )
+        mask_above_threshold = df_embeddings[col_filter_] >= min_value
+        log.info(f"  Subreddits to drop: {(~mask_above_threshold).sum():,.0f}")
+
+        r_, c_ = df_embeddings[mask_above_threshold].shape
+        log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE FILTERED")
+        mlflow.log_metrics(
+            {'filtered_embeddings-n_rows': r_,
+             'filtered_embeddings-n_cols': c_}
+        )
+        return df_embeddings[mask_above_threshold]
 
     def _log_pipeline_to_mlflow(self):
         """Set schema so we can og the mlflow model"""
