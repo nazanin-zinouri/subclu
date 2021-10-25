@@ -9,7 +9,8 @@ from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
-from mlflow.models.signature import infer_signature
+from mlflow.models.signature import ModelSignature
+from mlflow.types.schema import Schema, ColSpec
 
 import hydra
 from hydra.utils import get_original_cwd
@@ -54,6 +55,7 @@ def culster_embeddings(cfg: DictConfig) -> object:
         dict_clustering_algo=cfg['clustering_algo'],
         embeddings_to_cluster=cfg['embeddings_to_cluster'],
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
+        n_sample_embedding_rows=cfg.get('n_sample_embedding_rows', None),
         mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
         mlflow_run_name=(
             f"{cfg.get('mlflow_run_name', 'embedding_clustering')}-{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
@@ -77,6 +79,7 @@ class ClusterEmbeddings:
             dict_data_embeddings_to_cluster: dict,
             dict_clustering_algo: dict,
             embeddings_to_cluster: str = 'df_sub_level_agg_c_post_comments_and_sub_desc',
+            n_sample_embedding_rows: int = None,
             mlflow_tracking_uri: str = 'sqlite',
             mlflow_experiment_name: str = 'v0.4.0_use_multi_clustering_test',
             mlflow_run_name: str = 'embedding_clustering',
@@ -89,6 +92,7 @@ class ClusterEmbeddings:
         self.dict_clustering_algo = dict_clustering_algo
 
         self.embeddings_to_cluster = embeddings_to_cluster
+        self.n_sample_embedding_rows = n_sample_embedding_rows
 
         self.mlflow_experiment_name = mlflow_experiment_name
         self.mlflow_run_name = mlflow_run_name
@@ -166,7 +170,10 @@ class ClusterEmbeddings:
                 save_path=self.path_local_model,
             )
 
-            # TODO(djb): Get predictions for each row
+            # TODO(djb): Save clustering algo & log to mlflow
+            self._log_pipeline_to_mlflow()
+
+            # TODO(djb): Get predictions for each row (subreddit or post)
 
             # TODO(djb): Save predictions & log to mlflow
 
@@ -259,6 +266,10 @@ class ClusterEmbeddings:
         self.l_ix_post = ['subreddit_name', 'subreddit_id', 'post_id']
         self.l_cols_embeddings = [c for c in df_embeddings.columns if c.startswith('embeddings_')]
 
+        if self.n_sample_embedding_rows is not None:
+            log.info(f"  SAMPLING n_rows: {self.n_sample_embedding_rows}")
+            df_embeddings = df_embeddings.sample(n=self.n_sample_embedding_rows)
+
         r_, c_ = df_embeddings.shape
         log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
         mlflow.log_metrics(
@@ -293,6 +304,23 @@ class ClusterEmbeddings:
         those embeddings very much.
         """
         log.warning(f"** Filtering NOT IMPLEMENTED! **")
+
+    def _log_pipeline_to_mlflow(self):
+        """Set schema so we can og the mlflow model"""
+        log.info(f"Getting model signature...")
+        # TODO(djb): add schema
+        log.warning(f" Model-SCHEMA is currently null")
+        # We can't infer the signature b/c clustering models don't usually have a .predict() method
+        # signature = infer_signature(
+        #     df_embeddings[self.l_cols_embeddings].iloc[:20, :],
+        #     self.pipeline.predict(df_embeddings[self.l_cols_embeddings].iloc[:20, :])
+        # )
+
+        log.info(f"  Logging model to mlflow...")
+        mlflow.sklearn.log_model(
+            self.pipeline, "clustering_model",
+            # signature=signature
+        )
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
