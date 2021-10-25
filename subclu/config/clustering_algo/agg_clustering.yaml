@@ -2,7 +2,9 @@ model_name: 'AgglomerativeClustering'  # pull from the clustering_registry
 
 # Pass these kwargs to the model defined by the key in the clustering_registry
 model_kwargs:
-  n_clusters: 100
+  n_clusters: 65
   affinity: 'euclidean'
   linkage: 'ward'
-  connectivity: false
+  compute_distances: true
+  compute_full_tree: true
+  connectivity: null
