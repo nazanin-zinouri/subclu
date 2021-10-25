@@ -8,9 +8,11 @@ reference:
 - Describe different ways to use scipy's tools
     - https://joernhees.de/blog/2015/08/26/scipy-hierarchical-clustering-and-dendrogram-tutorial/
 """
-from typing import Union
+import logging
+from typing import Union, Tuple
 
 from matplotlib import pyplot as plt
+from matplotlib import cm
 import numpy as np
 import pandas as pd
 
@@ -87,6 +89,78 @@ def fancy_dendrogram(
     return ddata
 
 
+def plot_elbow_and_get_k(
+        Z: Union[pd.DataFrame, np.ndarray],
+        last_n: int = 500,
+        figsize: tuple = (14, 8),
+        plot_title: str = 'Cluster Distances & Optimal k',
+        xlabel: str = 'Number of clusters (k)',
+        ylabel: str = 'Distance',
+) -> pd.DataFrame:
+    """Use 'elbow' method to get an optimal value of k-clusters"""
+    fig = plt.figure(figsize=figsize)
+
+    try:
+        last = Z[-last_n:, 2]
+    except TypeError:
+        last = Z.to_numpy()[-last_n:, 2]
+
+    last_rev = last[::-1]
+    idxs = np.arange(1, len(last) + 1)
+    plt.plot(idxs, last_rev, label='distances')
+
+    acceleration = np.diff(last, 2)  # 2nd derivative of the distances
+    acceleration_rev = acceleration[::-1]
+
+    # create a df to track k, acceleration, and best-k in n interval
+    df_accel = (
+        pd.DataFrame(
+            {'acceleration': acceleration_rev}
+        )
+            .reset_index()
+            .assign(index=lambda x: x['index'] + 2)
+            .rename(columns={'index': 'k'})
+    )
+
+    k_intervals = [
+        (2, 10),
+        (10, 20),
+        (20, 50),
+        (50, 100),
+        (100, 200),
+        (200, 300),
+        (300, 500),
+    ]
+    viridis = cm.get_cmap('viridis', len(k_intervals))
+
+    for i, k_tup_ in enumerate(k_intervals):
+        mask_interval_coT = df_accel['k'].between(*k_tup_)
+
+        try:
+            df_accel.loc[
+                (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
+                'max_accel_for_k_interval'
+            ] = f"{k_tup_[0]:03d}_to_{k_tup_[1]:03d}"
+
+            k_ = df_accel.loc[
+                (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
+                'k'
+            ].values[0]
+
+            plt.axvline(x=k_, linestyle="--", label=f"k={k_}", color=viridis(i / len(k_intervals)))
+        except Exception as e:
+            logging.warning(f"{e}")
+
+    plt.title(plot_title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+
+    plt.plot(idxs[:-2] + 1, acceleration_rev, label='acceleration')
+    plt.legend()
+    plt.show()
+    # TODO(djb): add flag to save it b/c we'll need to save & log it to mlflow
+
+    return df_accel
 
 
 #
