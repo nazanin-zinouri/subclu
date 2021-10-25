@@ -9,6 +9,7 @@ reference:
     - https://joernhees.de/blog/2015/08/26/scipy-hierarchical-clustering-and-dendrogram-tutorial/
 """
 import logging
+from pathlib import Path
 from typing import Union, Tuple
 
 from matplotlib import pyplot as plt
@@ -61,6 +62,7 @@ def fancy_dendrogram(
         xlabel: str = 'item index OR (cluster size)',
         ylabel: str = 'distance',
         dist_fontsize: float = 13,
+        save_path: Union[str, Path] = None,
         **kwargs
 ):
     """Wrapper around dendogram diagram that adds distances & cut off
@@ -71,6 +73,7 @@ def fancy_dendrogram(
     if max_d and 'color_threshold' not in kwargs:
         kwargs['color_threshold'] = max_d
 
+    fig = plt.figure(figsize=(14, 8))
     ddata = dendrogram(Z, **kwargs)
 
     if not kwargs.get('no_plot', False):
@@ -89,6 +92,12 @@ def fancy_dendrogram(
                              va='top', ha='center')
         if max_d:
             plt.axhline(y=max_d, c='k')
+
+    if save_path is not None:
+        plt.savefig(
+            save_path,
+            dpi=200, bbox_inches='tight', pad_inches=0.2
+        )
     return ddata
 
 
@@ -100,6 +109,7 @@ def plot_elbow_and_get_k(
         xlabel: str = 'Number of clusters (k)',
         ylabel: str = 'Distance',
         col_optimal_k: str = 'optimal_k_for_interval',
+        save_path: Union[str, Path] = None,
 ) -> pd.DataFrame:
     """Use 'elbow' method to get an optimal value of k-clusters"""
     fig = plt.figure(figsize=figsize)
@@ -162,8 +172,14 @@ def plot_elbow_and_get_k(
 
     plt.plot(idxs[:-2] + 1, acceleration_rev, label='acceleration')
     plt.legend(loc=(1.02, 0.42))
-    plt.show()
-    # TODO(djb): add flag to save it b/c we'll need to save & log it to mlflow
+
+    if save_path is not None:
+        plt.savefig(
+            save_path,
+            dpi=200, bbox_inches='tight', pad_inches=0.2
+        )
+    # NOTE: if you plt.show() before saving, plt will create a new fig
+    # plt.show()
 
     return df_accel
 

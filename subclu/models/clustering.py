@@ -17,6 +17,7 @@ from hydra.utils import get_original_cwd
 from omegaconf import DictConfig
 
 # import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from sklearn.pipeline import Pipeline
@@ -29,12 +30,15 @@ from sklearn.pipeline import Pipeline
 #  python -m subclu.test.test_parallel_jobs
 # from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
-from ..utils.mlflow_logger import MlflowLogger
+from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
 # from ..data.data_loaders import LoadSubreddits, LoadPosts
 
-
+from .clustering_utils import (
+    create_linkage_for_dendrogram, fancy_dendrogram,
+    plot_elbow_and_get_k
+)
 from .clustering_registry import D_CLUSTER_MODELS, D_CLUSTER_PIPELINE
 
 
@@ -100,6 +104,7 @@ class ClusterEmbeddings:
 
         # Create path to store local run
         self.path_local_model = None
+        self.path_local_model_figures = None
         self.logs_path = logs_path
 
         # pipeline to store model
@@ -173,13 +178,17 @@ class ClusterEmbeddings:
             # TODO(djb): Save clustering algo & log to mlflow
             self._log_pipeline_to_mlflow()
 
+            # TODO(djb): Get metrics: elbow & "optimal" k's
+            #  Only applies to agg-clutering models
+            self._get_linkage_and_optimal_ks()
+
             # TODO(djb): Get predictions for each row (subreddit or post)
 
             # TODO(djb): Save predictions & log to mlflow
 
             # TODO(djb): Create, save & log dendrograms
 
-            # TODO(djb): Get metrics to compare clusters: elbow & "optimal" k's
+
 
             # TODO(djb): Get metrics to compare clusters: Silhouette
 
@@ -322,6 +331,79 @@ class ClusterEmbeddings:
             # signature=signature
         )
 
+    def _get_linkage_and_optimal_ks(self):
+        """Get model linkage, log it, & find optimal K-values"""
+        try:
+            log.info(f"-- Get linkage matrix for model --")
+            self.X_linkage = create_linkage_for_dendrogram(
+                self.pipeline.steps[-1][1]
+            )
+
+        except Exception as e:
+            log.error(f"Model might not be Hierarchical:\n  {e}")
+
+        try:
+            log.info(f"  Creating dendrogram...")
+            fig = plt.figure(figsize=(14, 8))
+            p_ = 40
+            truncate_mode_ = 'lastp'
+            fancy_dendrogram(
+                self.X_linkage,
+                plot_title='Clustering Algo',
+                annotate_above=self.X_linkage['distance'].quantile(q=0.99),
+                truncate_mode=truncate_mode_,
+                p=p_,
+                orientation='top',
+                show_leaf_counts=True, leaf_rotation=45,
+                show_contracted=False,
+            )
+            plt.savefig(
+                self.path_local_model_figures / (
+                    f"dendrogram"
+                    f"-truncate_mode_{truncate_mode_}"
+                    f"-p_{p_}"
+                    f".png"
+                ),
+                dpi=200, bbox_inches='tight', pad_inches=0.2
+            )
+            plt.show()
+            plt.close(fig); del fig
+            mlflow.log_artifacts(self.path_local_model_figures, 'figures')
+
+        except Exception as e:
+            log.error(f"Dendrogram failed:\n  {e}")
+
+        try:
+            log.info(f"-- Get optimal k-values --")
+            fig = plt.figure(figsize=(14, 8))
+            self.df_accel = plot_elbow_and_get_k(
+                self.X_linkage,
+                n_clusters_to_check=600
+            )
+            plt.savefig(
+                self.path_local_model_figures / (
+                    f"elbow_diagram.png"
+                ),
+                dpi=200, bbox_inches='tight', pad_inches=0.2
+            )
+            plt.show()  # show AFTER saving, otherwise we'll save an empty plot
+            plt.close(fig); del fig
+            mlflow.log_artifacts(self.path_local_model_figures, 'figures')
+            folder_ = 'df_accel'
+            folder_full_ = self.path_local_model / folder_
+            save_pd_df_to_parquet_in_chunks(
+                df=self.df_accel,
+                path=folder_full_,
+                write_index=True,
+            )
+            self.df_accel.to_csv(folder_full_ / 'df_accel.csv',
+                                 index=False)
+            mlflow.log_artifacts(folder_full_, artifact_path=folder_)
+
+        except Exception as e:
+            log.error(f"Elbow method failed:\n  {e}")
+
+
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
         if os.getcwd() != get_original_cwd():
@@ -338,6 +420,9 @@ class ClusterEmbeddings:
             Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
             log.info(f"  Local model saving directory: {self.path_local_model}")
             self._init_file_log()
+
+        self.path_local_model_figures = self.path_local_model / 'figures'
+        Path(self.path_local_model_figures).mkdir(exist_ok=True, parents=True)
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run
