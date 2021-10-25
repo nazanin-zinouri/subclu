@@ -19,11 +19,13 @@ import logging
 from logging import info
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 from typing import List, Union
 
 import joblib
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -33,6 +35,7 @@ from omegaconf import DictConfig, OmegaConf
 import mlflow
 from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
+from sklearn.metrics import classification_report, confusion_matrix
 from tqdm import tqdm
 
 
@@ -812,6 +815,141 @@ def log_pipeline_params(
         mlflow.log_param(f"_pipe-{param}", val)
         if verbose:
             info(f"  {param}: {val}")
+
+
+def rename_for_mlflow(metric_val_or_name: Union[str, float, Path]
+                      ) -> Union[str, float]:
+    """Replace some values that may break mlflow's log naming
+
+    Names usually break when using local storage for parameter values
+    or key names. However, we might not needed now that we're using the server
+    """
+    if isinstance(metric_val_or_name, Path):
+        return metric_val_or_name.name
+
+    try:
+        return (
+            metric_val_or_name
+            .replace(',', '')
+            .replace('.', '-')
+            .replace('/', '-')
+            .replace(' ', '_')
+            .replace('\n', '-')
+            .replace('\t', '-')
+        )
+    except (SyntaxError, AttributeError):
+        # if float or another similar type, return that value instead:
+        return metric_val_or_name
+
+
+def log_clf_report_and_conf_matrix(
+        y_true: Union[pd.Series, np.array],
+        y_pred: Union[pd.Series, np.array],
+        data_fold_name: str,
+        class_labels: iter = None,
+        save_path: str = None,
+        log_metrics_to_mlflow: bool = True,
+        log_artifacts_to_mlflow: bool = False,
+        log_to_console: bool = True,
+        remove_files_from_local_path: bool = False,
+        print_clf_df: bool = False,
+        return_confusion_mx: bool = False,
+) -> Union[None, pd.DataFrame]:
+    """Take a clf report (in dictionary format) and log specific params to:
+     - logging
+     - mlflow
+
+    Returns: None or pd.DataFrame
+    """
+    logging.info(f"Start processing {data_fold_name.upper()} metrics for logging")
+
+    clf_report = classification_report(y_true=y_true, y_pred=y_pred,
+                                       labels=class_labels,
+                                       output_dict=True)
+    log_metrics = dict()
+    for class_lab, results in clf_report.items():
+        # only save/report selected keys for dashboard, save clf report separately
+        if class_lab == 'accuracy':
+            log_metrics['accuracy'] = results
+        elif class_lab in ['weighted avg', 'macro avg']:
+            for score, val in results.items():
+                log_metrics[(f"{score.lower().replace('-', '_')}_"
+                             f"{class_lab.replace(' ', '_')}")] = val
+        elif class_lab not in ['micro avg', 'macro avg']:
+            metrics_filtered = ['f1-score', 'support']  # 'precision', 'recall'
+            for metric, val in {met: results[met] for met in metrics_filtered if met in results}.items():
+                log_metrics[f"{class_lab.replace(' ', '_')}-{metric.replace('-', '_')}"] = val
+
+    for met, val in tqdm(log_metrics.items()):
+        # this logging line is what Sagemaker will try to capture for metric performance
+        # and could be used for hyperparm tuning job. Generally we may want to use log-loss, though
+        if val is None:
+            logging.warning(f" Metric: {met} value is `None`, setting to -99")
+            val = -99
+        if log_to_console:
+            if isinstance(val, float):
+                logging.info(f" {data_fold_name.capitalize()} {met}: {val:6f}")
+            else:
+                logging.info(f" {data_fold_name.capitalize()} {met}: {val}")
+
+        if log_metrics_to_mlflow:
+            mlflow.log_metric(f"{data_fold_name.lower()}-{rename_for_mlflow(met)}", val)
+
+    clf_report_for_df = clf_report.copy()
+    clf_report_for_df.pop('accuracy', None)
+    df_rep = pd.DataFrame.from_dict(clf_report_for_df, orient='index')
+    df_rep.index.name = 'class'
+
+    df_rep.loc['accuracy', 'support'] = df_rep.loc['weighted avg', 'support']
+    df_rep.loc['accuracy', 'f1-score'] = log_metrics['accuracy']
+    df_rep['support'] = df_rep['support'].astype(int)
+    if print_clf_df:
+        with pd.option_context('display.float_format', '{:,.3f}'.format):
+            print(df_rep.fillna(''))
+
+    if save_path is not None:
+        Path.mkdir(Path(save_path), parents=True, exist_ok=True)
+        df_rep[['precision', 'recall', 'f1-score', 'support']
+               ].to_csv(Path(save_path) / f"{data_fold_name}-classification_report.csv",
+                        index=True)
+
+    # create confusion matrix & save it too
+    if y_true.ndim > 1:
+        y_true = pd.Series(np.argmax(y_true, axis=-1)).map({i: val for i, val in enumerate(class_labels)})
+    conf_mx = confusion_matrix(y_true, y_pred)
+
+    # Add PPV & NPV calculation
+    tn, fp, fn, tp = conf_mx.ravel()
+    d_extra_metrics = {
+        f"{data_fold_name.lower()}-ppv": (tp / (tp + fp)),
+        f"{data_fold_name.lower()}-npv": (tn / (tn + fn)),
+
+        f"{data_fold_name.lower()}-tn": tn,
+        f"{data_fold_name.lower()}-fp": fp,
+        f"{data_fold_name.lower()}-fn": fn,
+        f"{data_fold_name.lower()}-tp": tp,
+    }
+    if log_to_console:
+        for metric, val in d_extra_metrics.items():
+            info(f"{data_fold_name.lower()}-{metric}: {val}")
+    if log_metrics_to_mlflow:
+        mlflow.log_metrics(d_extra_metrics)
+
+    df_conf_mx = pd.DataFrame(conf_mx,
+                              index=[rename_for_mlflow(lab) for lab in class_labels],
+                              columns=[rename_for_mlflow(lab) for lab in class_labels])
+    if save_path is not None:
+        df_conf_mx.to_csv(Path(save_path) / f"{data_fold_name}-confusion_matrix.csv",
+                          index=True)
+
+    if log_artifacts_to_mlflow:
+        mlflow.log_artifacts(save_path)
+    if remove_files_from_local_path:
+        shutil.rmtree(save_path, ignore_errors=True)
+
+    if return_confusion_mx:
+        return df_conf_mx
+
 
 
 
