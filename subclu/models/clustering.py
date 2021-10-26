@@ -20,7 +20,6 @@ import joblib
 import mlflow
 import mlflow.sklearn
 
-from tqdm import tqdm
 import hydra
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig
@@ -33,7 +32,7 @@ import seaborn as sns
 from scipy.cluster.hierarchy import fcluster, leaves_list
 from sklearn.pipeline import Pipeline
 
-# from ..utils.tqdm_logger import LogTQDM
+from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import (
     MlflowLogger,  # save_pd_df_to_parquet_in_chunks,
@@ -156,6 +155,11 @@ class ClusterEmbeddings:
 
             self._set_path_local_model()
 
+            # TODO(djb): fix -- log configs for nested dictionaries
+            #  examples:
+            #   - pipeline input configs
+            #   - clustering algo inputs
+            #   - filter embeddings config
             self._create_and_log_config()
 
             log.info(f"Creating pipeline...")
@@ -197,28 +201,21 @@ class ClusterEmbeddings:
 
             # TODO(djb): Get metrics: elbow & "optimal" k's
             #  Only applies to agg-clutering models
+            # TODO(djb): Create, save & log dendrograms
             self._get_linkage_and_optimal_ks()
             self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
             # TODO(djb): Get predictions for each row (subreddit or post)
-            self._get_cluster_ids_and_labels(
-                df_embeddings=df_embeddings,
-                df_subs=df_subs,
-            )
-            # TODO(djb): Save predictions & log to mlflow
-
-            # TODO(djb): Create, save & log dendrograms
-
-
-
-            # TODO(djb): Get metrics to compare clusters: Silhouette
-
             # TODO(djb): Get metrics to compare clusters:
             #  - classification report
             #  - adjusted metrics (rand index, mutual info)
             #  - homegeneity
+            self._get_cluster_ids_and_labels(
+                df_embeddings=df_embeddings,
+                df_subs=df_subs,
+            )
 
-            # TODO(djb):
+            # TODO(djb): Get unsupervised metrics to compare models & k: Silhouette
 
             # Log hydra config outputs
             path_hydra_config = self.path_local_model / '.hydra'
@@ -232,6 +229,14 @@ class ClusterEmbeddings:
                               total_fxn_time / timedelta(minutes=1)
                               )
             log.info(f"=== END clustering ===")
+            self.mlf.log_ram_stats(param=False, only_memory_used=True)
+            log.info(f"  Uploading logs to mlflow...")
+            l_logs = list(Path(os.getcwd()).glob('*.log'))
+            for f_ in l_logs:
+                try:
+                    mlflow.log_artifact(str(f_))
+                except Exception as e:
+                    log.error(f"Couldn't log file: {f_}\n  {e}")
             mlflow.end_run()
 
         if os.getcwd() == get_original_cwd():
@@ -312,8 +317,7 @@ class ClusterEmbeddings:
     def _load_metadata_for_filtering(self) -> pd.DataFrame:
         """Load metadata to filter embeddings"""
         pass
-        log.warning(f"** Loading metadata NOT IMPLEMENTED! **")
-        # TODO(djb)
+        log.warning(f"** Loading metadata **")
         return LoadSubreddits(
             bucket_name=self.dict_data_text_and_metadata['bucket_name'],
             folder_path=self.dict_data_text_and_metadata['folder_subreddits_text_and_meta'],
@@ -450,7 +454,7 @@ class ClusterEmbeddings:
             except Exception as e:
                 log.error(f"  {e}")
 
-            for p_ in tqdm(p_vals):
+            for p_ in LogTQDM(p_vals):
                 log.info(f"  {p_}")
                 fig = plt.figure(figsize=(14, 8))
                 truncate_mode_ = 'lastp'
@@ -487,15 +491,15 @@ class ClusterEmbeddings:
             df_subs: pd.DataFrame = None,
     ):
         """For a number of K-values, we need to get the labels"""
+        # try to add other columns from the df_subs meta
+        l_cols_ground_truth = [
+            # 'rating_name',  # ignore rating, it's useles/noisy for clustering
+            'primary_topic',
+        ]
+        l_cols_to_add = l_cols_ground_truth + [
+            'posts_for_modeling_count',
+        ]
         if df_subs is not None:
-            # try to add other columns from the df_subs meta
-            l_cols_ground_truth = [
-                # 'rating_name',  # ignore rating, it's useles/noisy for clustering
-                'primary_topic',
-            ]
-            l_cols_to_add = l_cols_ground_truth + [
-                'posts_for_modeling_count',
-            ]
             l_cols_to_add = [c for c in l_cols_to_add if c in df_subs.columns]
 
             self.df_labels_ = (
@@ -538,7 +542,7 @@ class ClusterEmbeddings:
             s_k_to_evaluate.add(int(d_['k']))
 
         log.info(f"Get cluster IDs for each designated k...")
-        for k_ in tqdm(sorted(s_k_to_evaluate)):
+        for k_ in LogTQDM(sorted(s_k_to_evaluate)):
             self.df_labels_[f"{k_:03d}_k_labels"] = fcluster(self.X_linkage, k_, criterion='maxclust')
 
         log.info(self.df_labels_.shape)
@@ -552,7 +556,12 @@ class ClusterEmbeddings:
             # val_fill_pred_nulls = 'Meta/Reddit'
 
             log.info(f"-- Get true labels & metrics --")
-            for col_cls_labels in tqdm([c for c in self.df_labels_.columns if '_k_labels' in c], mininterval=.8, ):
+            # use list of optimal k's to log
+            d_optimal_ks_lookup = dict()
+            for interval_, d_ in self.optimal_ks.items():
+                d_optimal_ks_lookup[d_['k']] = interval_
+
+            for col_cls_labels in LogTQDM([c for c in self.df_labels_.columns if '_k_labels' in c], mininterval=.8, ):
                 k_int = int(col_cls_labels.split('_k_')[0])
                 k_col_prefix = col_cls_labels.replace('_labels', '')
                 log.info(f"  k: {k_col_prefix}")
@@ -615,6 +624,12 @@ class ClusterEmbeddings:
                             d_metrics_this_split[m_name] = metric_(
                                 labels_true=self.df_labels_[mask_not_null_gt][c_tl],
                                 labels_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            )
+
+                        if k_int in d_optimal_ks_lookup.keys():
+                            mlflow.log_metric(
+                                f"{c_tl}-{d_optimal_ks_lookup[k_int]}-{m_name}",
+                                d_metrics_this_split[m_name]
                             )
                     l_metrics_for_df.append(d_metrics_this_split)
 
@@ -690,10 +705,11 @@ class ClusterEmbeddings:
         Don't log dfs with meta or raw embeddings! they could be dfs that take up gigs of storage
         """
 
-        # TODO(djb): instead of manually logging everything, use vars(self)
-        #  to get all params & filter out:
-        #  - things that start with `df_`
-        #  - things named `mlf` (it's an mlflowLogger object)
+        # TODO(djb): fix -- log configs for nested dictionaries
+        #  examples:
+        #   - pipeline input configs
+        #   - clustering algo inputs
+        #   - filter embeddings config
         self.config_to_log_and_store = dict()
         for k_, v_ in vars(self).items():
             try:
