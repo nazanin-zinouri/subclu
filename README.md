@@ -18,6 +18,27 @@ For example, we should be able to say that in that past week in subreddit X:
 
 The final score for a subreddit is TBD. Besides topic labels, we might end up aggregating all the posts (and comments) in a subreddit to get a single value (or a vector). Getting a single vector per subreddit might be the best path forward so that we can use distance metrics to compare "most similar" subreddits and use that for recommendations.
 
+# Creating topic clusters process
+The process is split into the steps below. Note that the actual code is in modules inside the `subclu` folder, but we're using notebooks to make it easier to log and document the process.
+0. **Pull data** from BigQuery
+   - See `subclu > data > v0.4.0_add_more_geo_and_active_subs`
+      - `_01_select_subreddits.sql`
+      - `_02_selects_posts_for_modeling.sql`
+      - `_03_select_comments_for_modeling.sql`
+1. **EDA** of training data
+   - Notebooks that start with `djb_01`
+   - Check data before modeling to spot anythig missing or odd about data distributions
+2. **Vectorize** text (converting it into embeddings)
+   - Notebooks that start with `djb_02` (name before v0.4.0: `djb_06.x`)
+3. **Aggregate** the embeddings from posts and comments
+   - Notebooks that start with `djb_03` (name before v0.4.0: `djb_10.x` or `djb_11.x`)
+4. **Create** clusters
+   - Notebooks that start with `djb_04` (name before v0.4.0: `djb_17.x` or `djb_18.x`)
+
+Path to v0.4.0 notebooks (the latest version as of 2021-10):
+- `subreddit_clustering_i18n`/`notebooks`/`v0.4.0`
+
+
 # Getting started
 ## Environment
 For quick experimentation, I started using GCP notebooks and PyCharm. See the markdown file for detailed instructions: [gcp_environment_setup.md](gcp_environment_setup.md).
