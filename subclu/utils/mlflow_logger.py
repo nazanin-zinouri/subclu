@@ -706,6 +706,41 @@ def save_pd_df_to_parquet_in_chunks(
         df.to_parquet(path, write_index=write_index)
 
 
+def save_df_and_log_to_mlflow(
+        df: pd.DataFrame,
+        path: Union[str, Path],
+        subfolder: str,
+        index: bool = True,
+        parquet_via_dask: bool = False,
+        save_csv: bool = True,
+):
+    """Save df """
+    folder_full_ = Path(path) / subfolder
+    Path(folder_full_).mkdir(exist_ok=True, parents=True)
+
+    if parquet_via_dask:
+        save_pd_df_to_parquet_in_chunks(
+            df=df,
+            path=folder_full_,
+            write_index=index,
+        )
+    else:
+        df.to_parquet(
+            folder_full_ / f"{subfolder}.parquet",
+            index=index
+        )
+
+    if save_csv:
+        df.to_csv(
+            folder_full_ / f"{subfolder}.csv",
+            index=index,
+        )
+    if mlflow.active_run() is not None:
+        mlflow.log_artifacts(str(folder_full_), artifact_path=subfolder)
+    else:
+        logging.warning(f"  Did NOT find an active mlflow run")
+
+
 def log_pipeline_params(
         pipeline,
         save_path: Union[Path, str] = None,

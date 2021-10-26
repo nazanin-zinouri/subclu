@@ -10,8 +10,8 @@ from pathlib import Path
 import joblib
 import mlflow
 import mlflow.sklearn
-from mlflow.models.signature import ModelSignature
-from mlflow.types.schema import Schema, ColSpec
+# from mlflow.models.signature import ModelSignature
+# from mlflow.types.schema import Schema, ColSpec
 
 from tqdm import tqdm
 import hydra
@@ -33,7 +33,10 @@ from sklearn.pipeline import Pipeline
 #  python -m subclu.test.test_parallel_jobs
 # from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
-from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
+from ..utils.mlflow_logger import (
+    MlflowLogger, save_pd_df_to_parquet_in_chunks,
+    save_df_and_log_to_mlflow
+)
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
 from ..data.data_loaders import LoadSubreddits, LoadPosts
@@ -179,6 +182,7 @@ class ClusterEmbeddings:
             mlflow.log_metric('model_fit_time_minutes',
                               total_model_fit_time / timedelta(minutes=1)
                               )
+            self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
             mlflow_logger.log_pipeline_params(
                 self.pipeline,
@@ -190,6 +194,7 @@ class ClusterEmbeddings:
             # TODO(djb): Get metrics: elbow & "optimal" k's
             #  Only applies to agg-clutering models
             self._get_linkage_and_optimal_ks()
+            self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
             # TODO(djb): Get predictions for each row (subreddit or post)
             self._get_cluster_ids_and_labels(
@@ -297,6 +302,7 @@ class ClusterEmbeddings:
             {'input_embeddings-n_rows': r_,
              'input_embeddings-n_cols': c_}
         )
+        self.mlf.log_ram_stats(param=False, only_memory_used=True)
         return df_embeddings
 
     def _load_metadata_for_filtering(self) -> pd.DataFrame:
@@ -348,6 +354,7 @@ class ClusterEmbeddings:
             {'filtered_embeddings-n_rows': r_,
              'filtered_embeddings-n_cols': c_}
         )
+        self.mlf.log_ram_stats(param=False, only_memory_used=True)
         return df_embeddings[mask_above_threshold]
 
     def _log_pipeline_to_mlflow(self):
@@ -374,7 +381,12 @@ class ClusterEmbeddings:
             self.X_linkage = create_linkage_for_dendrogram(
                 self.pipeline.steps[-1][1]
             )
-
+            save_df_and_log_to_mlflow(
+                df=self.X_linkage,
+                path=self.path_local_model,
+                subfolder='X_linkage',
+                index=False,
+            )
         except Exception as e:
             log.error(f"Model might not be Hierarchical:\n  {e}")
 
@@ -395,17 +407,13 @@ class ClusterEmbeddings:
             plt.show()  # show AFTER saving, otherwise we'll save an empty plot
             plt.close(fig); del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
-            # Save figure
-            folder_ = 'df_accel'
-            folder_full_ = self.path_local_model / folder_
-            save_pd_df_to_parquet_in_chunks(
+
+            save_df_and_log_to_mlflow(
                 df=self.df_accel,
-                path=folder_full_,
-                write_index=True,
+                path=self.path_local_model,
+                subfolder='df_accel',
+                index=False,
             )
-            self.df_accel.to_csv(folder_full_ / 'df_accel.csv',
-                                 index=False)
-            mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
             # Save optimal k's, to mlflow & as artifacts
             for k_, d_ in self.optimal_ks.items():
@@ -414,18 +422,12 @@ class ClusterEmbeddings:
                     d_['k']
                 )
 
-            folder_ = 'optimal_ks'
-            log.info(f"  Saving optimal_ks: {folder_}")
-            folder_full_ = self.path_local_model / folder_
-            Path(folder_).mkdir(exist_ok=True, parents=True)
-            pd.DataFrame(self.optimal_ks).T.to_parquet(
-                path=folder_full_ / 'optimal_ks.parquet',
-            )
-            pd.DataFrame(self.optimal_ks).T.to_csv(
-                folder_full_ / 'optimal_ks.csv',
+            save_df_and_log_to_mlflow(
+                df=pd.DataFrame(self.optimal_ks).T,
+                path=self.path_local_model,
+                subfolder='optimal_ks',
                 index=True,
             )
-            mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
         except Exception as e:
             log.error(f"Elbow method failed:\n  {e}")
@@ -461,7 +463,7 @@ class ClusterEmbeddings:
                     self.path_local_model_figures / (
                         f"dendrogram"
                         f"-truncate_mode_{truncate_mode_}"
-                        f"-p_{p_}"
+                        f"-p_{p_:03d}"
                         f".png"
                     ),
                     dpi=200, bbox_inches='tight', pad_inches=0.2
@@ -594,30 +596,23 @@ class ClusterEmbeddings:
 
             folder_ = 'df_supervised_metrics'
             folder_full_ = self.path_local_model / folder_
-            save_pd_df_to_parquet_in_chunks(
+            save_df_and_log_to_mlflow(
                 df=self.df_supervised_metrics_,
-                path=folder_full_,
-                write_index=True,
-            )
-            self.df_supervised_metrics_.to_csv(
-                folder_full_ / f'{folder_}.csv',
-                index=False
+                path=self.path_local_model,
+                subfolder=folder_,
+                index=True,
             )
             joblib.dump(d_df_crosstab_labels,
                         folder_full_ / 'd_df_crosstab_labels.gzip'
                         )
             mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
-        folder_ = 'df_labels'
-        folder_full_ = self.path_local_model / folder_
-        save_pd_df_to_parquet_in_chunks(
+        save_df_and_log_to_mlflow(
             df=self.df_labels_,
-            path=folder_full_,
-            write_index=True,
+            path=self.path_local_model,
+            subfolder='df_labels',
+            index=True,
         )
-        self.df_labels_.to_csv(folder_full_ / f'{folder_}.csv',
-                               index=False)
-        mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
