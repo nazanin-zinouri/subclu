@@ -1,17 +1,24 @@
 """
 Module to cluster embeddings that have already been aggregated
+
+NOTE when using hydra (CLI tool)
+To avoid relative import errors when running from CLI, run script with:
+ * -m flag
+ * no ".py" ending
+
+Example:
+python -m subclu.test.test_parallel_jobs
+python -m subclu.models.clustering mlflow_experiment_name="v0.4.0_use_multi_clustering_test"
+
 """
 from datetime import datetime, timedelta
 import logging
 import os
 from pathlib import Path
-# from typing import Union
 
 import joblib
 import mlflow
 import mlflow.sklearn
-# from mlflow.models.signature import ModelSignature
-# from mlflow.types.schema import Schema, ColSpec
 
 from tqdm import tqdm
 import hydra
@@ -22,15 +29,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from scipy.cluster.hierarchy import fcluster
+from scipy.cluster.hierarchy import fcluster, leaves_list
 from sklearn.pipeline import Pipeline
 
-# NOTE:
-# To avoid relative import errors when running from CLI, run script with:
-#  * -m flag
-#  * no ".py" ending
-# Example:
-#  python -m subclu.test.test_parallel_jobs
 # from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import (
@@ -102,6 +103,7 @@ class ClusterEmbeddings:
             pipeline_config: dict = None,
             dict_filter_embeddings: dict = None,
             logs_path: str = 'logs/ClusterEmbeddings',
+            col_model_leaves_order: str = 'model_leaves_list_order_left_to_right',
             # **kwargs
     ):
         """"""
@@ -129,6 +131,7 @@ class ClusterEmbeddings:
         # attributes to save outputs
         self.df_accel = None
         self.optimal_ks = None
+        self.col_model_leaves_order = col_model_leaves_order
 
         # Set mlflowLogger instance for central tracker
         self.mlf = MlflowLogger(tracking_uri=self.mlflow_tracking_uri)
@@ -500,15 +503,37 @@ class ClusterEmbeddings:
                     how='left',
                     on=self.l_ix_subs,
                 )
+                .reset_index(drop=True)  # MUST reset index for list_leaves merge to be accurate
             ).copy()
         else:
-            self.df_labels_ = df_embeddings[self.l_ix_subs].copy()
+            self.df_labels_ = (
+                df_embeddings[self.l_ix_subs]
+                .reset_index(drop=True)  # MUST reset index for list_leaves merge to be accurate
+                .copy()
+            )
+
+        try:
+            log.info(f"  Add the model's sort order (distances) to df_labels")
+            # NOTE: this join assumes that we've reset_index for df_labels_ before joining
+            df_leaves_order = pd.DataFrame(
+                {
+                    self.col_model_leaves_order: range(len(self.df_labels_))
+                },
+                index=leaves_list(self.X_linkage),
+            )
+            self.df_labels_ = df_leaves_order.merge(
+                self.df_labels_,
+                how='right',
+                left_index=True,
+                right_index=True,
+            )
+        except Exception as e:
+            log.error(f"Failed to append model leaves order\n  {e}")
 
         s_k_to_evaluate = set(np.arange(10, 260, 10))
         # add the 'optimal' k_ values:
-        col_optimal_k = 'optimal_k_for_interval'
-        for interval_ in self.df_accel[col_optimal_k].dropna().unique():
-            s_k_to_evaluate.add(self.df_accel[self.df_accel[col_optimal_k] == interval_]['k'].values[0])
+        for interval_, d_ in self.optimal_ks.items():
+            s_k_to_evaluate.add(int(d_['k']))
 
         log.info(f"Get cluster IDs for each designated k...")
         for k_ in tqdm(sorted(s_k_to_evaluate)):
