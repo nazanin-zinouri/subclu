@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 # from typing import Union
 
+import joblib
 import mlflow
 import mlflow.sklearn
 from mlflow.models.signature import ModelSignature
@@ -122,13 +123,9 @@ class ClusterEmbeddings:
         self.pipeline = None
         self.dict_filter_embeddings = dict_filter_embeddings
 
-        # use pre-loaded metadata if running in interactive mode
-        # self.df_subs_meta = df_subs_meta
-        # self.df_posts_meta = df_posts_meta
-        # self.df_comments_meta = df_comments_meta
-
-        # self.embeddings_read_fxn = embeddings_read_fxn
-        # self.metadata_read_fxn = metadata_read_fxn
+        # attributes to save outputs
+        self.df_accel = None
+        self.optimal_ks = None
 
         # Set mlflowLogger instance for central tracker
         self.mlf = MlflowLogger(tracking_uri=self.mlflow_tracking_uri)
@@ -163,16 +160,13 @@ class ClusterEmbeddings:
             if self.dict_filter_embeddings is not None:
                 if self.dict_filter_embeddings.get('filter_subreddits', False):
                     log.info(f"-- Loading data to filter SUBREDDITS")
-                    # TODO(djb): load metadata so we can filter
                     df_subs = self._load_metadata_for_filtering()
 
-                    # TODO(djb) apply filtering
                     df_embeddings = self._apply_filtering(
                         df_embeddings=df_embeddings,
                         df_subs=df_subs,
                     )
 
-            # TODO(djb): Fit clustering algo
             log.info(f"-- Training clustering model --")
             t_start_model_fit = datetime.utcnow()
             self.pipeline.fit(
@@ -186,13 +180,11 @@ class ClusterEmbeddings:
                               total_model_fit_time / timedelta(minutes=1)
                               )
 
-            # TODO(djb): log pipeline params
             mlflow_logger.log_pipeline_params(
                 self.pipeline,
                 save_path=self.path_local_model,
             )
 
-            # TODO(djb): Save clustering algo & log to mlflow
             self._log_pipeline_to_mlflow()
 
             # TODO(djb): Get metrics: elbow & "optimal" k's
@@ -200,7 +192,10 @@ class ClusterEmbeddings:
             self._get_linkage_and_optimal_ks()
 
             # TODO(djb): Get predictions for each row (subreddit or post)
-            self._get_cluster_labels(df_embeddings=df_embeddings)
+            self._get_cluster_ids_and_labels(
+                df_embeddings=df_embeddings,
+                df_subs=df_subs,
+            )
             # TODO(djb): Save predictions & log to mlflow
 
             # TODO(djb): Create, save & log dendrograms
@@ -384,42 +379,12 @@ class ClusterEmbeddings:
             log.error(f"Model might not be Hierarchical:\n  {e}")
 
         try:
-            log.info(f"  Creating dendrogram...")
-            fig = plt.figure(figsize=(14, 8))
-            p_ = 40
-            truncate_mode_ = 'lastp'
-            fancy_dendrogram(
-                self.X_linkage,
-                plot_title='Clustering Algo',
-                annotate_above=self.X_linkage['distance'].quantile(q=0.99),
-                truncate_mode=truncate_mode_,
-                p=p_,
-                orientation='top',
-                show_leaf_counts=True, leaf_rotation=45,
-                show_contracted=False,
-            )
-            plt.savefig(
-                self.path_local_model_figures / (
-                    f"dendrogram"
-                    f"-truncate_mode_{truncate_mode_}"
-                    f"-p_{p_}"
-                    f".png"
-                ),
-                dpi=200, bbox_inches='tight', pad_inches=0.2
-            )
-            plt.show()
-            plt.close(fig); del fig
-            mlflow.log_artifacts(self.path_local_model_figures, 'figures')
-
-        except Exception as e:
-            log.error(f"Dendrogram failed:\n  {e}")
-
-        try:
             log.info(f"-- Get optimal k-values --")
             fig = plt.figure(figsize=(14, 8))
-            self.df_accel = plot_elbow_and_get_k(
+            self.df_accel, self.optimal_ks = plot_elbow_and_get_k(
                 self.X_linkage,
-                n_clusters_to_check=600
+                n_clusters_to_check=600,
+                return_optimal_ks=True,
             )
             plt.savefig(
                 self.path_local_model_figures / (
@@ -430,6 +395,7 @@ class ClusterEmbeddings:
             plt.show()  # show AFTER saving, otherwise we'll save an empty plot
             plt.close(fig); del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
+            # Save figure
             folder_ = 'df_accel'
             folder_full_ = self.path_local_model / folder_
             save_pd_df_to_parquet_in_chunks(
@@ -441,9 +407,217 @@ class ClusterEmbeddings:
                                  index=False)
             mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
+            # Save optimal k's, to mlflow & as artifacts
+            for k_, d_ in self.optimal_ks.items():
+                mlflow.log_metric(
+                    f"optimal_k-{k_}",
+                    d_['k']
+                )
+
+            folder_ = 'optimal_ks'
+            log.info(f"  Saving optimal_ks: {folder_}")
+            folder_full_ = self.path_local_model / folder_
+            Path(folder_).mkdir(exist_ok=True, parents=True)
+            pd.DataFrame(self.optimal_ks).T.to_parquet(
+                path=folder_full_ / 'optimal_ks.parquet',
+            )
+            pd.DataFrame(self.optimal_ks).T.to_csv(
+                folder_full_ / 'optimal_ks.csv',
+                index=True,
+            )
+            mlflow.log_artifacts(folder_full_, artifact_path=folder_)
+
         except Exception as e:
             log.error(f"Elbow method failed:\n  {e}")
 
+        try:
+            log.info(f"  Creating dendrograms...")
+            p_vals = {40}
+            try:
+                p_vals.add(
+                    int(self.optimal_ks['050_to_100']['k'] + 1)
+                )
+                p_vals.add(
+                    int(self.optimal_ks['100_to_200']['k'] + 1)
+                )
+            except Exception as e:
+                log.error(f"  {e}")
+
+            for p_ in tqdm(p_vals):
+                log.info(f"  {p_}")
+                fig = plt.figure(figsize=(14, 8))
+                truncate_mode_ = 'lastp'
+                fancy_dendrogram(
+                    self.X_linkage,
+                    plot_title='Clustering Algo',
+                    annotate_above=self.X_linkage['distance'].quantile(q=0.985),
+                    truncate_mode=truncate_mode_,
+                    p=p_,
+                    orientation='top',
+                    show_leaf_counts=True, leaf_rotation=45,
+                    show_contracted=False,
+                )
+                plt.savefig(
+                    self.path_local_model_figures / (
+                        f"dendrogram"
+                        f"-truncate_mode_{truncate_mode_}"
+                        f"-p_{p_}"
+                        f".png"
+                    ),
+                    dpi=200, bbox_inches='tight', pad_inches=0.2
+                )
+                plt.show()
+                plt.close(fig); del fig
+            mlflow.log_artifacts(self.path_local_model_figures, 'figures')
+
+        except Exception as e:
+            log.error(f"Dendrogram failed:\n  {e}")
+
+
+    def _get_cluster_ids_and_labels(
+            self,
+            df_embeddings: pd.DataFrame,
+            df_subs: pd.DataFrame = None,
+    ):
+        """For a number of K-values, we need to get the labels"""
+        if df_subs is not None:
+            # try to add other columns from the df_subs meta
+            l_cols_ground_truth = [
+                # 'rating_name',  # ignore rating, it's useles/noisy for clustering
+                'primary_topic',
+            ]
+            l_cols_to_add = l_cols_ground_truth + [
+                'posts_for_modeling_count',
+            ]
+            l_cols_to_add = [c for c in l_cols_to_add if c in df_subs.columns]
+
+            self.df_labels_ = (
+                df_embeddings[self.l_ix_subs]
+                .merge(
+                    df_subs[self.l_ix_subs + l_cols_to_add],
+                    how='left',
+                    on=self.l_ix_subs,
+                )
+            ).copy()
+        else:
+            self.df_labels_ = df_embeddings[self.l_ix_subs].copy()
+
+        s_k_to_evaluate = set(np.arange(10, 260, 10))
+        # add the 'optimal' k_ values:
+        col_optimal_k = 'optimal_k_for_interval'
+        for interval_ in self.df_accel[col_optimal_k].dropna().unique():
+            s_k_to_evaluate.add(self.df_accel[self.df_accel[col_optimal_k] == interval_]['k'].values[0])
+
+        log.info(f"Get cluster IDs for each designated k...")
+        for k_ in tqdm(sorted(s_k_to_evaluate)):
+            self.df_labels_[f"{k_:03d}_k_labels"] = fcluster(self.X_linkage, k_, criterion='maxclust')
+
+        log.info(self.df_labels_.shape)
+
+        if df_subs is not None:
+            # get named labels for each of the cols in l_cols_ground_truth
+            d_df_crosstab_labels = dict()
+            d_metrics = dict()
+            l_cols_predicted = list()
+            l_metrics_for_df = list()
+            val_fill_pred_nulls = 'Meta/Reddit'
+
+            log.info(f"-- Get true labels & metrics --")
+            for col_cls_labels in tqdm([c for c in self.df_labels_.columns if '_k_labels' in c], mininterval=.8, ):
+                k_int = int(col_cls_labels.split('_k_')[0])
+                k_col_prefix = col_cls_labels.replace('_labels', '')
+                log.info(f"  k: {k_col_prefix}")
+
+                d_df_crosstab_labels[col_cls_labels] = dict()
+                d_metrics[col_cls_labels] = dict()
+
+                for c_tl in l_cols_ground_truth:
+                    # to be on the safe side, sometimes nulls are filled as "null"
+                    mask_not_null_gt = ~(
+                            (self.df_labels_[c_tl].isnull()) |
+                            (self.df_labels_[c_tl] == 'null')
+                    )
+                    d_df_crosstab_labels[col_cls_labels][c_tl] = pd.crosstab(
+                        self.df_labels_[mask_not_null_gt][col_cls_labels],
+                        self.df_labels_[mask_not_null_gt][c_tl]
+                    )
+
+                    # Create new predicted column
+                    col_pred_ = f"{k_col_prefix}-predicted-{c_tl}"
+                    l_cols_predicted.append(col_pred_)
+                    self.df_labels_ = self.df_labels_.merge(
+                        (
+                            d_df_crosstab_labels[col_cls_labels][c_tl]
+                            .idxmax(axis=1)
+                            .to_frame()
+                            .rename(columns={0: col_pred_})
+                        ),
+                        how='left',
+                        left_on=col_cls_labels,
+                        right_index=True,
+                    )
+
+                    # Should be rare, but fill just in case?
+                    # self.df_labels_[col_pred_] = self.df_labels_[col_pred_].fillna(val_fill_pred_nulls)
+
+                    # =====================
+                    # Calculate metrics:
+                    # ===
+                    #         print(
+                    #             classification_report(
+                    #                 y_true=self.df_labels_[mask_not_null_gt][c_tl],
+                    #                 y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                    #                 zero_division=0,
+                    #             )
+                    #         )
+
+                    d_metrics_this_split = {
+                        'predicted_col': col_cls_labels,
+                        'truth_col': c_tl,
+                        'k': k_int,
+                    }
+                    for m_name, metric_ in D_CLUSTER_METRICS_WITH_KNOWN_LABELS.items():
+                        try:
+                            d_metrics_this_split[m_name] = metric_(
+                                y_true=self.df_labels_[mask_not_null_gt][c_tl],
+                                y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            )
+                        except TypeError:
+                            d_metrics_this_split[m_name] = metric_(
+                                labels_true=self.df_labels_[mask_not_null_gt][c_tl],
+                                labels_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            )
+                    l_metrics_for_df.append(d_metrics_this_split)
+
+            self.df_supervised_metrics_ = pd.DataFrame(l_metrics_for_df)
+            log.info(f"{self.df_supervised_metrics_.shape} <- df_supervised metrics shape")
+
+            folder_ = 'df_supervised_metrics'
+            folder_full_ = self.path_local_model / folder_
+            save_pd_df_to_parquet_in_chunks(
+                df=self.df_supervised_metrics_,
+                path=folder_full_,
+                write_index=True,
+            )
+            self.df_supervised_metrics_.to_csv(
+                folder_full_ / f'{folder_}.csv',
+                index=False
+            )
+            joblib.dump(d_df_crosstab_labels,
+                        folder_full_ / 'd_df_crosstab_labels.gzip'
+                        )
+            mlflow.log_artifacts(folder_full_, artifact_path=folder_)
+
+        folder_ = 'df_labels'
+        folder_full_ = self.path_local_model / folder_
+        save_pd_df_to_parquet_in_chunks(
+            df=self.df_labels_,
+            path=folder_full_,
+            write_index=True,
+        )
+        self.df_labels_.to_csv(folder_full_ / f'{folder_}.csv',
+                               index=False)
+        mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""

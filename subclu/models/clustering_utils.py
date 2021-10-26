@@ -103,14 +103,15 @@ def fancy_dendrogram(
 
 def plot_elbow_and_get_k(
         Z: Union[pd.DataFrame, np.ndarray],
-        n_clusters_to_check: int = 600,
+        n_clusters_to_check: int = 500,
         figsize: tuple = (14, 8),
         plot_title: str = 'Cluster Distances & Optimal k',
         xlabel: str = 'Number of clusters (k)',
         ylabel: str = 'Distance',
         col_optimal_k: str = 'optimal_k_for_interval',
         save_path: Union[str, Path] = None,
-) -> pd.DataFrame:
+        return_optimal_ks: bool = False,
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, dict]]:
     """Use 'elbow' method to get an optimal value of k-clusters"""
     fig = plt.figure(figsize=figsize)
 
@@ -148,19 +149,23 @@ def plot_elbow_and_get_k(
     ]
     viridis = cm.get_cmap('viridis', len(k_intervals))
 
+    d_optimal_k = dict()
     for i, k_tup_ in enumerate(k_intervals):
         mask_interval_coT = df_accel['k'].between(*k_tup_)
-
+        interval_name = f"{k_tup_[0]:03d}_to_{k_tup_[1]:03d}"
+        d_optimal_k[interval_name] = dict()
         try:
             df_accel.loc[
                 (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
                 col_optimal_k
-            ] = f"{k_tup_[0]:03d}_to_{k_tup_[1]:03d}"
+            ] = interval_name
 
             k_ = df_accel.loc[
                 (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
                 'k'
             ].values[0]
+            d_optimal_k[interval_name]['k'] = int(k_)  # convert to int b/c np.int can create errors
+            d_optimal_k[interval_name]['col_prefix'] = f"{k_:03d}_k"
 
             plt.axvline(x=k_, linestyle="--", label=f"k={k_}", color=viridis(i / len(k_intervals)))
         except Exception as e:
@@ -178,10 +183,96 @@ def plot_elbow_and_get_k(
             save_path,
             dpi=200, bbox_inches='tight', pad_inches=0.2
         )
-    # NOTE: if you plt.show() before saving, plt will create a new fig
-    # plt.show()
+    # NOTE: if you plt.show() before saving, plt will create a new fig and won't be able to
+    #  save the figure
 
-    return df_accel
+    if return_optimal_ks:
+        return df_accel, d_optimal_k
+    else:
+        return df_accel
+
+
+# def calculate_metrics_with_ground_truth(
+# ):
+#     """"""
+#     d_df_crosstab_labels = dict()
+#     d_metrics = dict()
+#     val_fill_pred_nulls = 'Meta/Reddit'
+#
+#     l_cols_ground_truth = [
+#         # 'rating_name',
+#         'primary_topic',
+#     ]
+#
+#     df_labels_coF_meta = df_labels_coF.merge(
+#         df_subs[l_ix_sub + l_cols_ground_truth],
+#         how='left',
+#         on=l_ix_sub,
+#     ).copy()
+#
+#     l_cols_predicted = list()
+#
+#     # for interval_ in tqdm(intervals_to_test):
+#     for interval_ in df_accel_coF[col_optimal_k].dropna().unique():
+#         print(f"=== Interval: {interval_} ===")
+#         col_cls_labels = f"{interval_}_labels"
+#         d_df_crosstab_labels[col_cls_labels] = dict()
+#         d_metrics[col_cls_labels] = dict()
+#
+#         for c_tl in l_cols_ground_truth:
+#             # For some reason the nulls in this table are the string 'null'! ugh
+#             mask_not_null_gt = ~(
+#                     (df_labels_coF_meta[c_tl].isnull()) |
+#                     (df_labels_coF_meta[c_tl] == 'null')
+#             )
+#             # print(f"  Nulls: {(~mask_not_null_gt).sum():,.0f}")
+#             d_df_crosstab_labels[col_cls_labels][c_tl] = pd.crosstab(
+#                 df_labels_coF_meta[mask_not_null_gt][col_cls_labels],
+#                 df_labels_coF_meta[mask_not_null_gt][c_tl]
+#             )
+#
+#             # Create new predicted column
+#             col_pred_ = f"{interval_}-predicted-{c_tl}"
+#             l_cols_predicted.append(col_pred_)
+#             df_labels_coF_meta = df_labels_coF_meta.merge(
+#                 (
+#                     d_df_crosstab_labels[col_cls_labels][c_tl]
+#                         # .drop('null', axis=1)
+#                         .idxmax(axis=1)
+#                         .to_frame()
+#                         .rename(columns={0: col_pred_})
+#                 ),
+#                 how='left',
+#                 left_on=col_cls_labels,
+#                 right_index=True,
+#             )
+#
+#             # Should be rare, but fill just in case?
+#             # df_labels_coF_meta[col_pred_] = df_labels_coF_meta[col_pred_].fillna(val_fill_pred_nulls)
+#
+#             # =====================
+#             # Calculate metrics:
+#             # ===
+#             #         print(
+#             #             classification_report(
+#             #                 y_true=df_labels_coF_meta[mask_not_null_gt][c_tl],
+#             #                 y_pred=df_labels_coF_meta[mask_not_null_gt][col_pred_],
+#             #                 zero_division=0,
+#             #             )
+#             #         )
+#             for m_name, metric_ in d_metrics_and_names.items():
+#                 d_metrics[col_cls_labels][c_tl] = dict()
+#                 try:
+#                     d_metrics[col_cls_labels][c_tl][m_name] = metric_(
+#                         y_true=df_labels_coF_meta[mask_not_null_gt][c_tl],
+#                         y_pred=df_labels_coF_meta[mask_not_null_gt][col_pred_],
+#                     )
+#                 except TypeError:
+#                     d_metrics[col_cls_labels][c_tl][m_name] = metric_(
+#                         labels_true=df_labels_coF_meta[mask_not_null_gt][c_tl],
+#                         labels_pred=df_labels_coF_meta[mask_not_null_gt][col_pred_],
+#                     )
+#                 print(f"  Metric {m_name}: {d_metrics[col_cls_labels][c_tl][m_name]:,.4f}")
 
 
 #
