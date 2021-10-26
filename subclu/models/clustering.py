@@ -28,6 +28,7 @@ from omegaconf import DictConfig
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from scipy.cluster.hierarchy import fcluster, leaves_list
 from sklearn.pipeline import Pipeline
@@ -35,12 +36,12 @@ from sklearn.pipeline import Pipeline
 # from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import (
-    MlflowLogger, save_pd_df_to_parquet_in_chunks,
+    MlflowLogger,  # save_pd_df_to_parquet_in_chunks,
     save_df_and_log_to_mlflow
 )
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
-from ..data.data_loaders import LoadSubreddits, LoadPosts
+from ..data.data_loaders import LoadSubreddits  # , LoadPosts
 
 from .clustering_utils import (
     create_linkage_for_dendrogram, fancy_dendrogram,
@@ -398,7 +399,7 @@ class ClusterEmbeddings:
             fig = plt.figure(figsize=(14, 8))
             self.df_accel, self.optimal_ks = plot_elbow_and_get_k(
                 self.X_linkage,
-                n_clusters_to_check=600,
+                n_clusters_to_check=500,
                 return_optimal_ks=True,
             )
             plt.savefig(
@@ -408,7 +409,8 @@ class ClusterEmbeddings:
                 dpi=200, bbox_inches='tight', pad_inches=0.2
             )
             plt.show()  # show AFTER saving, otherwise we'll save an empty plot
-            plt.close(fig); del fig
+            plt.close(fig)
+            del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
 
             save_df_and_log_to_mlflow(
@@ -472,12 +474,12 @@ class ClusterEmbeddings:
                     dpi=200, bbox_inches='tight', pad_inches=0.2
                 )
                 plt.show()
-                plt.close(fig); del fig
+                plt.close(fig)
+                del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
 
         except Exception as e:
             log.error(f"Dendrogram failed:\n  {e}")
-
 
     def _get_cluster_ids_and_labels(
             self,
@@ -547,7 +549,7 @@ class ClusterEmbeddings:
             d_metrics = dict()
             l_cols_predicted = list()
             l_metrics_for_df = list()
-            val_fill_pred_nulls = 'Meta/Reddit'
+            # val_fill_pred_nulls = 'Meta/Reddit'
 
             log.info(f"-- Get true labels & metrics --")
             for col_cls_labels in tqdm([c for c in self.df_labels_.columns if '_k_labels' in c], mininterval=.8, ):
@@ -588,7 +590,7 @@ class ClusterEmbeddings:
                     # self.df_labels_[col_pred_] = self.df_labels_[col_pred_].fillna(val_fill_pred_nulls)
 
                     # =====================
-                    # Calculate metrics:
+                    # Classification report
                     # ===
                     #         print(
                     #             classification_report(
@@ -619,6 +621,7 @@ class ClusterEmbeddings:
             self.df_supervised_metrics_ = pd.DataFrame(l_metrics_for_df)
             log.info(f"{self.df_supervised_metrics_.shape} <- df_supervised metrics shape")
 
+            log.info(f"  Saving df_supervised_metrics...")
             folder_ = 'df_supervised_metrics'
             folder_full_ = self.path_local_model / folder_
             save_df_and_log_to_mlflow(
@@ -630,6 +633,28 @@ class ClusterEmbeddings:
             joblib.dump(d_df_crosstab_labels,
                         folder_full_ / 'd_df_crosstab_labels.gzip'
                         )
+            log.info(f"  Plotting supervised metrics...")
+            for tc_val in self.df_supervised_metrics_['truth_col'].unique():
+                df_plot = self.df_supervised_metrics_[
+                    self.df_supervised_metrics_['truth_col'] == tc_val
+                ]
+                fig = plt.figure(figsize=(14, 8))
+                for c_ in [c for c in self.df_supervised_metrics_.columns if c.endswith('_score')]:
+
+                    sns.lineplot(data=df_plot, x='k', y=c_,
+                                 label=c_)
+
+                plt.title(f"Scores for: {tc_val}")
+                plt.ylabel(f"score")
+                plt.xlabel(f"k (number of clusters)")
+                plt.savefig(
+                    folder_full_ / (
+                        f"metrics_for_known_labels-{tc_val}.png"
+                    ),
+                    dpi=200, bbox_inches='tight', pad_inches=0.2
+                )
+                plt.close(fig)
+                del fig
             mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
         save_df_and_log_to_mlflow(
