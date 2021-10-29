@@ -2,25 +2,26 @@
 --  So we need to actually count and define what this means
 -- Colab notebook:
 --  https://colab.research.google.com/drive/1ut0VvzRUkFpjSuVP0h88m0aT5LHUM8gK#scrollTo=Z2VDEgdL5IPX
+
 -- Select all subreddits & get stats to check topic-cluster coverage
 DECLARE partition_date DATE DEFAULT '2021-10-25';
 
 WITH
     unique_posts_per_subreddit AS (
         SELECT
-            subreddit_name,
-            COUNT(*) as posts_l7_submitted,
-            COUNT(DISTINCT user_id) as unique_posters_l7_submitted
+            subreddit_id
+            , subreddit_name
+            , COUNT(*) as posts_l7_submitted
+            , COUNT(DISTINCT user_id) as unique_posters_l7_submitted
         FROM
-            `data-prod-165221.andrelytics_ez_schema.post_submit` as comment
+            -- Pull from cnc's table because it's more concistent with activity table
+            -- `data-prod-165221.andrelytics_ez_schema.post_submit` as comment
+            `data-prod-165221.cnc.successful_posts` AS sp
         WHERE
-            -- We need to adjust this date b/c the other partitions could be off by 1 or 2 days
-            DATE(_PARTITIONTIME) BETWEEN (partition_date - 8) AND (partition_date - 1)
-            AND source = "backend"
-            AND action = "submit"
+            DATE(dt) BETWEEN (partition_date - 7) AND partition_date
             AND noun = "post"
         GROUP BY
-            subreddit_name
+            subreddit_id, subreddit_name
     )
 
 
@@ -28,8 +29,9 @@ SELECT
     COALESCE(slo.subreddit_id, acs.subreddit_id)  AS subreddit_id
     , COALESCE(acs.subreddit_name, LOWER(slo.name)) AS subreddit_name
     , slo.subscribers
-    , CURRENT_DATE() - DATE(slo.created_date) AS subreddit_age_in_days
-    , (CURRENT_DATE() - DATE(slo.created_date)) / 365 AS subreddit_age_in_years
+    -- , DATE_DIFF(CURRENT_DATE(), DATE(slo.created_date), DAY) AS subreddit_age_days
+    , DATE_DIFF(CURRENT_DATE(), DATE(slo.created_date), MONTH) AS subreddit_age_months
+    , DATE_DIFF(CURRENT_DATE(), DATE(slo.created_date), YEAR) AS subreddit_age_years
 
     -- Sub activity
     , CASE
@@ -42,9 +44,12 @@ SELECT
     , acs.activity_7_day
 
     , CASE
-        WHEN COALESCE(unique_posters_l7_submitted, 0) = 1 THEN true
-        ELSE false
-    END AS all_posts_submitted_by_one_user_l7
+        WHEN (
+            (COALESCE(posts_l7, 0) = 0)
+            OR (unique_posters_l7_submitted IS NULL) ) THEN "0_posters"
+        WHEN COALESCE(unique_posters_l7_submitted, 0) = 1 THEN "1_poster"
+        ELSE "2_or_more_posters"
+    END AS unique_posters_l7_bin
     , u.unique_posters_l7_submitted
 
     , asr.posts_l7
