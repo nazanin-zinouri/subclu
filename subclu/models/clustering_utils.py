@@ -86,7 +86,7 @@ def fancy_dendrogram(
             if y > annotate_above:
                 plt.plot(x, y, 'o', c=c)
                 # original format: "%.3g"
-                plt.annotate("%.1f" % y, (x, y), xytext=(0, -5),
+                plt.annotate(f"{y:.1f}", (x, y), xytext=(0, -5),
                              textcoords='offset points',
                              fontsize=dist_fontsize,
                              va='top', ha='center')
