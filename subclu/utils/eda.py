@@ -14,7 +14,7 @@ from itertools import product
 import logging
 from logging import info
 from pathlib import Path
-from typing import Union, List, Any, Optional, Tuple
+from typing import Union, List, Any, Optional, Tuple, Dict
 import sys
 from pkg_resources import get_distribution
 
@@ -45,6 +45,39 @@ def reorder_array(items_to_front: list,
             items_to_front = [itm for itm in items_to_front if itm in set_found]
 
         return items_to_front + [itm for itm in array if itm not in items_to_front]
+
+
+def get_venn_sets2(
+        iter_a: iter,
+        iter_b: iter,
+        a_name: str = 'a',
+        b_name: str = 'b',
+        return_dict: bool = True,
+) -> Dict[str, set]:
+    """Input 2 iterables and return a dictionary with
+    the items in one
+    """
+    if not isinstance(iter_a, set):
+        set_a = set(iter_a)
+    else:
+        set_a = iter_a
+    if not isinstance(iter_b, set):
+        set_b = set(iter_b)
+    else:
+        set_b = iter_b
+
+    print(f"{len(set_a):6,.0f} <- {a_name}")
+    print(f"{len(set_b):6,.0f} <- {b_name}")
+    print(f"{len(set_a | set_b):6,.0f} <- {a_name} | {b_name}")
+
+    d_ = dict()
+    d_[f"{a_name}_only"] = set(iter_a) - set(iter_b)
+
+    d_[f"{a_name}_and_{b_name}"] = set(iter_a) & set(iter_b)
+
+    d_[f"{b_name}_only"] = set(iter_b) - set(iter_a)
+
+    return d_
 
 
 def setup_logging(
