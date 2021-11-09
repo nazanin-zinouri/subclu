@@ -47,8 +47,7 @@ User preferences:
 ```
 {
     "codeCellConfig": {
-        "codeFolding": true,
-        "autoClosingBrackets": true,
+        "codeFolding": true
     }
 }
 ```

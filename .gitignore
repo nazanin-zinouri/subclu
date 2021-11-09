@@ -144,20 +144,8 @@ dmypy.json
 *djb*-IGNORE.*py*
 *djb*ignore/
 
-# Annoy index from openTSNE
-*annoy_index*.ann
-
 # mlflow experiments (parameters, metrics, &/or data)
 *mlruns/
 
 # dask local storage
 *dask-worker-space/
-
-# office temp files
-~$*.xl*
-~$*.doc*
-~$*.ppt*
-
-# ignore hydra folders from multi-run
-.hydra
-hydra_runs/
