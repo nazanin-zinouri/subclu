@@ -6,12 +6,13 @@ by functions from `models/vectorize_text.py`
 
 Vectorize text > Aggregate embeddings > Compress embeddings | Cluster posts | Cluster subs
 """
+import logging
 from datetime import datetime, timedelta
 import gc
 from functools import partial
-import logging
+# import logging
 from logging import info
-import math
+# import os
 from pathlib import Path
 from typing import Tuple, Union, List
 
@@ -25,7 +26,7 @@ import dask.dataframe
 from dask import dataframe as dd
 import pandas as pd
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 # try modin instead of pandas?
 # os.environ["MODIN_ENGINE"] = 'dask'
@@ -81,7 +82,7 @@ class AggregateEmbeddings:
             df_v_sub: pd.DataFrame = None,
 
             mlflow_experiment: str = 'use_multilingual_v1_aggregates',
-            run_name: str = 'aggregate_embeddings_dask',
+            run_name: str = None,
             mlflow_tracking_uri: str = 'sqlite',
 
             n_sample_posts_files: float = None,
@@ -99,54 +100,9 @@ class AggregateEmbeddings:
 
             embeddings_read_fxn: callable = dd.read_parquet,
             metadata_read_fxn: callable = pd.read_parquet,
-            calculate_similarites: bool = False,
-            logs_path: str = 'logs/AggregateEmbeddings',
-            unique_checks: bool = False,
             **kwargs
     ):
-        """
-
-        Args:
-            bucket_name:
-            folder_subreddits_text_and_meta:
-            folder_comments_text_and_meta:
-            folder_posts_text_and_meta:
-            posts_uuid:
-            posts_folder:
-            col_text_post_word_count:
-            col_post_id:
-            df_v_posts:
-            comments_uuid:
-            comments_folder:
-            col_comment_id:
-            col_text_comment_word_count:
-            col_comment_text_len:
-            min_comment_text_len:
-            df_v_comments:
-            subreddit_desc_uuid:
-            subreddit_desc_folder:
-            col_subreddit_id:
-            df_v_sub:
-            mlflow_experiment:
-            run_name:
-            mlflow_tracking_uri:
-            n_sample_posts_files:
-            n_sample_comments_files:
-            agg_comments_to_post_weight_col:
-            agg_post_post_weight:
-            agg_post_comment_weight:
-            agg_post_subreddit_desc_weight:
-            agg_post_to_subreddit_weight_col:
-            df_subs_meta:
-            df_posts_meta:
-            df_comments_meta:
-            embeddings_read_fxn:
-            metadata_read_fxn:
-            calculate_similarites:
-            logs_path:
-            unique_checks:
-            **kwargs:
-        """
+        """"""
         self.bucket_name = bucket_name
         self.folder_subreddits_text_and_meta = folder_subreddits_text_and_meta
         self.folder_comments_text_and_meta = folder_comments_text_and_meta
@@ -194,16 +150,6 @@ class AggregateEmbeddings:
         self.embeddings_read_fxn = embeddings_read_fxn
         self.metadata_read_fxn = metadata_read_fxn
 
-        # use as flag to know whether or not to calculate subredit similarities
-        #  Set to False by default -- want to make similarity its own step
-        self.calculate_similarites = calculate_similarites
-
-        # Save logs here
-        self.logs_path = logs_path
-
-        # When sampling, set this to True to compute unique checks
-        self.unique_checks = unique_checks
-
         # Create path to store local run
         self.path_local_model = None
 
@@ -226,44 +172,6 @@ class AggregateEmbeddings:
         self.df_subs_agg_b_similarity = None
         self.df_subs_agg_c_similarity = None
 
-        self.df_subs_agg_a_similarity_pair = None
-        self.df_subs_agg_b_similarity_pair = None
-        self.df_subs_agg_c_similarity_pair = None
-
-    def _init_file_log(self) -> None:
-        """Create a file & FileHandler to log data"""
-        # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
-        if self.logs_path is not None:
-            logger = logging.getLogger()
-
-            path_logs = Path(self.logs_path)
-            Path.mkdir(path_logs, parents=False, exist_ok=True)
-            self.f_log_file = str(
-                path_logs /
-                f"{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}_{self.run_name}.log"
-            )
-
-            self.fileHandler = logging.FileHandler(self.f_log_file)
-            self.fileHandler.setLevel(logging.INFO)
-
-            formatter = logging.Formatter(
-                '%(asctime)s | %(levelname)s | "%(message)s"',
-                '%Y-%m-%d %H:%M:%S'
-            )
-            self.fileHandler.setFormatter(formatter)
-            logger.addHandler(self.fileHandler)
-
-    def _remove_file_logger(self) -> None:
-        """After completing job, remove logging handler to prevent
-        info from other jobs getting logged to the same log file
-        """
-        if self.fileHandler is not None:
-            logger = logging.getLogger()
-            try:
-                logger.removeHandler(self.fileHandler)
-            except Exception as e:
-                logging.warning(f"Can't remove logger\n{e}")
-
     def run_aggregation(self) -> None:
         """Main function to run full aggregation job
 
@@ -274,8 +182,6 @@ class AggregateEmbeddings:
           re-run embeddings process on old posts, only need to update new posts (and give less weight to old posts)
           right?
         """
-        # set & add logger for file
-        self._init_file_log()
         t_start_agg_embed = datetime.utcnow()
         info(f"== Start run_aggregation() method ==")
 
@@ -285,8 +191,6 @@ class AggregateEmbeddings:
         self.mlf.add_git_hash_to_active_run()
         self.mlf.set_tag_hostname(key='host_name')
         self.mlf.log_param_hostname(key='host_name')
-        self.mlf.log_cpu_count()
-        self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
         # create local path to store artifacts before logging to mlflow
         self.path_local_model = get_project_subfolder(
@@ -303,7 +207,6 @@ class AggregateEmbeddings:
         # Load raw embeddings
         # ---
         self._load_raw_embeddings()
-        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # Load metadata from files
@@ -316,7 +219,6 @@ class AggregateEmbeddings:
         # TODO(djb): re-enable after fixing other bugs &/or move its order?
         #  b/c we don't use it until later...
         self._load_metadata()
-        self.mlf.log_ram_stats(only_memory_used=True)
 
         # Filter out short comments using metadata
         # ---
@@ -341,7 +243,6 @@ class AggregateEmbeddings:
         # - up-votes
         # ---
         self._agg_comments_to_post_level()
-        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # Merge at post-level basic
@@ -350,9 +251,7 @@ class AggregateEmbeddings:
         # Weights by inputs, e.g., 70% post, 20% comments, 10% subreddit description
         # ---
         self._agg_posts_and_comments_to_post_level()
-        self.mlf.log_ram_stats(only_memory_used=True)
         self._agg_posts_comments_and_sub_descriptions_to_post_level()
-        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # TODO(djb): Merge at post-level with subreddit lag
@@ -380,53 +279,25 @@ class AggregateEmbeddings:
         # - number of days since post was created (more recent posts get more weight)
         # ---
         self._agg_post_aggregates_to_subreddit_level()
-        self.mlf.log_ram_stats(only_memory_used=True)
-        # TODO(djb): break up (save & log fxn):
-        #    save & log aggregates ASAP - this way I can start working on
-        #    creating clusters w/o having to wait for distances to be computed
-        # TODO(djb): log and save C) before B or A (C is what gives the best outputs)
-        self._save_and_log_aggregate_and_similarity_dfs()
-        self.mlf.log_ram_stats(only_memory_used=True)
 
         # ---------------------
         # Calculate subreddit similarity/distance
         # ---
-        if self.calculate_similarites:
-            self._calculate_subreddit_similarities()
-            self.mlf.log_ram_stats(only_memory_used=True)
+        self._calculate_subreddit_similarities()
 
-            self._save_and_log_aggregate_and_similarity_dfs()
-            self.mlf.log_ram_stats(only_memory_used=True)
+        self._save_and_log_aggregate_and_similarity_dfs()
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_agg_embed, log_label='Total Agg fxn time', verbose=True)
         mlflow.log_metric('vectorizing_time_minutes',
                           total_fxn_time / timedelta(minutes=1)
                           )
-
-        info(f"== COMPLETE run_aggregation() method ==")
-        # TODO(djb): log file-log to mlflow
-        self._send_log_file_to_mlflow()
-
         mlflow.end_run()
-        info(f"    Removing fileHandler...")
-        self._remove_file_logger()
-
-    def _send_log_file_to_mlflow(self) -> None:
-        """If log file exists, send it to MLFlow
-        In case a job fails, it's helpful to have this stand-alone method to send the log-file.
-        """
-        if self.f_log_file is not None:
-            try:
-                if mlflow.active_run() is not None:
-                    info(f"Logging log-file to mlflow...")
-                    # TODO(djb): could I add the mlflow UUID as an attribute to this
-                    #  object and reactivate it in case the run was killed?
-                    mlflow.log_artifact(self.f_log_file)
-                else:
-                    info(f"Could NOT log to MLFLow, there's no active run.")
-            except Exception as e:
-                logging.warning(f"Error logging log-file: \n{e}")
+        info(f"== COMPLETE run_aggregation() method ==")
+        # return (
+        #     self.df_subs_agg_a, self.df_subs_agg_b, self.df_subs_agg_c,
+        #     self.df_posts_agg_b, self.df_posts_agg_c, None
+        # )
 
     def _create_and_log_config(self):
         """Convert inputs into a dictionary we can save to replicate the run
@@ -459,8 +330,8 @@ class AggregateEmbeddings:
             'subreddit_desc_folder': self.subreddit_desc_folder,
             'col_subreddit_id': self.col_subreddit_id,
 
-            'n_sample_posts_files': self.n_sample_posts_files,
-            'n_sample_comments_files': self.n_sample_comments_files,
+            'frac_sample_posts': self.n_sample_posts_files,
+            'frac_sample_comments': self.n_sample_comments_files,
 
             'agg_comments_to_post_weight_col': self.agg_comments_to_post_weight_col,
             'agg_post_post_weight': self.agg_post_post_weight,
@@ -493,7 +364,6 @@ class AggregateEmbeddings:
                 read_function=self.embeddings_read_fxn,
                 cache_locally=True,
             )
-            # why are we tyring to drop `subreddit_id` all the time? to reduce compute or RAM?
             try:
                 self.df_v_sub = self.df_v_sub.drop(self.col_subreddit_id, axis=1)
             except KeyError:
@@ -507,7 +377,6 @@ class AggregateEmbeddings:
         info(f"  {r_sub:10,.0f} | {c_sub:4,.0f} <- Raw vectorized subreddit description shape")
         if active_run is not None:
             mlflow.log_metrics({'sub_description_raw_rows': r_sub, 'sub_description_raw_cols': c_sub})
-        info(f"  Unique check for subreddit description...")
         assert (r_sub == self.df_v_sub['subreddit_name'].nunique().compute()), (f"** Index not unique. "
                                                                                 f"Check duplicates df_v_sub **")
 
@@ -535,15 +404,11 @@ class AggregateEmbeddings:
             # copy so that the internal object is different from the pre-loaded object
             self.df_v_posts = self.df_v_posts.copy()
 
-        info(f"  Getting df_v_posts.shape ...")
         r_post, c_post = get_dask_df_shape(self.df_v_posts)
         info(f"  {r_post:10,.0f} | {c_post:4,.0f} <- Raw POSTS shape")
-        # Sampling only works reliably in pandas, it takes forever to compute in dask,
-        #  so we only sample at file-level
 
         if active_run is not None:
             mlflow.log_metrics({'posts_raw_rows': r_post, 'posts_raw_cols': c_post})
-        info(f"  Checking that posts are unique...")
         assert (r_post == self.df_v_posts[self.col_post_id].nunique().compute()), (f"** Post-ID NOT unique. "
                                                                                    f"Check duplicates df_v_posts **")
 
@@ -554,38 +419,13 @@ class AggregateEmbeddings:
             info(f"Loading COMMENTS embeddings...")
             if self.n_sample_comments_files is not None:
                 info(f"  Sampling COMMENTS FILES down to: {self.n_sample_comments_files:,.0f}")
-
-            # If we get a list of multiple UUIDs, we need to:
-            #   - load each mlflow UUID df independently
-            #   - concat the two dask-dataframes
-            if isinstance(self.comments_uuid, str):
-                self.df_v_comments = self.mlf.read_run_artifact(
-                    run_id=self.comments_uuid,
-                    artifact_folder=self.comments_folder,
-                    read_function=self.embeddings_read_fxn,
-                    cache_locally=True,
-                    n_sample_files=self.n_sample_comments_files,
-                )
-            else:
-                info(f"  Found {len(self.comments_uuid)} run UUIDs with COMMENT embeddings...")
-                if self.n_sample_comments_files is not None:
-                    n_files_per_run = math.ceil(self.n_sample_comments_files / len(self.comments_uuid))
-                    info(f"    Sampling {n_files_per_run} FILES per run UUID")
-                else:
-                    n_files_per_run = None
-
-                self.df_v_comments = dd.concat(
-                    [
-                        self.mlf.read_run_artifact(
-                            run_id=comm_uuid_,
-                            artifact_folder=self.comments_folder,
-                            read_function=self.embeddings_read_fxn,
-                            cache_locally=True,
-                            n_sample_files=n_files_per_run,
-                        ) for comm_uuid_ in self.comments_uuid
-                    ],
-                    axis=0,
-                )
+            self.df_v_comments = self.mlf.read_run_artifact(
+                run_id=self.comments_uuid,
+                artifact_folder=self.comments_folder,
+                read_function=self.embeddings_read_fxn,
+                cache_locally=True,
+                n_sample_files=self.n_sample_comments_files,
+            )
             try:
                 self.df_v_comments = self.df_v_comments.drop(self.col_subreddit_id, axis=1)
             except KeyError:
@@ -597,7 +437,6 @@ class AggregateEmbeddings:
         #  in another step
         # r_com_raw, c_com_raw = get_dask_df_shape(self.df_v_comments)
         # info(f"  {r_com_raw:10,.0f} | {c_com_raw:4,.0f} <- Raw COMMENTS shape")
-
         # No longer need to use index.get_level_values() b/c I reset_index() before saving
         #  But now need to use .compute() before .isin() b/c dask doesn't work otherwise...
         if self.n_sample_comments_files is not None:
@@ -608,7 +447,7 @@ class AggregateEmbeddings:
                  )
             ]
 
-            if self.n_sample_comments_files <= 9:
+            if self.n_sample_comments_files <= 4:
                 r_com, c_com = get_dask_df_shape(self.df_v_comments)
                 info(f"  {r_com:11,.0f} | {c_com:4,.0f} <- COMMENTS shape, after keeping only existing posts")
 
@@ -759,7 +598,7 @@ class AggregateEmbeddings:
         if active_run is not None:
             mlflow.log_metrics({'df_v_com_agg_rows': r_com_agg, 'df_v_com_agg_cols': c_com_agg})
         if self.n_sample_comments_files is not None:
-            if all([self.n_sample_comments_files <= 4, self.unique_checks]):
+            if self.n_sample_comments_files <= 9:
                 logging.warning(f"Checking that index is unique after aggregation... [only when testing]")
                 assert (r_com_agg == self.df_v_com_agg[self.col_post_id].nunique().compute()), "Index not unique"
         info(f"  {r_com_agg:11,.0f} | {c_com_agg:4,.0f} <- df_v_com_agg SHAPE")
@@ -778,9 +617,9 @@ class AggregateEmbeddings:
             # https://github.com/dask/dask/issues/5294
 
             # First get count for posts with comments
-            # hold off on calling .compute() until later so dask can optimize the DAG
+            # hold off on computing until later so dask can optimize the DAG
             self.col_comment_count = 'comment_count'
-            df_comment_count_per_post_only_1_or_more = (
+            self.df_comment_count_per_post = (
                 self.df_v_comments
                 .groupby(self.l_ix_post_level)
                 [self.col_comment_id].count()
@@ -789,7 +628,6 @@ class AggregateEmbeddings:
                 # .compute()
             )
 
-            info(f"Create MASK of posts with comments...")
             self.mask_posts_posts_with_comments = self.df_v_posts['post_id'].isin(
                 self.df_v_comments['post_id'].compute()
             )
@@ -797,10 +635,9 @@ class AggregateEmbeddings:
             # 2nd, add posts with zero comments
             #  Make sure to add the same columns & merge at the same index level!
             # Use concat instead of merge b/c it's less compute-intensive
-            info(f"Concat dfs: comment_count>=1 & comment_count==0")
             self.df_comment_count_per_post = dd.concat(
                 [
-                    df_comment_count_per_post_only_1_or_more,
+                    self.df_comment_count_per_post,
                     self.df_v_posts[~self.mask_posts_posts_with_comments][self.l_ix_post_level].assign(
                         **{self.col_comment_count: 0}
                     )
@@ -810,7 +647,7 @@ class AggregateEmbeddings:
 
             if self.n_sample_comments_files is not None:
                 if self.n_sample_comments_files <= 4:
-                    # only compute for test runs, otherwise it wastes A LOT of compute & TIME
+                    # only compute for test runs, otherwise it wastes a lot of compute
                     df_counts_summary = value_counts_and_pcts(
                         self.df_comment_count_per_post['comment_count'].compute(),
                         add_col_prefix=False,
@@ -839,7 +676,7 @@ class AggregateEmbeddings:
                         )
                         raise Exception(f"Error calculating comment count per post")
 
-            # Don't compute this now, wait for later when we need to create a mask to get IDs
+            # don't compute this now, wait for later when we need to create a mask to get IDs
             #  for posts & comments that need to be averaged
             # info(f"  {(self.df_comment_count_per_post['comment_count'].compute() >= 2).sum():10,.0f}"
             #      f" <- Posts with 2+ comments (total posts that need COMMENT weighted average)")
@@ -950,7 +787,7 @@ class AggregateEmbeddings:
         info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_b shape after aggregation")
 
         if self.n_sample_comments_files is not None:
-            if all([self.n_sample_comments_files <= 4, self.unique_checks]):
+            if self.n_sample_comments_files <= 4:
                 logging.warning(f"Unique check only applied when sampling/testing")
                 assert (r_agg_posts == self.df_posts_agg_b[self.col_post_id].nunique().compute()), "Index not unique"
 
@@ -1033,7 +870,7 @@ class AggregateEmbeddings:
         )  # .sort_index()
 
         if self.n_sample_comments_files is not None:
-            if all([self.n_sample_comments_files <= 5, self.unique_checks]):
+            if self.n_sample_comments_files <= 9:
                 # Only calculate with fewer than 10 files, this might be taking up 30+ minutes!!
                 r_agg_posts, c_agg_posts = get_dask_df_shape(self.df_posts_agg_c, col_len_check=self.col_post_id)
                 info(f"  {r_agg_posts:11,.0f} | {c_agg_posts:4,.0f} <- df_posts_agg_c shape after aggregation")
@@ -1196,65 +1033,51 @@ class AggregateEmbeddings:
 
         # create dict to make it easier to reload dataframes logged as artifacts
         # e.g., we should be able to get a list of the expected df subfolders even if we change the name of a folder
-        d_dfs_folders_to_log = {k: k for k, v in d_dfs_to_save.items() if v is not None}
-        info(f"Dictionary of dfs to log & save (only dfs that have been created):\n"
-             f"{d_dfs_folders_to_log}")
+        d_dfs_folders_to_log = {k: k for k in d_dfs_to_save.keys()}
         mlflow_logger.save_and_log_config(
             config=d_dfs_folders_to_log,
             local_path=self.path_local_model,
             name_for_artifact_folder='d_logged_dfs_subfolders',
         )
 
-        # Only save dfs that have been created
-        for folder_, df_ in tqdm({k: v for k, v in d_dfs_to_save.items() if v is not None}.items(),
-                                 ascii=True, ncols=80, position=0):
-            t_start_df_ = datetime.utcnow()
-
-            path_sub_local = self.path_local_model / folder_
+        for folder_, df_ in tqdm(d_dfs_to_save.items()):
             info(f"** {folder_} **")
-            if Path(path_sub_local).exists():
-                info(f"  ** SKIPPING because path already exits **")
-                continue
-            else:
-                info(f"  Saving locally...")
+
+            info(f"Saving locally...")
+            path_sub_local = self.path_local_model / folder_
 
             # The assumption is that similarity DFs should be pandas DFs
             #  so we should be safe saving index for them
-            # save_pd_df_to_parquet_in_chunks can handle either pd.dfs OR dd.dfs
             if folder_.endswith('_similarity'):
-                info(f"  Keeping index intact...")
+                info(f"Keeping index intact...")
+                rows_, cols_ = df_.shape
                 save_pd_df_to_parquet_in_chunks(
                     df=df_,
                     path=path_sub_local,
                     write_index=True,
                 )
             else:
+                if isinstance(df_, pd.DataFrame):
+                    rows_, cols_ = df_.shape
+                else:
+                    rows_, cols_ = get_dask_df_shape(df_)
                 save_pd_df_to_parquet_in_chunks(
                     df=df_.reset_index(),
                     path=path_sub_local,
                     write_index=False,
                 )
 
-            if isinstance(df_, pd.DataFrame):
-                info(f"  Logging df shape...")
-                rows_, cols_ = df_.shape
-                mlflow.log_metrics(
-                    {f"{folder_}-rows": rows_,
-                     f"{folder_}-cols": cols_,
-                     }
-                )
-            else:
-                # TODO(djb) run separate job to add dask df shape AFTER df is saved,
-                #   otherwise it takes A LOT of extra compute to get len(df)
-                info(f"  NOT logging shape of dask df to save time & compute")
+            # for dask dfs, don't try to
+            mlflow.log_metrics(
+                {f"{folder_}-rows": rows_,
+                 f"{folder_}-cols": cols_,
+                 }
+            )
 
-            info(f"  Logging artifact to mlflow...")
+            info(f"Logging artifact to mlflow...")
             mlflow.log_artifacts(path_sub_local, artifact_path=folder_)
-            elapsed_time(start_time=t_start_df_, log_label=f"Total for saving & logging ** {folder_} **",
-                         verbose=True)
 
-        elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()',
-                     verbose=True)
+        elapsed_time(start_time=t_start_method, log_label='Total for _save_and_log_aggregate_and_similarity_dfs()', verbose=True)
 
 
 def get_dask_df_shape(

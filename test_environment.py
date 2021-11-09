@@ -1,6 +1,6 @@
 import sys
 
-REQUIRED_PYTHON = "python3"
+REQUIRED_PYTHON = "python"
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
             "This project requires Python {}. Found: Python {}".format(
                 required_major, sys.version))
     else:
-        print("\n>>> Development environment passes all tests!")
+        print(">>> Development environment passes all tests!")
 
 
 if __name__ == '__main__':

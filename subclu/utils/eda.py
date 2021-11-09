@@ -14,7 +14,7 @@ from itertools import product
 import logging
 from logging import info
 from pathlib import Path
-from typing import Union, List, Any, Optional, Tuple, Dict
+from typing import Union, List, Any, Optional, Tuple
 import sys
 from pkg_resources import get_distribution
 
@@ -47,44 +47,10 @@ def reorder_array(items_to_front: list,
         return items_to_front + [itm for itm in array if itm not in items_to_front]
 
 
-def get_venn_sets2(
-        iter_a: iter,
-        iter_b: iter,
-        a_name: str = 'a',
-        b_name: str = 'b',
-        return_dict: bool = True,
-) -> Dict[str, set]:
-    """Input 2 iterables and return a dictionary with
-    the items in one
-    """
-    if not isinstance(iter_a, set):
-        set_a = set(iter_a)
-    else:
-        set_a = iter_a
-    if not isinstance(iter_b, set):
-        set_b = set(iter_b)
-    else:
-        set_b = iter_b
-
-    print(f"{len(set_a):6,.0f} <- {a_name}")
-    print(f"{len(set_b):6,.0f} <- {b_name}")
-    print(f"{len(set_a | set_b):6,.0f} <- {a_name} + {b_name}")
-
-    d_ = dict()
-    d_[f"{a_name}_only"] = set(iter_a) - set(iter_b)
-
-    d_[f"{a_name}_and_{b_name}"] = set(iter_a) & set(iter_b)
-
-    d_[f"{b_name}_only"] = set(iter_b) - set(iter_a)
-
-    return d_
-
-
 def setup_logging(
         log_format: str = 'basic_with_time',
         console_level=logging.INFO,
         file_level=logging.INFO,
-        path_logs: str = 'logs',
         file_root_name: str = None,
         verbose: bool = False
 ) -> None:
@@ -112,18 +78,14 @@ def setup_logging(
 
     # Note: logging.basicConfig won't work inside ipython unless we reload `logging`
     importlib.reload(logging)
-    # if file_root_name is not None:
-    #     path_logs = Path(path_logs)
-    #     Path.mkdir(path_logs, parents=False, exist_ok=True)
-    #     # for some reason file logging isn't working with basicConfig...
-    #     logging.basicConfig(
-    #         level=file_level,
-    #         format=log_format,
-    #         handlers=[
-    #             logging.FileHandler(str(path_logs / f'{str_dtm_start}_{file_root_name}.log')),
-    #         ],
-    #         datefmt='%Y-%m-%d %H:%M:%S'
-    #     )
+    if file_root_name is not None:
+        path_logs = Path('logs')
+        Path.mkdir(path_logs, parents=False, exist_ok=True)
+        logging.basicConfig(filename=str(path_logs / f'{str_dtm_start}_{file_root_name}.log'),
+                            level=file_level,
+                            format=log_format,
+                            datefmt='%Y-%m-%d %H:%M:%S'
+                            )
 
     # Explicitly getLogger in case running inside ipython/jupyter
     logger = logging.getLogger()
@@ -149,16 +111,6 @@ def setup_logging(
 
     # For some reason, sqlalchemy can sometimes be set to the wrong level, so se it back
     logging.getLogger('sqlalchemy.engine').setLevel(logging.WARN)
-
-    # set & add logger for file
-    if file_root_name is not None:
-        path_logs = Path(path_logs)
-        Path.mkdir(path_logs, parents=False, exist_ok=True)
-
-        fileHandler = logging.FileHandler(str(path_logs / f'{str_dtm_start}_{file_root_name}.log'))
-        fileHandler.setLevel(file_level)
-        fileHandler.setFormatter(formatter)
-        logger.addHandler(fileHandler)
 
     if verbose:
         print("Final handlers")
