@@ -18,6 +18,27 @@ For example, we should be able to say that in that past week in subreddit X:
 
 The final score for a subreddit is TBD. Besides topic labels, we might end up aggregating all the posts (and comments) in a subreddit to get a single value (or a vector). Getting a single vector per subreddit might be the best path forward so that we can use distance metrics to compare "most similar" subreddits and use that for recommendations.
 
+# Creating topic clusters process
+The process is split into the steps below. Note that the actual code is in modules inside the `subclu` folder, but we're using notebooks to make it easier to log and document the process.
+0. **Pull data** from BigQuery
+   - See `subclu > data > v0.4.0_add_more_geo_and_active_subs`
+      - `_01_select_subreddits.sql`
+      - `_02_selects_posts_for_modeling.sql`
+      - `_03_select_comments_for_modeling.sql`
+1. **EDA** of training data
+   - Notebooks that start with `djb_01`
+   - Check data before modeling to spot anythig missing or odd about data distributions
+2. **Vectorize** text (converting it into embeddings)
+   - Notebooks that start with `djb_02` (name before v0.4.0: `djb_06.x`)
+3. **Aggregate** the embeddings from posts and comments
+   - Notebooks that start with `djb_03` (name before v0.4.0: `djb_10.x` or `djb_11.x`)
+4. **Create** clusters
+   - Notebooks that start with `djb_04` (name before v0.4.0: `djb_17.x` or `djb_18.x`)
+
+Path to v0.4.0 notebooks (the latest version as of 2021-10):
+- `subreddit_clustering_i18n`/`notebooks`/`v0.4.0`
+
+
 # Getting started
 ## Environment
 For quick experimentation, I started using GCP notebooks and PyCharm. See the markdown file for detailed instructions: [gcp_environment_setup.md](gcp_environment_setup.md).
@@ -30,11 +51,11 @@ Note that the required libraries are listed in `setup.py` under `INSTALL_REQUIRE
 
 Editable mode (`--editable` or `-e`) makes it easy to continue editing your module and use the updated code without having to re-install it. This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-import the package.
 
-Example installation in GCP notebooks
+### Example installation in GCP notebooks
 1) Assume sudo for your gcp user
 <br>`sudo su - david.bermejo`
-2) Use pip to install from location that's synced to PyCharm (active development).
-<br>`pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/`
+2) Use pip to install from location that's synced to PyCharm (active development).<br>
+`pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/`
    - If you're installing a superset of requirements add: `[<extra_name>]` at the end of path
 
 ```
@@ -46,6 +67,38 @@ pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/[torch]
 ```
 
+### Installing on a laptop/local
+The heavy GPU work won't work on a standard laptop, but you can still install to do some local EDA. **NOTE** that the `[laptop_dev]` requirements includes `jupyterlab`.
+
+Assuming you have `conda` installed, you can use the `Make` file to create a `venv` with the required libraries:<br>
+`make install_requirements`
+
+Otherwise, you'll have to do the steps manually:
+1. Change your directory to my homework directory
+2. Create a virtual environment (venv)
+3. Activate the venv
+4. Install the project's requirements via pip
+
+```bash
+# 1
+cd XXX
+
+# 2
+python3 -m venv .venv
+
+# 3
+source .venv/bin/activate
+
+# 4
+python3 -m pip install -r requirements_laptop.txt
+```
+
+Then you can run a juypter lab server:
+```bash
+jupyter lab
+```
+
+### Reloading in jupyter
 In jupyter, you can add this magic at the beginning of a notebook to reload edited code without having to re-import modules.
 ```
 %load_ext autoreload

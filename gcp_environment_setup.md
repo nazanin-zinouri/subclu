@@ -1,4 +1,33 @@
-# GCP Notebooks + ssh setup
+# GCP AI Notebooks + ssh setup
+
+## View existing notebooks / Consoles & URL Proxy
+After you've created a notebook VM, you should be able to see it in one of the following consoles:
+
+#### Consoles:
+VM instances in `data-prod` project:
+- https://console.cloud.google.com/compute/instances?project=data-prod-165221
+
+GCP AI notebooks in `data-science` project:
+- https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-science-prod-218515&lastRefresh=1633020573527
+
+GCP spark clusters on `data-science` project:
+- https://console.cloud.google.com/dataproc/clusters?region=us-central1&project=data-science-prod-218515
+
+
+#### Individual VMs:
+Inference for USE:
+- project: data-prod
+- Use for getting embeddings (vectorizing text)
+- https://7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com/lab
+
+CPU / EDA:
+- project: data-prod
+- Use for Dask cluster, bump to 64 CPUs & 400+ GB RAM)
+- Use for regular EDA: (32 CPUs & ~64 GB RAM)
+- https://1185e8680f9b40ca-dot-us-west1.notebooks.googleusercontent.com/lab?
+
+
+
 ## Create a GCP Notebook
 For this project I'm using GCP notebooks for R&D because they offer self-service scalability & ssh connections that make it easy to integrate with PyCharm for local development & github integration.
 
@@ -190,7 +219,7 @@ git config --global user.name "David Bermejo"
 
 
 ## Clone repo to JupyterLab
-The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:
+The default method to clone uses HTTPS, but Reddit requires ssh authentication. So you need to open a terminal and clone it like so:<br>
 `git clone git@github.snooguts.net:david-bermejo/subreddit_clustering_i18n.git`
 
 After you clone, you can cd to the new folder with the repo & use git CLI as usual.
@@ -267,15 +296,19 @@ After you've set the remote connection you can use the remote interpreter. The n
 # Install our module in `editable` mode
 After you have the code for this project on your remote, you can install it as a module.
 
-Editable makes it easy to continue editing your module and use the updated code without having to re-install it. This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-import the package.
+`Editable` mode makes it easy to continue editing your module and use the updated code **without having to re-install it**! This can speed up development when you pair it with jupyter's magic to automatically refresh edited code without having to re-install or re-import the package. For more info, check this [stack-overflow thread](https://stackoverflow.com/questions/35064426/when-would-the-e-editable-option-be-useful-with-pip-install)
 
 To install the repo as a package as `--editable` in GCP, first assume sudo for your gcp user. Then install the code from where you stored the code synced to PyCharm.
 
-NOTE: you might need to install it with a `--user` flag in case some of the installed packages create conflicts with native packages
+In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
+In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
+```
+%load_ext autoreload
+%autoreload 2
+```
 
 If resolving packages is taking too long, might need to use a flag (in the short term):
-- See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue
-
+- See https://stackoverflow.com/questions/65122957/resolving-new-pip-backtracking-runtime-issue<br>
 `--use-deprecated=legacy-resolver`
 
 
@@ -299,14 +332,23 @@ pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_
 
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_233]" --use-deprecated=legacy-resolver
 
+
+
+# VM in data-science project
+pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[inference_4gpus_tf_234]" --use-deprecated=legacy-resolver
+
+
+# ==
 #  For some reason extras don't always work so it's sometimes easier to cd to folder
 cd /home/david.bermejo/repos/subreddit_clustering_i18n
 pip install -e ".[tensorflow232]" --use-deprecated=legacy-resolver
+
+pip install -e ".[inference_4gpus_tf_234]" --use-deprecated=legacy-resolver
 ```
 
-
-Try `--user` install if above steps fail **(don't sudo su)**.
-For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library version 
+### `--user` in case installation doesn't work
+Try `--user` install if above steps fail **(don't use `sudo su` in this case!)**.
+For the tensorflow VM/image I tried the --user tag because I was getting access errors. & conflicts between library versions 
 ```bash
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow232]" --user --use-deprecated=legacy-resolver
 ```
@@ -316,15 +358,65 @@ If all else fails, install tensorflow-text directly:
 pip install "tensorflow-text==2.3.0" --user
 ```
 
+### Creating an `[extra]` set of package requirements
+**NOTE** You may need to create an `extra` set of requirements if you're installing tensorflow libraries that conflict with the VM's baseline libraries. Usually these are:
+- core libraries that pip might try to update
+- Google-API pre-installed libraries that shouldn't be updated
+- Tensorflow pre-installed libraries that shouldn't be updated
 
-In jupyter, you can add this magic at the beginning of a notebook to reload edited code:
+`setup.py` example:
+```python
+from setuptools import find_packages, setup
+
+# install_requires gets installed ALWAYS
+INSTALL_REQUIRES = [
+  "mlflow == 1.16.0",
+  "dask[complete] == 2021.6.0",
+]
+
+# extras only get installed when/if they're called explicitly
+EXTRAS_REQUIRE = {
+  "tensorflow_232": [
+    "pyarrow == 4.0.1",
+    "google-api-core == 1.30.0",
+    "tensorflow == 2.3.2",
+    "tensorflow-text == 2.3.0",
+  ],
+  
+  "inference_4gpus_tf_234": [
+    # core preinstalled, VM won't allow it to be over-written
+    "pyarrow == 5.0.0",
+    
+    # GCP preinstalled
+    "google-api-core == 1.31.2",
+    
+    # TF pre-installed
+    "tensorflow == 2.3.4",
+
+    # TF library needed to use USE-multilingual
+    "tensorflow-text == 2.3.0",
+  ],
+}
+
+setup(
+    name='subclu',
+    packages=find_packages(),
+    version='0.4.0',
+    description='A package to identify clusters of subreddits and/or posts',
+    author='david.bermejo@reddit.com',
+    license='',
+    python_requires=">=3.7",
+    install_requires=INSTALL_REQUIRES,
+
+    # Additional groups of dependencies here (e.g. development dependencies).
+    # Users will be able to install these using the "extras" syntax, for example:
+    #   $ pip install sampleproject[dev]
+    extras_require=EXTRAS_REQUIRE,
+)
 ```
-%load_ext autoreload
-%autoreload 2
-```
 
 
-### Reference / weird conflicts & venv things
+## Reference / weird conflicts & venv things
 The base installation has some weird numpy conflicts so you may need to install as --user:
 
 I tried creating a conda venv, but the venv for david.bermejo doesn't get shared for the `jupyter` user.
@@ -366,7 +458,7 @@ pip install -r base_requirements.txt --use-deprecated=legacy-resolver
 ```
 
 
-# Running mlflow server on GCP
+# Running mlflow-server on GCP
 
 ## Step 1: Run this command in the **GCP Notebok/VM**.
 The new pattern is to call the mlflow DB for the current host name:
@@ -375,7 +467,7 @@ The new pattern is to call the mlflow DB for the current host name:
 mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
 ```
 
-### CPU-based VM with lots of RAM:
+### CPU-based VM with lots of RAM & CPUs:
 ```
 mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-100-2021-04-28-djb-eda-german-subs/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
 ```
@@ -467,7 +559,12 @@ Thu Jul 29 23:26:53 2021
 
 `watch` is my favorite command here because it auto-refreshes in a pseudo-dynamic way. After you're done (`Ctrl+C` or `:q`), you go back to your terminal without `stdout` clutter. The `-n` flag is followed by how often (in seconds) you want the call to `nvidia-smi` to happen.
 
-`watch -n 5 nvidia-smi`
+For example, one of these:
+```
+watch -n 5 nvidia-smi
+watch -n 4 nvidia-smi
+watch -n 3 nvidia-smi
+```
 
 
 The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new set of stats ever 10 seconds:

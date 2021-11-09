@@ -9,6 +9,7 @@ We could also use Unicode's cldr:
 
 For IP geolocation we'll need to research what coding system they use.
 TODO(djb)
+
 """
 
 
@@ -51,8 +52,10 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     'gu': 'Gujarati',
     'ha': 'Hausa',
     'haw': 'Hawaiian',
+
     'hi': 'Hindi',
     'hi-Latn': 'Hindi',
+
     'hmn': 'Hmong',
     'hr': 'Croatian',
     'ht': 'Haitian Creole',
@@ -63,8 +66,10 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     'is': 'Icelandic',
     'it': 'Italian',
     'iw': 'Hebrew',
+
     'ja': 'Japanese',
     'ja-Latn': 'Japanese',
+
     'jv': 'Javanese',
     'ka': 'Georgian',
     'kk': 'Kazakh',
@@ -98,6 +103,7 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     'ro': 'Romanian',
     'ru': 'Russian',
     'ru-Latn': 'Russian',
+
     'sd': 'Sindhi',
     'si': 'Sinhala',
     'sk': 'Slovak',
@@ -123,9 +129,13 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     'xh': 'Xhosa',
     'yi': 'Yiddish',
     'yo': 'Yoruba',
+
     'zh': 'Chinese',
+    'zh-cn': 'Chinese',  # Chinese simplified
     'zh-Latn': 'Chinese',
-    'zu': 'Zulu'
+    'zh-tw': 'Chinese',
+
+    'zu': 'Zulu',
 }
 
 L_USE_MULTILINGUAL_LANGUAGE_NAMES = [
@@ -160,36 +170,68 @@ for lang_code, lang_name in D_CLD3_CODE_TO_LANGUAGE_NAME.items():
 
 # These codes were extracted from top subreddit posts extract from:
 #  top_subreddits_2021-07_16.yaml
+# Languages with * next to them are high priority for i18n
 L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
-    'en',
-    'de',
-    'pt',
-    'es',
-    'fr',
-    'no',
-    'af',
-    'nl',
-    'it',
-    'id',
-    'da',
-    'so',
-    'tl',
-    'cy',
-    'sv',
-    'ca',
-    'tr',
-    'ro',
-    'et',
-    'fi',
-    'hr',
-    'sw',
-    'pl',
-    'hu',
-    'ja',
-    'la',
-    'sl',
-    'lb',
-    'vi',
+    'en',  # English
+    'de',  # * German *
+    'pt',  # * Portuguese *
+    'es',  # * Spanish *
+    'fr',  # * French *
+    'it',  # * Italian *
+
+    'af',  # Afrikaans - usually English slang can be misclassified this way
+    'nl',  # Dutch
+    'no',  # Norwegian - English/Germanic language mix ups
+
+    'tl',  # Tagalog
+    'so',  # Somali
+    'id',  # Indonesian
+
+    'da',  # Danish - English/Germanic language mix ups
+    'cy',  # Welsh - not sure how this is so high
+    'ca',  # Catalan - Spanish & Portuguese gets misclassified as this
+    'ro',  # Romanian - Latin mix? (Spanish, Portuguese, Italian?)
+
+    'sv',  # Swedish
+    'tr',  # Turkish
+    'et',  # Estonian
+
+    'pl',  # Polish
+    'fi',  # Finnish
+    'sw',  # Swahili
+
+    'sl',  # Slovenian
+    'hr',  # Croatian
+
+    'vi',  # Vietnamese
+    'ru',  # Russian
+    'ru-Latn', # Russian
+
+    'ja',  # Japanese
+    'ja-Latn',
+
+    'zh',  # Chinese
+    'zh-Latn',
+    'zh-cn',  # Chinese, simplified
+    'zh-tw',  # Chinese, Taiwan
+
+    # Languages in India
+    'hi',   # Hindi
+    'hi-Latn',  # Hindi
+    'mr',  # 'Marathi'
+    'ta',  # 'Tamil'
+    'te',  # 'Telugu'
+    'ml',  # 'Malayalam'
+
+    # 'la',  # latin -- exclude this b/c it's prob mis-classification of Romance languages
+    # 'fy',  # Western Frisian is prob mis-classification of Dutch or Germanic languages
+    'hu',  # Hungarian
+    # 'lb',  # Luxemburgish -- also prob a misclassification of German/French/Dutch
+    'sq',  # Albanian
+
+    # 'el',  # Greek
+    # 'el-Latn',
+
 ]
 
 L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL = list(
