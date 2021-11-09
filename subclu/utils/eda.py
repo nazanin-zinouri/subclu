@@ -68,7 +68,7 @@ def get_venn_sets2(
 
     print(f"{len(set_a):6,.0f} <- {a_name}")
     print(f"{len(set_b):6,.0f} <- {b_name}")
-    print(f"{len(set_a | set_b):6,.0f} <- {a_name} | {b_name}")
+    print(f"{len(set_a | set_b):6,.0f} <- {a_name} + {b_name}")
 
     d_ = dict()
     d_[f"{a_name}_only"] = set(iter_a) - set(iter_b)
