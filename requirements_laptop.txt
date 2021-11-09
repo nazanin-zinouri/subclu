@@ -1,0 +1,2 @@
+# local package
+-e .[latop_dev]

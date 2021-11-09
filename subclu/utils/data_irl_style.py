@@ -20,7 +20,7 @@ import matplotlib.colors as colors
 
 def get_colormap(
         n_items,
-        type='discrete',
+        map_type='discrete',
         return_as_list=False
 ) -> Union[colors.ListedColormap, colors.LinearSegmentedColormap, list]:
     """
@@ -28,7 +28,7 @@ def get_colormap(
 
     Args:
         n_items: how many items to plot?
-        type: One of: [discrete, continuous, divergent, continuous_dark]
+        map_type: One of: [discrete, continuous, divergent, continuous_dark]
         return_as_list:
             Most of matplotlib is ok with a "cmap" object, but seaborn doesn't play well with them.
             Instead set return_as_list=True so that sns can interpret the function's output.
@@ -36,7 +36,7 @@ def get_colormap(
     Returns:
         a CMAP object (color.ListedColormap or color.LinearSegmentedColormap) or a list of colors
     """
-    if type == 'discrete':
+    if map_type == 'discrete':
         reddit_base_cmap = np.array(
             ['#FF4500', '#0DD3BB', '#24A0ED', '#FFCA00', '#FFB000', '#FF8717', '#00A6A5', '#0079D3'])
         n_base_cmap = 8
@@ -54,7 +54,7 @@ def get_colormap(
         if not n_items:
             n_items = n_base_cmap
 
-        if type == 'discrete' and n_items > n_base_cmap:
+        if map_type == 'discrete' and n_items > n_base_cmap:
             raise Exception('Number of requested colors greater than what palette can offer')
 
         color_list = reddit_base_cmap[color_item_mapping[n_items]]
@@ -64,11 +64,11 @@ def get_colormap(
         else:
             return colors.ListedColormap(color_list)
 
-    elif type == 'continuous':
+    elif map_type == 'continuous':
         return colors.LinearSegmentedColormap.from_list(None, ['#FF4500', '#fcece6'], N=n_items)
-    elif type == 'divergent':
+    elif map_type == 'divergent':
         return colors.LinearSegmentedColormap.from_list(None, ['#FF4500', '#f5f5f5', '#0079D3'], N=n_items)
-    elif type == 'continuous_dark':
+    elif map_type == 'continuous_dark':
         return colors.LinearSegmentedColormap.from_list(None, ['#000000', '#FF4500', '#FFFFFF'], N=n_items)
 
 
@@ -184,6 +184,7 @@ def base_colors_for_manual_labels() -> dict:
         'uncategorized': "#e3dbda",  # light-reddish gray (too light: fcf3f2)
         'over18_nsfw': "#8c8c8c",  # dark gray
     }
+
 
 def check_colors_used(
         d_new: dict,

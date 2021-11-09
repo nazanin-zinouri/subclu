@@ -1,0 +1,18 @@
+dataset_name: 'v0.4.0 inputs - Top Subreddits (no Geo) + Geo-relevant subs, comments: TBD'
+bucket_name: 'i18n-subreddit-clustering'
+folder_subreddits_text_and_meta: 'subreddits/top/2021-09-24'
+folder_posts_text_and_meta: 'posts/top/2021-09-27'
+folder_comments_text_and_meta: 'comments/top/2021-10-04'
+
+comments_vectorized_mlflow_uuids: ['5f10cd75334142168a6ebb787e477c1f', '2fcfefc3d5af43328168d3478b4fdeb6']
+comments_vectorized_gcs: [
+    "gs://i18n-subreddit-clustering/mlflow/mlruns/14/5f10cd75334142168a6ebb787e477c1f/artifacts/df_vect_comments/*.parquet",
+    "gs://i18n-subreddit-clustering/mlflow/mlruns/14/2fcfefc3d5af43328168d3478b4fdeb6/artifacts/df_vect_comments/*.parquet"
+    ]
+comments_vectorized_mlflow_uuids_lowercase: null
+
+posts_vectorized_mlflow_uuids: ['8eef951842a34a6e81d176b15ae74afd']
+posts_vectorized_mlflow_uuids_lowercase: ['537514ab3c724b10903000501802de0e']
+
+subreddit_meta_vectorized_mlflow_uuids: ['8eef951842a34a6e81d176b15ae74afd']
+subreddit_meta_vectorized_mlflow_uuids_lowercase: ['537514ab3c724b10903000501802de0e']

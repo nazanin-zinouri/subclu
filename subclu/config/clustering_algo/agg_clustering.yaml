@@ -1,0 +1,19 @@
+model_name: 'AgglomerativeClustering'  # pull from the clustering_registry
+
+connectivity_graph:
+  add_step: false
+  name: kneighbors_graph
+  kwargs:
+    n_neighbors: 30
+    mode: connectivity
+    metric: cosine
+    include_self: false
+    n_jobs: 10
+
+# Pass these kwargs to the model defined by the key in the clustering_registry
+model_kwargs:
+  n_clusters: 65
+  affinity: 'euclidean'
+  linkage: 'ward'
+  compute_distances: true
+  compute_full_tree: true
