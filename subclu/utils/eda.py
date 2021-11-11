@@ -555,6 +555,8 @@ def style_df_numeric(
 
     if int_cols is True:
         int_cols = set(all_num_cols)
+    elif int_cols is False:
+        int_cols = native_int_cols
     elif int_cols is None:
         int_cols = native_int_cols | {c for c in all_num_cols if any(lbl in c for lbl in int_labels)}
     else:
