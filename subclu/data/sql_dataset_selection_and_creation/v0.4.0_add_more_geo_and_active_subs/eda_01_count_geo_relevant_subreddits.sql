@@ -4,9 +4,10 @@
 --  https://colab.research.google.com/drive/1ut0VvzRUkFpjSuVP0h88m0aT5LHUM8gK#scrollTo=Z2VDEgdL5IPX
 
 -- Select all subreddits & get stats to check topic-cluster coverage
-DECLARE partition_date DATE DEFAULT '2021-10-25';
+DECLARE partition_date DATE DEFAULT '2021-11-01';
 DECLARE GEO_PT_START DATE DEFAULT '2021-09-06';
 DECLARE GEO_PT_END DATE DEFAULT '2021-09-20';
+DECLARE MIN_USERS_L7 NUMERIC DEFAULT 2;
 
 DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and Northern Ireland| of America|";
 
@@ -28,15 +29,33 @@ WITH
         GROUP BY
             subreddit_id, subreddit_name
     ),
-    subs_geo_custom AS (
+    subs_geo_custom_raw AS (
         SELECT
-            subreddit_id
-            , geo_relevant_countries AS geo_relevant_countries_v04
-            , geo_relevant_country_codes AS geo_relevant_country_codes_v04
-            , geo_relevant_country_count AS geo_relevant_country_count_v04
-            , geo_relevant_subreddit AS geo_relevant_subreddit_v04
-        FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924`
+            *
+        -- This table already has a filter set at 0.16 (16%)
+        --  BUT it's not at a daily aggregation -- it is done over 2 weeks
+        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210922`
+        WHERE 1=1
+            AND (
+                country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
+                OR geo_region = 'LATAM'
+                -- eng-i18n =  Canada, UK, Australia
+                OR geo_country_code IN ('CA', 'GB', 'AU')
+            )
     ),
+    subs_geo_custom_agg AS (
+        SELECT
+            geo.subreddit_id
+            -- , geo.subreddit_name
+
+            -- Order so that we get (Mexico, US) only, and not both: (US, Mexico) AND (Mexico, US)
+            , STRING_AGG(geo.country_name, ', ' ORDER BY geo.country_name) AS geo_relevant_countries_v04
+            , STRING_AGG(geo.geo_country_code, ', ' ORDER BY geo.geo_country_code) AS geo_relevant_country_codes_v04
+            , COUNT(geo.geo_country_code) AS geo_relevant_country_count_v04
+        FROM subs_geo_custom_raw AS geo
+        GROUP BY 1
+    ),
+
     subs_geo_default_raw AS (
         SELECT
             LOWER(geo.subreddit_name) AS subreddit_name
@@ -93,11 +112,11 @@ SELECT
     , CASE WHEN (geo.geo_relevant_country_count >= 1) THEN true
         ELSE false
         END AS geo_relevant_subreddit
-    , COALESCE(geo_relevant_subreddit_v04, false) AS geo_relevant_subreddit_v04
-
-    , geoc.* EXCEPT(subreddit_id, geo_relevant_subreddit_v04)
+    , CASE WHEN (geoc.geo_relevant_country_count_v04 >= 1) THEN true
+        ELSE false
+        END AS geo_relevant_subreddit_v04
+    , geoc.* EXCEPT(subreddit_id)
     , geo.* EXCEPT (subreddit_id)
-
 
     -- Sub activity
     , CASE
@@ -114,7 +133,10 @@ SELECT
             (COALESCE(asr.posts_l7, 0) = 0)
             OR (unique_posters_l7_submitted IS NULL) ) THEN "0_posters"
         WHEN COALESCE(unique_posters_l7_submitted, 0) = 1 THEN "1_poster"
-        ELSE "2_or_more_posters"
+        WHEN COALESCE(unique_posters_l7_submitted, 0) = 2 THEN "2_posters"
+        WHEN COALESCE(unique_posters_l7_submitted, 0) = 3 THEN "3_posters"
+        WHEN COALESCE(unique_posters_l7_submitted, 0) = 4 THEN "4_posters"
+        ELSE "5_or_more_posters"
     END AS unique_posters_l7_bin
     , u.unique_posters_l7_submitted
 
@@ -130,7 +152,7 @@ SELECT
     , nt.rating_name
     , primary_topic
     , rating_weight
-    -- , array_to_string(mature_themes,", ") as mature_themes
+    -- -- , array_to_string(mature_themes,", ") as mature_themes
 
     , slo.verdict
     , slo.type
@@ -140,10 +162,12 @@ SELECT
     , slo.is_spam
 
 
-FROM (
-    SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
-    WHERE DATE(pt) = partition_date
-) AS asr
+FROM
+    (
+        SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+        WHERE DATE(pt) = partition_date
+    ) AS asr
+
     INNER JOIN (
         -- subreddit_lookup includes pages for users, so we need LEFT JOIN
         --  or INNER JOIN with active_subreddits or all_reddit_subreddits
@@ -153,8 +177,7 @@ FROM (
     ) AS slo
         ON asr.subreddit_name = LOWER(slo.name)
 
-    -- Need outer join for this b/c all of these subs have already been included in the model
-    FULL OUTER JOIN subs_geo_custom AS geoc
+    LEFT JOIN subs_geo_custom_agg AS geoc
         ON slo.subreddit_id = geoc.subreddit_id
 
     LEFT JOIN subs_geo_default_agg AS geo
@@ -178,7 +201,7 @@ FROM (
         ON acs.subreddit_id = nt.subreddit_id
 
 WHERE 1=1
-    AND asr.users_l7 >= 10
+    AND COALESCE(asr.users_l7, 0) >= MIN_USERS_L7
     AND COALESCE(verdict, 'f') <> 'admin_removed'
     AND COALESCE(is_spam, false) = false
     AND COALESCE(is_deleted, false) = false
@@ -187,3 +210,27 @@ ORDER BY users_l7 DESC, posts_l7 ASC, activity_7_day ASC # subreddit_name ASC
 
 -- LIMIT 5000
 ;
+
+
+-- ==============================
+-- Count check, tables side by side
+-- ===
+-- SELECT
+--     (SELECT COUNT(*) FROM unique_posts_per_subreddit) AS unique_posts_per_subreddit_raw_count
+--     , (SELECT COUNT(*) FROM subs_geo_custom_raw) AS subs_geo_custom_raw_count
+--     , (SELECT COUNT(*) FROM subs_geo_custom_agg) AS subs_geo_custom_agg_count  -- Expect 173+
+--     , (SELECT COUNT(*) FROM subs_geo_default_raw) AS subs_geo_default_raw_count
+--     , (SELECT COUNT(*) FROM subs_geo_default_agg) AS subs_geo_default_agg_count
+-- ;
+-- with:
+-- DECLARE partition_date DATE DEFAULT '2021-11-11';
+-- DECLARE GEO_PT_START DATE DEFAULT '2021-09-06';
+-- DECLARE GEO_PT_END DATE DEFAULT '2021-09-20';
+-- DECLARE MIN_USERS_L7 NUMERIC DEFAULT 1;
+-- unique_posts_per_subreddit_raw_count	subs_geo_custom_raw_count	subs_geo_custom_agg_count
+--   subs_geo_default_raw_count	subs_geo_default_agg_count
+-- 203,018
+-- 308,498
+-- 271,052
+-- 328,492
+--  98,641
