@@ -19,6 +19,113 @@ import pandas as pd
 
 from scipy.cluster.hierarchy import dendrogram
 
+from ..utils.eda import reorder_array
+
+
+def create_dynamic_clusters(
+        df_labels: pd.DataFrame,
+        min_subreddits_in_cluster: int = 5,
+        l_cols_labels_input: list = None,
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        append_columns: bool = True,
+) -> pd.DataFrame:
+    """For country to country clusters (DE to DE, FR to FR)
+    we need to resize the clusters because some might be too big and others too small
+    some might even be orphan.
+
+    Use this function to create a new set of columns to use for FPRs
+    and similar use cases.
+    """
+    if l_cols_labels_input is None:
+        l_cols_labels_input = [c for c in df_labels.columns if c.endswith('_label')]
+    # Create new cols that have zero-padding so we can concat and sort them
+    l_cols_labels_new = [f"{c}_nested" for c in l_cols_labels_input]
+
+    df_new_labels = pd.DataFrame(index=df_labels.index)
+    df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:03.0f}".format))
+
+    # Concat the values of the new columns so it's easier to tell depth of each cluster
+    for i in range(len(l_cols_labels_new)):
+        if i == 0:
+            df_new_labels[l_cols_labels_new[-1]] = (
+                df_new_labels[l_cols_labels_new[0]]
+                .str.cat(
+                    df_new_labels[l_cols_labels_new[1:]],
+                    sep='-'
+                )
+            )
+        else:
+            df_new_labels[l_cols_labels_new[-i - 1]] = (
+                df_new_labels[l_cols_labels_new[0]]
+                .str.cat(
+                    df_new_labels[l_cols_labels_new[1:-i]],
+                    sep='-'
+                )
+            )
+
+    # Current algo works from smallest cluster to highest cluster (bottom up)
+    # TODO(djb): create cluster that works at 052 and splits only if subsets meet criteria
+    df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
+    df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
+    df_new_labels[col_new_cluster_prim_topic] = df_labels[
+        l_cols_labels_new[-1].replace('_label_nested', '_majority_primary_topic')
+    ]
+
+    for c_ in sorted(l_cols_labels_new[:-1], reverse=True):
+        c_name_new = c_.replace('_nested', '')
+        col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
+
+        # find which current clusters are below threshold
+        df_vc = df_new_labels[col_new_cluster_val].value_counts()
+        dv_vc_below_threshold = df_vc[df_vc <= min_subreddits_in_cluster]
+        print(f"{dv_vc_below_threshold.shape} <- Shape of clusters below threshold")
+
+        # Replace cluster labels & names for current clusters that have too few subs in a cluster
+        mask_subs_to_reassign = df_new_labels[col_new_cluster_val].isin(dv_vc_below_threshold.index)
+        df_new_labels.loc[
+            mask_subs_to_reassign,
+            col_new_cluster_val
+        ] = df_new_labels[mask_subs_to_reassign][c_]
+
+        df_new_labels.loc[
+            mask_subs_to_reassign,
+            col_new_cluster_name
+        ] = c_name_new
+
+        df_new_labels.loc[
+            mask_subs_to_reassign,
+            col_new_cluster_prim_topic
+        ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
+
+    if append_columns:
+        df_new_labels = df_labels.merge(
+            df_new_labels,
+            how='left',
+            left_index=True,
+            right_index=True,
+        ).copy()
+
+        l_cols_to_front = [
+            'subreddit_id',
+            'subreddit_name',
+            'model_distance_order',
+            'posts_for_modeling_count',
+            'primary_topic_0921',
+            col_new_cluster_val,
+            col_new_cluster_name,
+            col_new_cluster_prim_topic,
+        ]
+        l_cols_to_front = [c for c in l_cols_to_front if c in df_new_labels.columns]
+        df_new_labels = df_new_labels[
+            reorder_array(l_cols_to_front, df_new_labels.columns)
+        ]
+
+    return df_new_labels
+
+
+
 
 def create_linkage_for_dendrogram(model) -> pd.DataFrame:
     """
