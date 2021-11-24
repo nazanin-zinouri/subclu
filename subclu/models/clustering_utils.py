@@ -10,7 +10,7 @@ reference:
 """
 import logging
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -24,6 +24,7 @@ from ..utils.eda import reorder_array
 
 def create_dynamic_clusters(
         df_labels: pd.DataFrame,
+        agg_strategy: str = 'split_large_clusters',
         min_subreddits_in_cluster: int = 5,
         l_cols_labels_input: list = None,
         col_new_cluster_val: str = 'cluster_label',
@@ -67,6 +68,7 @@ def create_dynamic_clusters(
 
     # Current algo works from smallest cluster to highest cluster (bottom up)
     # TODO(djb): create cluster that works at 052 and splits only if subsets meet criteria
+    # if agg_strategy == 'aggregate_small_clusters':
     df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
     df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
     df_new_labels[col_new_cluster_prim_topic] = df_labels[
@@ -98,6 +100,12 @@ def create_dynamic_clusters(
             mask_subs_to_reassign,
             col_new_cluster_prim_topic
         ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
+    # elif agg_strategy == 'split_large_clusters':
+    #     pass
+    # else:
+    #     l_expected_aggs = ['aggregate_small_clusters', 'split_large_clusters']
+    #     raise NotImplementedError(f"Agg strategy not implemented: {agg_strategy}.\n"
+    #                               f"  Expected one of: {l_expected_aggs}")
 
     if append_columns:
         df_new_labels = df_labels.merge(
@@ -125,6 +133,92 @@ def create_dynamic_clusters(
     return df_new_labels
 
 
+def convert_distance_or_ab_to_list_for_fpr(
+        df: pd.DataFrame,
+        convert_to_ab: bool = True,
+        col_counterpart_count: str = 'counterpart_count',
+        col_list_cluster_names: str = 'list_cluster_subreddit_names',
+        col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
+        l_cols_for_seeds: List[str] = None,
+        l_cols_for_clusters: List[str] = None,
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        verbose: bool = False,
+) -> pd.DataFrame:
+    """Take a df_distances or df_ab and reshape it to get output needed for an FPR
+    TODO(djb): this might be better as a method for a cluster class... right now each function feels
+      disjointed and I need to pass the same column names back and forth a few times
+    """
+    if convert_to_ab:
+        if l_cols_for_seeds is None:
+            l_cols_for_seeds = [
+                'subreddit_id', 'subreddit_name',
+                'model_distance_order', 'primary_topic_0921',
+                col_new_cluster_val, 'cluster_label_k', col_new_cluster_prim_topic,
+            ]
+        if l_cols_for_clusters is None:
+            l_cols_for_clusters = [
+                'subreddit_id', 'subreddit_name',
+                col_new_cluster_val
+            ]
+        if verbose:
+            print(l_cols_for_seeds)
+            print(l_cols_for_clusters)
+
+        df_ab = (
+            df[l_cols_for_seeds].copy()
+            .merge(
+                df[l_cols_for_clusters],
+                how='left',
+                on=[col_new_cluster_val],
+                suffixes=('_seed', '_cluster')
+            )
+        )
+        if verbose:
+            print(f"  {df_ab.shape} <- df_ab.shape raw")
+        # Set name of columns to be used for aggregation
+        col_sub_name_a = 'subreddit_name_seed'
+        col_sub_id_a = 'subreddit_id_seed'
+        col_sub_name_b = 'subreddit_name_cluster'
+        col_sub_id_b = 'subreddit_id_cluster'
+        # Remove matches to self b/c that makes no sense as a recommendation
+        df_ab = df_ab[
+            df_ab[col_sub_id_a] != df_ab[col_sub_id_b]
+            ]
+        print(f"  {df_ab.shape} <- df_ab.shape after removing matches to self")
+    else:
+        raise NotImplementedError(f"reshape for df_distances not implemented")
+
+    df_a_to_b_list = (
+        df_ab
+        .groupby(['model_distance_order', col_sub_name_a, col_sub_id_a,
+                  col_new_cluster_val, col_new_cluster_name])
+        .agg(
+            **{
+                col_counterpart_count: (col_sub_id_b, 'nunique'),
+                col_list_cluster_names: (col_sub_name_b, list),
+                col_list_cluster_ids: (col_sub_id_b, list),
+            }
+        )
+        .reset_index()
+        # .rename(columns={'subreddit_name_a': 'subreddit_name_de',
+        #                  'subreddit_id_a': 'subreddit_id_de'})
+        .sort_values(by=['model_distance_order', ], ascending=True)
+        .drop(['model_distance_order'], axis=1)
+    )
+
+    # when converting to JSON for gspread it's better to convert the list into a string
+    # and to remove the brackets. Otherwise we can get errors.
+    for c_ in [col_list_cluster_names, col_list_cluster_ids]:
+        df_a_to_b_list[c_] = (
+            df_a_to_b_list[c_]
+            .astype(str)
+            .str[1:-1]
+            .str.replace("'", "")
+        )
+    print(f"  {df_a_to_b_list.shape} <- df_a_to_b.shape")
+    return df_a_to_b_list
 
 
 def create_linkage_for_dendrogram(model) -> pd.DataFrame:
