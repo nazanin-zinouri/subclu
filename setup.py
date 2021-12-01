@@ -41,6 +41,9 @@ INSTALL_REQUIRES = [
     "plotly == 4.14.3",
     "kaleido == 0.2.1",
 
+    # Read & write to GCS & google sheets
+    "gspread >= 4.0.1",
+
 ]
 
 # These libraries will be installed only if called with "extras" syntax:
@@ -50,6 +53,11 @@ EXTRAS_REQUIRE = {
         # cookie cutter tools
         "python-dotenv >= 0.5.1",
         "Sphinx", "coverage", "awscli", "flake8"
+    ],
+
+    "colab": [
+        # Extra installs needed in colab notebooks
+        "gcsfs >= 2021.11.1"
     ],
 
     "latop_dev": [
