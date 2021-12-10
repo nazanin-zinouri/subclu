@@ -11,9 +11,14 @@ For IP geolocation we'll need to research what coding system they use.
 TODO(djb)
 
 """
+import numpy as np
+import pandas as pd
 
 
 D_CLD3_CODE_TO_LANGUAGE_NAME = {
+    # manually added when language unknown
+    "UNKNOWN": "Unknown",
+
     # manually added from JSON file:
     "tl": "Tagalog",
     "he": "Hebrew",
@@ -168,7 +173,7 @@ for lang_code, lang_name in D_CLD3_CODE_TO_LANGUAGE_NAME.items():
     if lang_name in L_USE_MULTILINGUAL_LANGUAGE_NAMES:
         L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL.append(lang_code)
 
-# These codes were extracted from top subreddit posts extract from:
+# These codes were extracted from top subreddit POSTS extract from:
 #  top_subreddits_2021-07_16.yaml
 # Languages with * next to them are high priority for i18n
 L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
@@ -229,14 +234,52 @@ L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
     # 'lb',  # Luxemburgish -- also prob a misclassification of German/French/Dutch
     'sq',  # Albanian
 
-    # 'el',  # Greek
-    # 'el-Latn',
+    'el',  # Greek
+    'el-Latn',
+
+    # Languages from this analysis
+    # https://towardsdatascience.com/the-most-popular-languages-on-reddit-analyzed-with-snowflake-and-a-java-udtf-4e58c8ba473c
+    'bs',  # Bosnian
+    'sr',  # Serbian
+    'is',  # Icelandic
+    'bg',  # 'Bulgarian'
+    'bg-Latn',  # 'Bulgarian'
+    'ms',  # 'Malay'
+    "he",  # "Hebrew"
+    'iw',  # 'Hebrew'
+    'ko',  # 'Korean'
+    'st',  # 'Southern Sotho'
 
 ]
 
 L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL = list(
     set(L_CLD3_CODES_FOR_LANGUAGES_IN_USE_MULTILINGUAL) |
     set(L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT)
+)
+
+# Create a dataframe with language information
+# we can then use this df to create a table in bigQuery
+DF_LANGUAGE_MAPPING = (
+    pd.DataFrame(
+        [D_CLD3_CODE_TO_LANGUAGE_NAME]
+    ).T
+    .reset_index()
+    .rename(columns={'index': 'language_code',
+                     0: 'language_name'})
+)
+
+DF_LANGUAGE_MAPPING['language_name_top_only'] = np.where(
+    DF_LANGUAGE_MAPPING['language_code'].isin(['UNKNOWN'] + L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL),
+    DF_LANGUAGE_MAPPING['language_name'],
+    'Other_language'
+)
+DF_LANGUAGE_MAPPING['language_in_use_multilingual'] = np.where(
+    DF_LANGUAGE_MAPPING['language_name'].isin(L_USE_MULTILINGUAL_LANGUAGE_NAMES),
+    True,
+    False
+)
+DF_LANGUAGE_MAPPING = DF_LANGUAGE_MAPPING.sort_values(
+    by=['language_name'], ascending=True
 )
 
 
