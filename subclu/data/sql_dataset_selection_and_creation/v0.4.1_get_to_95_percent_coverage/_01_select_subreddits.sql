@@ -235,14 +235,13 @@ AS (
 --  2) source table
 -- EXPORT DATA
 --     OPTIONS(
---         uri='gs://i18n-subreddit-clustering/subreddits/top/2021-09-24/*.parquet',
+--         uri='gs://i18n-subreddit-clustering/subreddits/top/2021-12-14/*.parquet',
 --         format='PARQUET',
 --         overwrite=true
 --     ) AS
-
 --     SELECT
 --         sel.*
---     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924` AS sel
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20211214` AS sel
 --     ORDER BY users_l28 DESC, subscribers DESC, posts_l28 DESC
 -- ;
 
