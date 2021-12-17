@@ -425,7 +425,7 @@ AS (
 -- ###
 -- Export POST table to GCS for modeling
 -- EXPORT DATA OPTIONS(
---   uri='gs://i18n-subreddit-clustering/posts/top/2021-12-24/*.parquet',
+--   uri='gs://i18n-subreddit-clustering/posts/top/2021-12-14/*.parquet',
 --   format='PARQUET',
 --   overwrite=true
 --   ) AS

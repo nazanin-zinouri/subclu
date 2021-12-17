@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from logging import info
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 
 import mlflow
 import pandas as pd
@@ -32,15 +32,16 @@ from ..utils.mlflow_logger import (
 
 
 def vectorize_text_to_embeddings(
+        subreddits_path: str,
+        posts_path: str,
+        comments_path: str,
         mlflow_experiment: str,
+        subreddits_path_exclude: str = None,
         model_name: str = 'use_multilingual',
         run_name: str = None,
         tokenize_lowercase: bool = False,
 
         bucket_name: str = 'i18n-subreddit-clustering',
-        subreddits_path: str = 'subreddits/de/2021-06-16',
-        posts_path: str = 'posts/de/2021-06-16',
-        comments_path: str = 'comments/de/2021-06-16',
         preprocess_text_folder: str = None,
 
         col_text_post: str = 'text',
@@ -91,6 +92,7 @@ def vectorize_text_to_embeddings(
         'posts_path': posts_path,
         'comments_path': comments_path,
         'preprocess_text_folder': preprocess_text_folder,
+        'subreddits_path_exclude': subreddits_path_exclude,
 
         'col_text_post': col_text_post,
         'col_text_post_word_count': col_text_post_word_count,
@@ -188,6 +190,23 @@ def vectorize_text_to_embeddings(
     elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
     logging.warning(f"For TF-HUB models, the only preprocessing applied is lowercase()")
 
+    # check whether to filter out subs -- this filter only applies to comments or posts
+    #  not to subreddit inference (this is so small and cheap it's not worth filtering)
+    df_subs_exclude = None
+    if subreddits_path_exclude is not None:
+        # Even if we have to process thousands of subs, these should be ok
+        #  as a single file. Sometimes BigQuery can output dozens of files even
+        #  if we're only processing a few thousand subs
+        info(f"Load subreddits df...")
+        t_start_subs_filter_load = datetime.utcnow()
+        df_subs_exclude = pd.read_parquet(
+            path=f"gs://{bucket_name}/{subreddits_path_exclude}",
+            columns=l_cols_subreddits
+        )
+        elapsed_time(t_start_subs_filter_load, log_label='df_subs_exclude loading', verbose=True)
+        info(f"  {df_subs_exclude.shape} <- df_subs_exclude shape")
+        assert len(df_subs_exclude) == df_subs_exclude[col_subreddit_id].nunique()
+
     if subreddits_path is not None:
         # Even if we have to process thousands of subs, these should be ok
         #  as a single file. Sometimes BigQuery can output dozens of files even
@@ -238,6 +257,11 @@ def vectorize_text_to_embeddings(
         elapsed_time(t_start_posts, log_label='df_post loading', verbose=True)
         info(f"  {df_posts.shape} <- df_posts.shape")
         assert len(df_posts) == df_posts[col_post_id].nunique()
+
+        if df_subs_exclude is not None:
+            info(f"  Excluding posts for subs to exclude...")
+            df_posts = df_posts[~df_posts['subreddit_id'].isin(df_subs_exclude['subreddit_id'])]
+            info(f"  {df_posts.shape} <- df_posts.shape AFTER excluding subreddits")
 
         if n_sample_posts is not None:
             info(f"  Sampling posts down to: {n_sample_posts:,.0f}")
@@ -353,12 +377,21 @@ def vectorize_text_to_embeddings(
                 except (TypeError, UnboundLocalError) as e:
                     pass
 
+                if df_subs_exclude is not None:
+                    info(f"  Excluding posts for subs to exclude...")
+                    df_comments = df_comments[~df_comments['subreddit_id'].isin(df_subs_exclude['subreddit_id'])]
+                    info(f"  {df_comments.shape} <- df_comments.shape AFTER excluding subreddits")
+
                 if n_sample_comments is not None:
                     n_sample_comments_per_file = 1 + int(n_sample_comments / total_comms_file_count)
                     info(f"  Sampling COMMENTS down to: {n_sample_comments:,.0f}"
                          f"     Samples PER FILE: {n_sample_comments_per_file:,.0f}")
                     df_comments = df_comments.sample(n=n_sample_comments_per_file)
                     info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
+
+                if len(df_comments) == 0:
+                    info(f"  No comments left to vectorize after filtering, moving to next file...")
+                    continue
 
                 # only add the comment len AFTER sampling, otherwise we can get the wrong values
                 total_comments_count += len(df_comments)
@@ -424,18 +457,25 @@ def vectorize_text_to_embeddings(
                  'total_comment_files_processed': count_comms_files_processed
                  }
             )
-            # add manual meta file for comms
-            _, c = df_vect_comments.shape
-            f_meta = f"_manual_meta-{total_comments_count}_by_{c}.txt"
-            with open(Path(local_comms_subfolder_full) / f_meta, 'w') as f_:
-                f_.write(f"Original dataframe info\n==="
-                         f"\n{total_comments_count:9,.0f}\t | rows (comments)\n{c:9,.0f} | columns of LAST FILE\n")
-                f_.write(f"\nColumn list:\n{list(df_vect_comments.columns)}")
 
-            info(f"Logging COMMENT files as mlflow artifact (to GCS)...")
-            mlflow.log_artifacts(str(local_comms_subfolder_full), local_comms_subfolder_relative)
+            if total_comments_count == 0:
+                logging.warning(f"No comments to process, can't log artifacts to mlflow")
+            else:
+                try:
+                    # add manual meta file for comms
+                    _, c = df_vect_comments.shape
+                    f_meta = f"_manual_meta-{total_comments_count}_by_{c}.txt"
+                    with open(Path(local_comms_subfolder_full) / f_meta, 'w') as f_:
+                        f_.write(f"Original dataframe info\n==="
+                                 f"\n{total_comments_count:9,.0f}\t | rows (comments)\n{c:9,.0f} | columns of LAST FILE\n")
+                        f_.write(f"\nColumn list:\n{list(df_vect_comments.columns)}")
+                except (UnboundLocalError):
+                    pass
 
-            del df_vect_comments
+                info(f"Logging COMMENT files as mlflow artifact (to GCS)...")
+                mlflow.log_artifacts(str(local_comms_subfolder_full), local_comms_subfolder_relative)
+
+                del df_vect_comments
             gc.collect()
 
         else:
@@ -493,7 +533,7 @@ def vectorize_text_to_embeddings(
                       total_fxn_time / timedelta(minutes=1)
                       )
     mlflow.end_run()
-    # return model, df_vect, df_vect_comments, df_vect_subs
+    # Don't return anything b/c it's hard to predict output, instead check mlflow for artifacts
 
 
 def get_embeddings_as_df(

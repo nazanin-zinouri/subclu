@@ -106,6 +106,14 @@ class MlflowLogger:
             'v0.4.0_use_multi_clustering_test',
             'v0.4.0_use_multi_clustering',
 
+            # new experiments for v0.4.1 - again using inference GPU VM
+            'v0.4.1_mUSE_inference_test',
+            'v0.4.1_mUSE_inference',
+            'v0.4.1_mUSE_aggregates_test',
+            'v0.4.1_mUSE_aggregates',
+            'v0.4.1_mUSE_clustering_test',
+            'v0.4.1_mUSE_clustering',
+
         ]
         for i, exp in enumerate(l_experiments):
             try:
