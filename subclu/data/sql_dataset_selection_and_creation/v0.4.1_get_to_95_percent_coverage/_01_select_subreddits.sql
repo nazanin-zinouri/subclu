@@ -10,334 +10,102 @@
 -- Old Notebook with EDA comparing subreddits b/n different versions
 --  https://colab.research.google.com/drive/12GA7u_gWMlTCH4or9AKUm3u5mufMBshV#scrollTo=t2Z6E47Ohgde
 
--- CREATE TABLE with new selected subreddits for v0.4.0 clustering
+-- CREATE TABLE with new selected subreddits for v0.4.1 topic model & clusters
 DECLARE partition_date DATE DEFAULT '2021-12-14';
-DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org";
+DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org|#|\*";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
-DECLARE min_users_l7 NUMERIC DEFAULT 2000;
-DECLARE min_posts_l28 NUMERIC DEFAULT 90;
-DECLARE min_comments_l28 NUMERIC DEFAULT 3;
-DECLARE min_posts_plus_comments_top_l28 NUMERIC DEFAULT 250;
-
--- eng-i18n = Canada, UK, Australia
-DECLARE min_users_eng_i18n_l7 NUMERIC DEFAULT 100;
-DECLARE min_posts_eng_i18n_l28 NUMERIC DEFAULT 4;
+-- DECLARE min_users_l7 NUMERIC DEFAULT 10;
+-- DECLARE min_posts_l28 NUMERIC DEFAULT 90;
+-- DECLARE min_comments_l28 NUMERIC DEFAULT 3;
+-- DECLARE min_posts_plus_comments_top_l28 NUMERIC DEFAULT 250;
 
 -- All other i18n countries
 --  From these, only India is expected to have a large number of English-language subreddits
 --  Some i18n subs (like 1fcnuernberg) are only really active once a week b/c of game schedule
 --   so they have few posts, but many comments. Add post + comment filter instead of only post
-DECLARE min_users_geo_l7 NUMERIC DEFAULT 50;
+DECLARE min_users_geo_l7 NUMERIC DEFAULT 45;
 DECLARE min_posts_geo_l28 NUMERIC DEFAULT 4;
 
 
 -- Start CREATE TABLE statement
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20211214`
 AS (
+    WITH
+    -- Most of the logic has moved to a candidates table to make querying easier/faster
 
--- First select subreddits based on geo-relevance
-WITH
-    -- These subs come from a custom table that lowers the percent to qualify as geo-relevant
-    --   this table includes subs even if they are `active=false`
-    geo_subs_custom_raw AS (
+    -- We limit the count of posts to geo-relevant subs where we'll actually use it
+    --  For highly active subs (usually English/US) we'll simply use CnC's "active" definition flag
+    geo_candidate_subs_w_post_count AS (
         SELECT
-            subreddit_name
-            , subreddit_id
-            , country_name
-            , geo2.geo_country_code AS country_code
-            , geo2.geo_region AS region
-            , ROW_NUMBER() OVER (PARTITION BY subreddit_id, geo_country_code ORDER BY pt desc) as sub_geo_rank_no
-        -- This table is a single snapshot, so no need to filter by partition
-        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20210922` AS geo2
-        WHERE 1=1
+            c.subreddit_id
+            , c.subreddit_name
+            , CASE
+                WHEN COALESCE(c.geo_relevant_subreddit_v04, false) THEN true
+                WHEN COALESCE(c.geo_relevant_subreddit, false) THEN true
+                ELSE false
+                END AS geo_relevant_subreddit_all
+            , CASE
+                WHEN (c.geo_relevant_countries_v04 IS NOT NULL) THEN c.geo_relevant_countries_v04
+                WHEN COALESCE(c.geo_relevant_countries IS NOT NULL) THEN c.geo_relevant_countries
+                ELSE NULL
+                END AS geo_relevant_countries_all
+            , CASE
+                WHEN (c.ambassador_or_default_sub_germany = true) THEN true
+                WHEN COALESCE(c.ambassador_or_default_sub_france = true) THEN true
+                ELSE false
+                END AS ambassador_or_default_any
+
+            , COUNT(DISTINCT sp.post_id) as posts_not_removed_l28
+
+        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddit_candidates_20211214` AS c
+            LEFT JOIN (
+                SELECT *
+                FROM `data-prod-165221.cnc.successful_posts`
+                WHERE (dt) BETWEEN (partition_date - 29) AND partition_date
+                    AND removed = 0
+            ) AS sp
+                ON c.subreddit_id = sp.subreddit_id AND c.subreddit_name = sp.subreddit_name
+
+        WHERE
+            c.users_l7 >= 20
+            AND c.posts_l28 >= 2
             AND (
-                country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
-                OR geo_region = 'LATAM'
-                -- eng-i18n =  Canada, UK, Australia
-                OR geo_country_code IN ('CA', 'GB', 'AU')
+                COALESCE(c.geo_relevant_subreddit_v04, false) = true
+                OR COALESCE(c.geo_relevant_subreddit, false) = true
+                OR COALESCE(c.ambassador_or_default_sub_germany, false) = true
+                OR COALESCE(c.ambassador_or_default_sub_france, false) = true
             )
+        GROUP BY 1, 2, 3, 4, 5
+        -- ORDER BY 6 DESC
     ),
 
-    subs_selected_by_geo AS (
-        SELECT
-            geo.subreddit_id
-            , geo.subreddit_name
-
-            -- Order so that we get (Mexico, US) only, and not (US, Mexico)
-            , STRING_AGG(geo.country_name, ', ' ORDER BY geo.country_name) AS geo_relevant_countries
-            , STRING_AGG(geo.country_code, ', ' ORDER BY geo.country_code) AS geo_relevant_country_codes
-            , COUNT(geo.country_code) AS geo_relevant_country_count
-
-            -- cols for checking/debugging
-            , asr.users_l7
-            , asr.posts_l28
-            , asr.comments_l28
-            , nt.rating_name
-            , nt.primary_topic
-
-        FROM geo_subs_custom_raw AS geo
-        LEFT JOIN (
-            SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
-            WHERE DATE(pt) = partition_date
-        ) AS asr
-            ON geo.subreddit_name = asr.subreddit_name
-        LEFT JOIN (
-            SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-            WHERE dt = partition_date
-        ) AS slo
-            ON asr.subreddit_name = LOWER(slo.name)
-        LEFT JOIN (
-            SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
-            WHERE pt = partition_date
-        ) AS nt
-            ON geo.subreddit_id = nt.subreddit_id
-
-        WHERE 1=1
-            -- Drop duplicated country names
-            AND geo.sub_geo_rank_no = 1
-
-            -- remove quarantine filter, b/c if we score them we might be able to clusters
-            --   of subreddits that are similar to previoiusly quarantined subs
-            -- AND slo.quarantine = false
-
-            -- Apply activity by geo:
-            AND (
-                (
-                    (
-                        country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
-                        OR region = 'LATAM'
-                    )
-                    AND asr.users_l7 >= min_users_geo_l7
-                    AND asr.posts_l28 >= min_posts_geo_l28
-                )
-                OR (
-                    (
-                        country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
-                        OR region = 'LATAM'
-                    )
-                    AND asr.users_l7 >= min_users_geo_l7
-                    AND (asr.posts_l28 + asr.comments_l28) >= min_posts_plus_comments_geo_l28
-                )
-                OR (
-                    country_code IN ('CA', 'GB', 'AU')
-                    AND asr.users_l7 >= min_users_eng_i18n_l7
-                    AND asr.posts_l28 >= min_posts_eng_i18n_l28
-                )
-            )
-
-            -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
-            -- Better to include some in clustering than exclude a sub that was mislabeled
-            -- REMOVE `NOT` to reverse (show only the things we filtered out)
-            --      'askredditespanol' -- rated as X... sigh
-            AND NOT (
-                (
-                    COALESCE(slo.whitelist_status, '') = 'no_ads'
-                    AND COALESCE(nt.rating_short, '') = 'X'
-                    AND (
-                        COALESCE(nt.primary_topic, '') IN ('Mature Themes and Adult Content', 'Celebrity')
-                        OR 'sex_porn' IN UNNEST(mature_themes)
-                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
-                        OR 'nudity_explicit' IN UNNEST(mature_themes)
-                    )
-                )
-                OR COALESCE(nt.primary_topic, '') = 'Celebrity'
-                OR (
-                    COALESCE(nt.rating_short, '') = 'X'
-                    AND 'nudity_explicit' IN UNNEST(mature_themes)
-                    AND 'nudity_full' IN UNNEST(mature_themes)
-                )
-                OR (
-                    -- r/askredditEspanol doesn't get caught by this because it has a NULL primary_topic
-                    COALESCE(nt.rating_short, 'M') = 'X'
-                    AND COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
-                    AND (
-                        'sex_porn' IN UNNEST(mature_themes)
-                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
-                        OR 'nudity_explicit' IN UNNEST(mature_themes)
-                        OR 'sex_explicit_ref' IN UNNEST(mature_themes)
-                    )
-                )
-                OR (
-                    'sex_porn' IN UNNEST(mature_themes)
-                    AND (
-                        'sex_content_arousal' IN UNNEST(mature_themes)
-                        OR 'nudity_explicit' IN UNNEST(mature_themes)
-                        OR 'sex_ref_regular' IN UNNEST(mature_themes)
-                    )
-                )
-                OR (
-                    COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
-                    AND 'sex_content_arousal' IN UNNEST(mature_themes)
-                )
-            )
-
-        GROUP BY 1, 2
-            , 6, 7, 8, 9, 10
-        -- ORDER BY geo.subreddit_name
-    ),
-
-    ambassador_subs AS (
-        -- Wacy's table pulls data from a spreadsheet that Alex updates
-        SELECT
-            LOWER(amb.subreddit_name)           AS subreddit_name
-            , slo.subreddit_id
-
-        FROM `reddit-employee-datasets.wacy_su.ambassador_subreddits` AS amb
-        LEFT JOIN (
-            SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-            WHERE dt = partition_date
-        ) AS slo
-            ON LOWER(amb.subreddit_name) = LOWER(slo.name)
-        WHERE amb.subreddit_name IS NOT NULL
-    ),
-
-    -- ###############
-    -- Here we select subreddits from anywhere based on minimum users(views) & post counts
-    subs_selected_by_activity AS (
-        SELECT
-            asr.subreddit_name
-            , slo.subreddit_id
-
-            -- Use for checks but drop for prod to reduce name conflicts & reduce query complexity
-            --  we'll add these later for all subreddits in the final table
-            # , acs.* EXCEPT( subreddit_name)
-            -- , asr.users_l7
-            -- , asr.posts_l28
-            -- , asr.comments_l28
-
-            -- , nt.rating_short
-            -- , nt.rating_name
-            -- , nt.primary_topic
-            -- , array_to_string(secondary_topics,", ") as secondary_topics
-            -- , array_to_string(mature_themes,", ") as mature_themes_list
-
-        FROM `data-prod-165221.all_reddit.all_reddit_subreddits` AS asr
-        LEFT JOIN (
-            SELECT * FROM `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`
-            WHERE DATE(_PARTITIONTIME) = partition_date
-        ) AS acs
-            ON asr.subreddit_name = acs.subreddit_name
-        LEFT JOIN (
-            SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-            WHERE dt = partition_date
-        ) AS slo
-            ON asr.subreddit_name = LOWER(slo.name)
-        LEFT JOIN (
-            SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
-            WHERE pt = partition_date
-        ) AS nt
-            ON acs.subreddit_id = nt.subreddit_id
-
-        WHERE 1=1
-            AND DATE(asr.pt) = partition_date
-
-            -- remove quarantine filter, b/c if we score them we might be able to clusters
-            --   of subreddits that are similar to previoiusly quarantined subs
-            -- AND slo.quarantine = false
-            AND asr.users_l7 >= min_users_l7
-            AND (
-                (
-                    asr.posts_l28 >= min_posts_l28
-                    AND asr.comments_l28 >= min_comments_l28
-                )
-                OR ((asr.posts_l28 + asr.comments_l28) >= min_posts_plus_comments_top_l28)
-            )
-
-            -- Need COALESCE because thousands of subs have an empty field
-            AND COALESCE(slo.over_18, 'f') = 'f'
-
-            -- For the high-activity subs, keep the active flag?
-            -- AND COALESCE(acs.active, False) = True
-
-            -- Filter out subs that are highly likely porn to reduce processing overhead & improve similarities
-            -- Better to include some in clustering than exclude a sub that was mislabeled
-            -- REMOVE `NOT` to reverse (show only the things we filtered out)
-            --      'askredditespanol' -- rated as X... sigh
-            -- Test edge cases by only looking at subs not rated as E
-            -- AND COALESCE(nt.rating_short, '') NOT IN ('E')
-            AND NOT (
-                (
-                    COALESCE(slo.whitelist_status, '') = 'no_ads'
-                    AND COALESCE(nt.rating_short, '') = 'X'
-                    AND (
-                        COALESCE(nt.primary_topic, '') IN ('Mature Themes and Adult Content', 'Celebrity')
-                        OR 'sex_porn' IN UNNEST(mature_themes)
-                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
-                        OR 'nudity_explicit' IN UNNEST(mature_themes)
-                    )
-                )
-                OR COALESCE(nt.primary_topic, '') = 'Celebrity'
-                OR (
-                    COALESCE(nt.rating_short, '') = 'X'
-                    AND 'nudity_explicit' IN UNNEST(mature_themes)
-                    AND 'nudity_full' IN UNNEST(mature_themes)
-                )
-                OR (
-                    -- r/askredditEspanol doesn't get caught by this because it has a NULL primary_topic
-                    COALESCE(nt.rating_short, 'M') = 'X'
-                    AND COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
-                    AND (
-                        'sex_porn' IN UNNEST(mature_themes)
-                        OR 'sex_content_arousal' IN UNNEST(mature_themes)
-                        OR 'nudity_explicit' IN UNNEST(mature_themes)
-                        OR 'sex_explicit_ref' IN UNNEST(mature_themes)
-                    )
-                )
-                OR (
-                    'sex_porn' IN UNNEST(mature_themes)
-                    AND (
-                        'sex_content_arousal' IN UNNEST(mature_themes)
-                        OR 'nudity_explicit' IN UNNEST(mature_themes)
-                        OR 'sex_ref_regular' IN UNNEST(mature_themes)
-                    )
-                )
-                OR (
-                    COALESCE(nt.primary_topic, '') IN ('Celebrity', 'Mature Themes and Adult Content')
-                    AND 'sex_content_arousal' IN UNNEST(mature_themes)
-                )
-            )
-    ),
-
-    -- Here's where we merge all subreddits to cluster: top (no geo), Geo-top, & ambassador subs
-    -- Split into 2 steps:
-    --  1st: get the distinct sub-name & sub-ID
-    --  2nd: get flags for why a sub qualified (join with geo-relevant & ambassador tables)
-    selected_subs_base AS (
-        SELECT
-            COALESCE(top1.subreddit_name, geo1.subreddit_name, amb1.subreddit_name)  AS subreddit_name
-            , COALESCE(top1.subreddit_id, geo1.subreddit_id, amb1.subreddit_id) AS subreddit_id
-
-        FROM subs_selected_by_activity  AS top1
-        FULL OUTER JOIN subs_selected_by_geo  AS geo1
-            ON top1.subreddit_id = geo1.subreddit_id AND top1.subreddit_name = geo1.subreddit_name
-        FULL OUTER JOIN ambassador_subs AS amb1
-            ON top1.subreddit_id = amb1.subreddit_id AND top1.subreddit_name = amb1.subreddit_name
-    ),
+    -- Here's where we apply filters and update flags for: top (no geo), geo-top, & ambassador subs
     selected_subs AS (
         SELECT
             sel.subreddit_name
             , sel.subreddit_id
-            , geo.geo_relevant_country_codes
-            , geo.geo_relevant_countries
-            , geo.geo_relevant_country_count
+            , gc.geo_relevant_subreddit_all
+            , gc.geo_relevant_countries_all
+            , gc.ambassador_or_default_any
+            , gc.posts_not_removed_l28
+            , sel.* EXCEPT(subreddit_name, subreddit_id)
 
-            , CASE
-                WHEN (geo.subreddit_id IS NOT NULL) THEN true
-                ELSE false
-                END AS geo_relevant_subreddit
-            , CASE
-                WHEN (amb.subreddit_id IS NOT NULL) THEN true
-                ELSE false
-                END AS ambassador_subreddit
-        -- Join to find why a subreddit qualified
-        FROM (SELECT DISTINCT * FROM selected_subs_base) AS sel
-        FULL OUTER JOIN subs_selected_by_geo  AS geo
-            ON sel.subreddit_id = geo.subreddit_id AND sel.subreddit_name = geo.subreddit_name
-        FULL OUTER JOIN ambassador_subs AS amb
-            ON sel.subreddit_id = amb.subreddit_id AND sel.subreddit_name = amb.subreddit_name
+        FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddit_candidates_20211214` AS sel
+        LEFT JOIN geo_candidate_subs_w_post_count gc
+            ON sel.subreddit_name = gc.subreddit_name AND sel.subreddit_id = gc.subreddit_id
 
-        -- We can get null IDS if an ambassador subreddit is planned but not created yet
-        WHERE sel.subreddit_id IS NOT NULL
+        WHERE
+            sel.active = true
+            OR (
+                (
+                    gc.geo_relevant_subreddit_all = true
+                    OR gc.ambassador_or_default_any = true
+                )
+                AND (
+                    sel.users_l7 >= 50
+                    AND gc.posts_not_removed_l28 >= 4
+                )
+            )
     ),
 
     subreddit_lookup_clean_text_meta AS (
@@ -374,43 +142,11 @@ WITH
             partition_date AS pt_date
             , sel.*
 
-            -- TODO replace my old manual rating cols with the NEW ratings & tag columns
-            , COALESCE (
-                LOWER(dst.topic),
-                "uncategorized"
-            ) AS combined_topic
-            , CASE
-                WHEN rt.rating IN ("x", "nc17") THEN "over18_nsfw"
-                WHEN dst.topic = "Mature Themes and Adult Content" THEN "over18_nsfw"
-                WHEN slo.over_18 = "t" THEN "over18_nsfw"
-                ELSE COALESCE (
-                    LOWER(dst.topic),
-                    "uncategorized"
-                )
-                END         AS combined_topic_and_rating
-
-            , nt.rating_short
-            , nt.rating_name
-            , nt.primary_topic
-            , array_to_string(secondary_topics,", ") as secondary_topics
-            , array_to_string(mature_themes,", ") as mature_themes_list
-
             -- Meta from lookup
-            , slo.over_18
             , slo.allow_top
             , slo.video_whitelisted
             , slo.lang      AS subreddit_language
             , slo.whitelist_status
-            , slo.subscribers
-
-            , asr.first_screenview_date
-            , asr.last_screenview_date
-            , asr.users_l7
-            , asr.users_l28
-            , asr.posts_l7
-            , asr.posts_l28
-            , asr.comments_l7
-            , asr.comments_l28
 
             , CURRENT_DATE() as pt
 
@@ -425,29 +161,15 @@ WITH
 
         -- Use distinct in case a sub qualifies for more than 1 reason
         FROM (SELECT DISTINCT * FROM selected_subs) AS sel
-        LEFT JOIN (
-            -- Using sub-selection in case there are subs that haven't been registered in asr table
-            SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
-            WHERE DATE(pt) = partition_date
-        ) AS asr
-            ON sel.subreddit_name = asr.subreddit_name
-        LEFT JOIN (
-            SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_ratings`
-            WHERE DATE(pt) = partition_date
-        ) AS rt
-            ON sel.subreddit_name = rt.subreddit_name
-        LEFT JOIN(
-            SELECT * FROM `data-prod-165221.ds_v2_subreddit_tables.subreddit_topics`
-            WHERE DATE(pt) = partition_date
-        ) AS dst
-            ON sel.subreddit_name = dst.subreddit_name
+        -- LEFT JOIN (
+        --     -- Using sub-selection in case there are subs that haven't been registered in asr table
+        --     SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+        --     WHERE DATE(pt) = partition_date
+        -- ) AS asr
+        --     ON sel.subreddit_name = asr.subreddit_name
+
         LEFT JOIN subreddit_lookup_clean_text_meta AS slo
             ON sel.subreddit_name = LOWER(slo.name)
-        LEFT JOIN (
-            SELECT * FROM `reddit-protected-data.cnc_taxonomy_cassandra_sync.shredded_crowdsourced_topic_and_rating`
-            WHERE pt = partition_date
-         ) AS nt
-            ON sel.subreddit_id = nt.subreddit_id
 
         -- WHERE 1=1
             -- Re-apply minimum post count in case something unexpected happened in previous joins
