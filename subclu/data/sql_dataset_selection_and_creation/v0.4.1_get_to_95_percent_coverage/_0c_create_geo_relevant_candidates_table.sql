@@ -13,7 +13,7 @@ DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and No
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_geo_subreddit_candidates_20211214`
 AS (
-WITH
+    WITH
     unique_posts_per_subreddit AS (
         SELECT
             subreddit_id
@@ -117,6 +117,13 @@ SELECT
     , DATE_DIFF(CURRENT_DATE(), DATE(slo.created_date), MONTH) AS subreddit_age_months
     , DATE_DIFF(CURRENT_DATE(), DATE(slo.created_date), YEAR) AS subreddit_age_years
 
+    -- Ambassador columns
+    , amb.ambassador_or_default_sub_germany
+    , amb.ambassador_or_default_sub_france
+    , amb.i18n_type
+    , amb.i18n_country_code
+    , amb.i18n_type_2
+
     -- Geo-relevant columns v0.4 & 40% threshold
     , CASE WHEN (geo.geo_relevant_country_count >= 1) THEN true
         ELSE false
@@ -126,6 +133,7 @@ SELECT
         END AS geo_relevant_subreddit_v04
     , geoc.* EXCEPT(subreddit_id)
     , geo.* EXCEPT (subreddit_id)
+
 
     -- Sub activity
     , CASE
@@ -187,6 +195,10 @@ FROM
     ) AS slo
         ON asr.subreddit_name = LOWER(slo.name)
 
+    -- custom ambassador table
+    LEFT JOIN `reddit-employee-datasets.david_bermejo.ambassador_subreddits_union_20211216` AS amb
+        ON slo.subreddit_id = amb.subreddit_id AND LOWER(slo.name) = amb.subreddit_name
+
     LEFT JOIN subs_geo_custom_agg AS geoc
         ON slo.subreddit_id = geoc.subreddit_id
 
@@ -221,7 +233,7 @@ WHERE 1=1
 --     )
 
 ORDER BY users_l7 DESC, posts_l7 ASC, activity_7_day ASC # subreddit_name ASC
-)
+)  -- Close CREATE table statement
 ;
 
 
