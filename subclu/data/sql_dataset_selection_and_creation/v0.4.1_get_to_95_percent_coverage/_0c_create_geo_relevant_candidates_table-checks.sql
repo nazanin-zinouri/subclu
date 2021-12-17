@@ -82,7 +82,7 @@ SELECT
     , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
 
 -- FROM final_geo_output
-FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20211213`
+FROM `reddit-employee-datasets.david_bermejo.subclu_geo_subreddits_20211214`
 WHERE 1=1
     AND total_users >= 1000
 
