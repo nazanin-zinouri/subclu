@@ -11,13 +11,14 @@
 -- * max posts per sub
 -- * name of new created table (update date)
 -- * table with latest selected subreddits (e.g., subclu_subreddits_top_no_geo_20210709)
+--      * update geo-relevant & ambassador columns if needed
 -- * name of newly created table for exporting
 -- * new GCS folder for new table
 
 -- Create new POSTS table for v0.4.1 models
-DECLARE start_date DATE DEFAULT '2021-08-01';
-DECLARE end_date DATE DEFAULT '2021-09-21';
-DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1200;
+DECLARE start_date DATE DEFAULT '2021-10-14';
+DECLARE end_date DATE DEFAULT '2021-12-14';
+DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 1000;
 
 -- Remove these from OCR text
 DECLARE regex_remove_ocr_str STRING DEFAULT r"\d+[-:,\.]\d+([-:,\.]\d{2,4}){0,1}|\d|[\+\#]|[ur]/|http[s]{0,1}://|www\.|/r/|\.html|reddit|\.com|\.org";
@@ -25,26 +26,23 @@ DECLARE regex_remove_post_url STRING DEFAULT r"http[s]{0,1}://|www.|.html|utm|so
 DECLARE regex_replace_with_space_post_url STRING DEFAULT  r"/u/|/r/|/comments/|/|-|_+|\?|\&utm|\&|=|\+";
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214`
 PARTITION BY submit_date
 AS (
 
-WITH
+    WITH
     posts_with_language AS (
         SELECT
             -- Rank by post-ID + user_id + thing_type (one user can post AND comment)
             ROW_NUMBER() OVER(
-                PARTITION BY post_id, id, user_id
-                ORDER BY created_timestamp ASC, probability DESC
+                PARTITION BY post_id, user_id
+                ORDER BY created_timestamp ASC, weighted_probability DESC
             ) AS post_thing_user_row_num
             , *
 
-        FROM `reddit-protected-data.language_detection.comment_language_v2`
+        FROM `data-prod-165221.language_detection.post_language_detection_cld3`
         WHERE DATE(_PARTITIONTIME) BETWEEN start_date AND end_date
-            AND thing_type = 'post'
-            AND id = post_id
-            -- USE: Remove dupes in language detection table at post OR comment-level
-            -- AND pl.post_thing_user_row_num = 1
+            -- No longer need to add additional filters because all rows here should be posts
     ),
     posts_not_removed AS(
         SELECT
@@ -86,19 +84,22 @@ WITH
             , sp.post_nsfw
 
             -- Meta about subreddit
+            --  for v0.4.1 there are 2 ways to qualify as geo-relevant, so we need extra columns
             , gs.geo_relevant_countries
             , gs.geo_relevant_country_codes
             , gs.geo_relevant_subreddit
-            , gs.ambassador_subreddit
+            , gs.geo_relevant_subreddit_all
+            , gs.geo_relevant_subreddit_v04
+            , gs.ambassador_or_default_any
+            , gs.ambassador_or_default_sub_france
+            , gs.ambassador_or_default_sub_germany
 
-            , gs.combined_topic
-            , gs.combined_topic_and_rating
+            -- No longer use old/manual combined topic, use instead new tags/rating
             , gs.rating_short
             , gs.rating_name
             , gs.primary_topic
-            , gs.secondary_topics
 
-        FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20210924` AS gs
+        FROM `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_no_geo_20211214` AS gs
         LEFT JOIN posts_not_removed AS sp
             ON gs.subreddit_name = sp.subreddit_name AND gs.subreddit_id = sp.subreddit_id
 
@@ -123,7 +124,6 @@ WITH
             , tl.subreddit_id
             , tl.post_id
             , tl.user_id
-            , tl.thing_type
 
             -- Metadata
             , tl.created_timestamp
@@ -147,23 +147,25 @@ WITH
             , tl.geolocation_country_code
 
             -- Meta about subreddit
-            , geo.combined_topic
-            , geo.combined_topic_and_rating
             , geo.rating_short
             , geo.rating_name
             , geo.primary_topic
-            , geo.secondary_topics
 
             , geo.geo_relevant_countries
             , geo.geo_relevant_country_codes
             , geo.geo_relevant_subreddit
-            , geo.ambassador_subreddit
+            , geo.geo_relevant_subreddit_all
+            , geo.geo_relevant_subreddit_v04
+            , geo.ambassador_or_default_any
+            , geo.ambassador_or_default_sub_france
+            , geo.ambassador_or_default_sub_germany
 
             # Language predictions
-            , tl.language
-            , tl.probability
+            -- Focus on weighted language b/c that's what I end up using anyway
+            -- , tl.language
+            -- , tl.probability
             , tl.weighted_language
-            , tl.weighted_language_probability
+            , tl.weighted_probability AS weighted_language_probability
 
             , plo.language_preference AS post_language_preference
 
@@ -182,7 +184,6 @@ WITH
         INNER JOIN geo
             ON tl.subreddit_id = geo.subreddit_id
                 AND tl.post_id = geo.post_id
-                AND tl.thing_type = geo.noun
                 AND tl.user_id = geo.user_id
         INNER JOIN (
             SELECT *
@@ -424,11 +425,11 @@ WITH
 -- ###
 -- Export POST table to GCS for modeling
 -- EXPORT DATA OPTIONS(
---   uri='gs://i18n-subreddit-clustering/posts/top/2021-09-27/*.parquet',
+--   uri='gs://i18n-subreddit-clustering/posts/top/2021-12-24/*.parquet',
 --   format='PARQUET',
 --   overwrite=true
 --   ) AS
 -- SELECT * EXCEPT (created_timestamp)
--- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214`
 -- ORDER BY subreddit_id DESC, rank_post_in_sub DESC
 -- ;
