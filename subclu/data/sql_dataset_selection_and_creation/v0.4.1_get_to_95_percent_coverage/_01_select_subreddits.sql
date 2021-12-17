@@ -14,10 +14,10 @@
 DECLARE partition_date DATE DEFAULT '2021-12-14';
 DECLARE regex_remove_str STRING DEFAULT r"https://|http://|www\.|/r/|\.html|reddit|\.com|\.org|#|\*";
 DECLARE regex_replace_with_space_str STRING DEFAULT r"wiki/|/|-|_|\?|&nbsp;";
--- DECLARE min_users_l7 NUMERIC DEFAULT 10;
--- DECLARE min_posts_l28 NUMERIC DEFAULT 90;
--- DECLARE min_comments_l28 NUMERIC DEFAULT 3;
--- DECLARE min_posts_plus_comments_top_l28 NUMERIC DEFAULT 250;
+
+-- Besides making sure that English/high-activity communities have the `active` flag
+--  we also make sure that there are a miniumn number of users in L7
+DECLARE min_users_l7 NUMERIC DEFAULT 100;
 
 -- All other i18n countries
 --  From these, only India is expected to have a large number of English-language subreddits
@@ -95,7 +95,10 @@ AS (
             ON sel.subreddit_name = gc.subreddit_name AND sel.subreddit_id = gc.subreddit_id
 
         WHERE
-            sel.active = true
+            (
+                sel.active = true
+                AND sel.users_l7 >= min_users_l7
+            )
             OR (
                 (
                     gc.geo_relevant_subreddit_all = true
