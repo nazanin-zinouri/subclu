@@ -23,7 +23,7 @@ The process is split into the steps below. Note that the actual code is in modul
 0. **Pull data** from BigQuery
    - See `subclu > data > v0.4.0_add_more_geo_and_active_subs`
       - `_01_select_subreddits.sql`
-      - `_02_selects_posts_for_modeling.sql`
+      - `_02_select_posts_for_modeling.sql`
       - `_03_select_comments_for_modeling.sql`
 1. **EDA** of training data
    - Notebooks that start with `djb_01`
