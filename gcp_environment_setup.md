@@ -317,6 +317,7 @@ sudo su - david.bermejo
 
 # Install my additional libraries
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
+pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
 
 # if resolving takes too long
 pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --use-deprecated=legacy-resolver
@@ -330,6 +331,7 @@ pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]" -
 # install TF or Torch libraries
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_232]" --use-deprecated=legacy-resolver
 
+# Default VM inference on data-prod
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_233]" --use-deprecated=legacy-resolver
 
 

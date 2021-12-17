@@ -179,6 +179,7 @@ EXTRAS_REQUIRE = {
     ],
 
     "tensorflow_233": [
+        # This is the default for main inference box
         # Core libraries need to be pinned... otherwise `pip` tries to upgrade them
         "click == 8.0.1",
         "joblib == 1.0.1",
@@ -320,7 +321,7 @@ EXTRAS_REQUIRE = {
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.4.0',
+    version='0.4.1',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',
