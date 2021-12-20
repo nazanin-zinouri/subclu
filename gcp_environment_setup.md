@@ -649,3 +649,73 @@ gsutil lifecycle get gs://i18n-subreddit-clustering
 #  ]
 # }
 ```
+
+# Check hard-drive space & delete trash (clearing space in hard drive)
+
+If you use `rm -r` to delete files or folders, the space gets freed up right away. However, if you use the jupyter GUI to "delete" files or folders, this action will move the files to a `Trash` folder that you need to manually clear yourself.
+
+If you're using the default `jupyter` user in the GUI, the default location for trash is:<br>
+`/home/jupyter/.local/share/Trash/files`
+
+If you want to remove the trash files you can use this command:
+```bash
+rm -r /home/jupyter/.local/share/Trash/files
+```
+
+## Checking space used
+If you want to check how much space is free & used across all drives/locations you can use `df`<br>
+```bash
+df -h
+
+Filesystem      Size  Used Avail Use% Mounted on
+udev             60G     0   60G   0% /dev
+tmpfs            12G  8.6M   12G   1% /run
+/dev/sda1       492G   35G  438G   8% /
+tmpfs            60G     0   60G   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+tmpfs            60G     0   60G   0% /sys/fs/cgroup
+/dev/sda15      124M  6.1M  118M   5% /boot/efi
+```
+
+You can also check usage in specific locations using `du`:<br>
+```bash
+cd /home/jupyter
+
+sudo du -Lsh *  | sort -hr
+# -L shows symbolic-link files & folders
+# -s: sum for each folder/file
+# -h: human-readable results (MB and GB instead of bytes)
+# *: all files in current directory
+
+452M    subreddit_clustering_i18n
+95M     src
+15M     tutorials
+864K    mlflow
+432K    notebooks_throwaway
+4.0K    Untitled.ipynb
+```
+
+Check only hidden files/folders
+```bash
+cd /home/jupyter
+sudo du -sh .[^.]*  | sort -hr
+# Using a regular expression to check hidden files (folders & files that begin with a period)
+
+89M     .local
+25M     .cache
+768K    .ipython
+124K    .config
+68K     .jupyter
+36K     .pki
+20K     .ssh
+16K     .gsutil
+8.0K    .nv
+8.0K    .keras
+8.0K    .ipynb_checkpoints
+8.0K    .docker
+8.0K    .bash_history
+4.0K    .profile
+4.0K    .gitconfig
+4.0K    .bashrc
+4.0K    .bash_logout
+```
