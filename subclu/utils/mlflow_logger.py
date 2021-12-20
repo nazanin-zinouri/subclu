@@ -994,8 +994,6 @@ def log_clf_report_and_conf_matrix(
         return df_conf_mx
 
 
-
-
 #
 # ~ fin
 #

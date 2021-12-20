@@ -4,7 +4,10 @@ Utils to send tqdm info to log files - this class should log to both console AND
 Inspired by open issue in github:
 https://github.com/tqdm/tqdm/issues/313
 """
+from datetime import datetime
 import logging
+from pathlib import Path
+from typing import Union
 
 from tqdm import tqdm
 
@@ -51,3 +54,53 @@ class LogTQDM(tqdm):
         if not msg:
             msg = self.__str__()
         self.logger.info('%s', msg)
+
+
+class FileLogger():
+    def __init__(
+            self,
+            logs_path: Union[str, Path],
+            log_name: str = 'log',
+            log_level = logging.INFO
+    ):
+        """"""
+        self.logs_path = Path(logs_path)
+        self.log_name = log_name
+        self.log_level = log_level
+
+        self.f_log_file = str(
+            self.logs_path /
+            f"{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}_{self.log_name}.log"
+        )
+        self.fileHandler = None
+
+    def init_file_log(self) -> None:
+        """Create a file & FileHandler to log data"""
+        logger = logging.getLogger()
+        Path.mkdir(self.logs_path, parents=True, exist_ok=True)
+
+        self.fileHandler = logging.FileHandler(self.f_log_file)
+        self.fileHandler.setLevel(self.log_level)
+
+        formatter = logging.Formatter(
+            '%(asctime)s | %(levelname)s | "%(message)s"',
+            '%Y-%m-%d %H:%M:%S'
+        )
+        self.fileHandler.setFormatter(formatter)
+        logger.addHandler(self.fileHandler)
+
+    def remove_file_logger(self) -> None:
+        """After completing job, remove logging handler to prevent
+        info from other jobs getting logged to the same log file
+        """
+        if self.fileHandler is not None:
+            logger = logging.getLogger()
+            try:
+                logger.removeHandler(self.fileHandler)
+            except Exception as e:
+                logging.warning(f"Can't remove logger\n{e}")
+
+
+#
+# ~ fin
+#
