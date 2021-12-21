@@ -28,7 +28,10 @@ class LogTQDM(tqdm):
             desc: str = 'progress: ',
             # bar_format: str = '{desc}{percentage:3.0f}%{r_bar}',  # this only shows text w/o a progress bar
             **kwargs):
-        self._logger = logger
+        if logger is not None:
+            self._logger = logger
+        else:
+            self._logger = LOGGER
         super().__init__(
             *args,
             mininterval=mininterval,
@@ -56,7 +59,7 @@ class LogTQDM(tqdm):
         self.logger.info('%s', msg)
 
 
-class FileLogger():
+class FileLogger:
     def __init__(
             self,
             logs_path: Union[str, Path],
