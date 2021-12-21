@@ -88,8 +88,6 @@ def vectorize_text_to_embeddings(
     - posts_path[col_text_post_url] (TODO: djb)
     - comments_path[col_text_comment]
     """
-    print(f"new function loaded")
-
     # TODO(djb): is there a way to just log all the inputs to the fxn?
     d_params_to_log = {
         'model_name': model_name,
@@ -151,7 +149,6 @@ def vectorize_text_to_embeddings(
         col_text_comment,
         col_text_comment_word_count,
     ]
-    print(f"new function loaded")
     if col_post_id is not None:
         # Append post ID only if not None, use this 'hack'
         #  as a way to process posts with batching
@@ -346,32 +343,30 @@ def vectorize_text_to_embeddings(
             # print(f"List of files to process: \n  {l_comment_files_to_process}")
 
             l_comment_files_to_process = list(bucket.list_blobs(prefix=comments_path))[:n_sample_comment_files]
+            if n_comment_files_slice_end is not None:
+                if n_comment_files_slice_start is None:
+                    n_comment_files_slice_start = 0
+                # make new copy of files to process so that when slicing the time estimates from tqdm
+                #  are useful/accurate
+                l_comment_files_to_process = (
+                    l_comment_files_to_process[n_comment_files_slice_start:n_comment_files_slice_end]
+                )
             total_comms_file_count = len(l_comment_files_to_process)
 
             info(f"-- Loading & vectorizing COMMENTS in files: {total_comms_file_count} --"
                  f"\nExpected batch size: {tf_batch_inference_rows}"
-
                  )
             try:
                 df_posts.shape
             except (TypeError, UnboundLocalError) as e:
                 logging.warning(f"df_posts missing, so we can't filter comments without a post...\n{e}")
 
-            if n_comment_files_slice_end is not None:
-                if n_comment_files_slice_start is None:
-                    n_comment_files_slice_start = 0
-
             # TODO(djb): instead of reading each file from GCS, cache them locally first!
             count_comms_files_processed = 1  # count from 1 because slices start at zero
             for i, blob in enumerate(LogTQDM(
                     l_comment_files_to_process, mininterval=20, ascii=True,
-                    logger=logging.getLogger(__name__)
+                    logger=log
             )):
-                if n_comment_files_slice_end is not None:
-                    if not (n_comment_files_slice_start <= i < n_comment_files_slice_end):
-                        info(f"    -- Skipping file: {blob.name} --")
-                        continue
-
                 gc.collect()
                 # Use this name to map old files to new files
                 f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
@@ -425,7 +420,7 @@ def vectorize_text_to_embeddings(
 
                     for col_ in LogTQDM(
                             cols_comment_text_to_concat, ascii=True,
-                            # logger=log
+                            logger=log
                             ):
                         mask_c_not_null = ~df_comments[col_].isnull()
                         df_comments.loc[
@@ -665,7 +660,7 @@ def get_embeddings_as_df(
             info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
         for i in LogTQDM(
-                iteration_chunks, mininterval=11, ascii=True,  ncols=80, position=0, leave=True,
+                iteration_chunks, mininterval=11, ascii=True,  ncols=80,  # position=0, leave=True,
                 logger=log
                 ):
             try:
