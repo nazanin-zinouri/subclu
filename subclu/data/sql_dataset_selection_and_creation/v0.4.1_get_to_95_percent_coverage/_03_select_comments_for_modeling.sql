@@ -8,16 +8,17 @@
 -- Update checklist:
 -- * start date
 -- * end date
--- * max posts per sub
+-- * min comment len
+-- * max comments per sub
 -- * name of new created table (update date)
--- * table with latest selected subreddits (e.g., subclu_subreddits_top_no_geo_20210709)
+-- * table with latest selected posts (e.g., subclu_posts_top_no_geo_20211214)
 -- * name of newly created table for exporting
 -- * new GCS folder for new table
 
 -- Select COMMENTS for v0.4.1 topic clustering
--- Query complete (3 min 14 sec elapsed, 168.5 GB processed)
-DECLARE start_date DATE DEFAULT '2021-08-01';
-DECLARE end_date DATE DEFAULT '2021-09-21';
+-- Query complete (3 min 41 sec elapsed, 252.4 GB processed)
+DECLARE start_date DATE DEFAULT '2021-10-01';
+DECLARE end_date DATE DEFAULT '2021-12-15';
 DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 8;
 DECLARE MAX_COMMENTS_PER_POST NUMERIC DEFAULT 9;
 
@@ -29,13 +30,11 @@ AS (
 WITH
     selected_posts AS (
         -- Start with selected posts to reduce orphan comments
-        SELECT * FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
-        -- SELECT *
-        -- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+        SELECT * FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214`
+        -- Use where-clause for testing
         -- WHERE 1=1
         --     AND (
-        --         geo_relevant_subreddit = TRUE
-        --         OR ambassador_subreddit = TRUE
+        --         geo_relevant_subreddit_all = TRUE
         --     )
     ),
     geo AS (
@@ -62,7 +61,6 @@ WITH
 
             -- Meta about subreddit
             # , gs.combined_topic
-            , gs.combined_topic_and_rating
             # , gs.rating
             # , gs.rating_version
 
@@ -84,7 +82,7 @@ WITH
             AND sp.removed = 0
     ),
 
-    -- TL = thing language. In this case thing=comment
+    -- TL = thing_language. In this case thing=comment
     tl_with_meta AS (
         SELECT
             -- # counts check
@@ -113,9 +111,8 @@ WITH
             , tl.geolocation_country_code
 
             -- Meta about subreddit
-            , geo.combined_topic_and_rating
 
-            # Language predictions
+            -- Language predictions
             , tl.language
             , tl.probability
             , tl.weighted_language
@@ -170,25 +167,9 @@ WITH
         WHERE row_num_tl_dupes = 1
     ),
 
-    -- If count of comments to post is below threshold, we don't need to filter out or rank posts
-    comments_from_posts_below_threshold AS (
-        SELECT
-            tl.subreddit_id
-            , tl.post_id
-            , tl.comment_id
-
-        FROM (
-            SELECT * FROM selected_posts
-            -- Note that we might end up with a lower number because some comments might be removed
-            WHERE comments <= MAX_COMMENTS_PER_POST
-        )  AS sp
-
-        -- Inner join b/c there might be posts that have all their comments removed
-        INNER JOIN tl_unique_with_meta AS tl
-            ON sp.subreddit_id = tl.subreddit_id AND sp.post_id = tl.post_id
-    ),
-
-    comments_from_posts_above_threshold AS (
+    -- We can't rely on comments_count table to be right because it may not be synced at the same date,
+    --  so better to always rank and limit comments
+    comments_ranked AS (
         SELECT
             tl.subreddit_id
             , tl.post_id
@@ -200,36 +181,21 @@ WITH
             ) comment_rank_by_post_id
 
         FROM (
-            SELECT * FROM selected_posts
-            -- Note that we might end up with a lower number because some comments might be removed
-            WHERE comments > MAX_COMMENTS_PER_POST
-        )  AS sp
-
-        -- Inner join b/c there might be posts that have all their comments removed
-        INNER JOIN (
             SELECT * FROM tl_unique_with_meta
             -- Filter to keep only comments that are long enough
-            WHERE comment_text_len > MIN_COMMENT_LEN
+            WHERE comment_text_len >= MIN_COMMENT_LEN
         ) AS tl
-            ON sp.subreddit_id = tl.subreddit_id AND sp.post_id = tl.post_id
     ),
 
     selected_comments AS (
         -- Pick only comments that meet ranking/filtering criteria
         SELECT
-            COALESCE(c1.subreddit_id, c2.subreddit_id) AS subreddit_id
-            , COALESCE(c1.post_id, c2.post_id) AS post_id
-            , COALESCE(c1.comment_id, c2.comment_id) as comment_id
-        FROM comments_from_posts_below_threshold AS c1
-
-        FULL OUTER JOIN (
-            SELECT * FROM comments_from_posts_above_threshold
-            -- filter out comments above threshold
-            WHERE comment_rank_by_post_id <= MAX_COMMENTS_PER_POST
-        ) AS c2
-            ON c1.subreddit_id = c2.subreddit_id
-                AND c1.post_id = c2.post_id
-                AND c1.comment_id = c2.comment_id
+            subreddit_id
+            , post_id
+            , comment_id
+        FROM comments_ranked AS cr
+        -- filter out comments above threshold
+        WHERE comment_rank_by_post_id <= MAX_COMMENTS_PER_POST
     ),
 
     tl_unique_with_meta_top_comments AS (
@@ -245,12 +211,57 @@ WITH
                 AND sc.comment_id = tl.comment_id
     )
 
-
     -- This is the final table used for modeling
     --   Comment this section out if you want to preview with queries below
     SELECT * FROM  tl_unique_with_meta_top_comments
 ); -- close create table parens
 
+
+-- ==============================
+-- check counts AFTER creating COMMENTS table
+-- ===
+-- check counts AFTER creating COMMENTS table
+-- SELECT
+--     *
+--     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
+--     , (comment_unique_count / subreddit_unique_count) AS comments_per_subreddit_mean
+--     , (comment_unique_count / post_unique_count) AS comments_per_post_mean
+
+-- FROM (
+--     SELECT
+--         COUNT(*)       AS row_count
+--         , COUNT(DISTINCT post_id) AS post_unique_count
+--         , COUNT(DISTINCT comment_id) AS comment_unique_count
+--         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
+
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20211214`
+-- );
+-- RESULT, numbers match the numbers before materializing table
+--   Query complete (8.9 sec elapsed, 1.2 GB processed)
+--   New: Query complete (8.9 sec elapsed, 1.7 GB processed)
+--  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean 	 comments_per_subreddit_mean 	 comments_per_post_mean
+--  39,901,968 	 7,038,219 	 39,901,968 	 19,020 	 370.0 	 2,097.9 	 5.7
+-- NEW row_count	post_unique_count	comment_unique_count	subreddit_unique_count
+--                                                       posts_per_subreddit_mean	comments_per_subreddit_mean	comments_per_post_mean
+--  54,407,324 	 11,155,334  54,407,324 	 48,835 	 228.4	 1,114.1	4.9
+
+
+-- ==============================
+-- Export data to google cloud storage (GCS)
+-- ===
+-- Update checklist:
+--   - URI folder location
+--   - source table name
+-- Export new comments for topic modeling
+-- EXPORT DATA OPTIONS (
+--     uri='gs://i18n-subreddit-clustering/comments/top/2021-12-14/*.parquet',
+--     format='PARQUET',
+--     overwrite=true
+-- ) AS
+-- SELECT * EXCEPT (created_timestamp)
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20211214`
+-- ORDER BY subreddit_name ASC
+-- ;
 
 
 -- ==============================
@@ -406,46 +417,4 @@ WITH
 --     , COUNT(DISTINCT subreddit_id)  AS subreddit_id_unique
 --     , COUNT(DISTINCT user_id)  AS user_id_unique
 -- FROM geo
--- ;
-
-
--- ==============================
--- check counts AFTER creating the table
--- ===
--- SELECT
---     *
---     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
---     , (comment_unique_count / subreddit_unique_count) AS comments_per_subreddit_mean
---     , (comment_unique_count / post_unique_count) AS comments_per_post_mean
-
--- FROM (
---     SELECT
---         COUNT(*)       AS row_count
---         , COUNT(DISTINCT post_id) AS post_unique_count
---         , COUNT(DISTINCT comment_id) AS comment_unique_count
---         , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
-
---     FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20211004`
--- );
--- RESULT, numbers match the numbers before materializing table
---   Query complete (8.9 sec elapsed, 1.2 GB processed)
---  row_count 	 post_unique_count 	 comment_unique_count 	 subreddit_unique_count 	 posts_per_subreddit_mean 	 comments_per_subreddit_mean 	 comments_per_post_mean
---  39,901,968 	 7,038,219 	 39,901,968 	 19,020 	 370.0 	 2,097.9 	 5.7
-
-
-
--- ==============================
--- Export data to google cloud storage (GCS)
--- ===
--- Update checklist:
---   - URI folder location
---   - source table name
--- EXPORT DATA OPTIONS (
---     uri='gs://i18n-subreddit-clustering/comments/top/2021-10-04/*.parquet',
---     format='PARQUET',
---     overwrite=true
--- ) AS
--- SELECT * EXCEPT (created_timestamp)
--- FROM `reddit-employee-datasets.david_bermejo.subclu_comments_top_no_geo_20211004`
--- ORDER BY subreddit_name ASC
 -- ;
