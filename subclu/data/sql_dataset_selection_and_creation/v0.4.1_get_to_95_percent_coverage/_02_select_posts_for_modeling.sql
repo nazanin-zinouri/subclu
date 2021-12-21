@@ -372,7 +372,7 @@ AS (
 
 
 -- ##############################
--- Count totals v. unique AFTER CREATING TABLE
+-- Count POST totals v. unique AFTER CREATING TABLE
 -- SELECT
 --     *
 --     , (post_unique_count / subreddit_unique_count) AS posts_per_subreddit_mean
@@ -388,14 +388,14 @@ AS (
 --         , COUNT(flair_text)         AS posts_with_flair_text
 --         , COUNTIF(COALESCE(ocr_images_in_post_count, 0) > 0) AS posts_with_ocr_text
 --         , COUNT(post_url_for_embeddings)    AS urls_for_embeddings_count
-
---     FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20210927`
+--
+--     FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214`
 -- )
 -- ;
 -- RESULT
---  row_count 	 post_unique_count 	 subreddit_unique_count 	 user_id_unique 	 posts_with_flair_text 	 posts_with_ocr_text 	 urls_for_embeddings_count
---                                                                                      posts_per_subreddit_mean	posts_with_flair_text_pct	posts_with_ocr_text_pct	posts_with_urls_for_embeddings_pct
---  8,439,672 	 8,439,672 	 19,192 	 3,200,528 	 4,236,168 	 1,631,692 	 1,214,128 	 439.75 	50.2%	19.3%	14.4%
+-- post_unique_count	subreddit_unique_count	user_id_unique	posts_with_flair_text	posts_with_ocr_text	urls_for_embeddings_count
+--                                                                                         posts_per_subreddit_mean     posts_with_flair_text_pct	posts_with_ocr_text_pct	posts_with_urls_for_embeddings_pct
+-- 15,629,959 	 15,629,958 	 49,625 	 4,077,866 	 5,981,264 	 2,303,048 	 3,868,595 	314.9613703	38.3%	14.7%	24.8%
 
 
 
