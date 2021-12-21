@@ -436,16 +436,57 @@ def vectorize_text_to_embeddings(
 
                 t_start_comms_vect = datetime.utcnow()
                 # Reset index right away so we don't forget to do it later
-                df_vect_comments = get_embeddings_as_df(
-                    model=model,
-                    df=df_comments,
-                    col_text=col_text_comment if cols_comment_text_to_concat is None else col_comment_text_to_concat,
-                    cols_index='comment_default_' if cols_index_comment is None else cols_index_comment,
-                    lowercase_text=tokenize_lowercase,
-                    batch_size=tf_batch_inference_rows,
-                    limit_first_n_chars=tf_limit_first_n_chars,
-                    verbose_init=get_embeddings_verbose,
-                ).reset_index()
+                col_text_ = col_text_comment if cols_comment_text_to_concat is None else col_comment_text_to_concat
+                cols_index_ = 'comment_default_' if cols_index_comment is None else cols_index_comment
+                # In general, we want a high batch_size because that'll complete faster, but we need to reduce
+                #  it when we deal with long text b/c it can overflow the GPU's memory and result in OOM errors.
+                # If a batch (n-rows in a file) fails, get_embeddings_as_df() will retry with
+                #  a lower `limit_first_n_chars` value. However, that may not be enough if too many comments
+                #  in a batch are really long. In that case, I have 2 try/excepts to reduce the `batch_size`
+                #  which should make it more likely for a job to complete even if the input batch_size was too hight.
+                try:
+                    df_vect_comments = get_embeddings_as_df(
+                        model=model,
+                        df=df_comments,
+                        col_text=col_text_,
+                        cols_index=cols_index_,
+                        lowercase_text=tokenize_lowercase,
+                        batch_size=tf_batch_inference_rows,
+                        limit_first_n_chars=tf_limit_first_n_chars,
+                        verbose_init=get_embeddings_verbose,
+                    ).reset_index()
+                except Exception as e:
+                    try:
+                        logging.error(f"Failed to vectorize comments")
+                        logging.error(e)
+                        new_batch_size = int(tf_batch_inference_rows * 0.8)
+                        info(f"*** Retrying with smaller batch size {new_batch_size}***")
+                        df_vect_comments = get_embeddings_as_df(
+                            model=model,
+                            df=df_comments,
+                            col_text=col_text_,
+                            cols_index=cols_index_,
+                            lowercase_text=tokenize_lowercase,
+                            batch_size=new_batch_size,
+                            limit_first_n_chars=tf_limit_first_n_chars,
+                            verbose_init=get_embeddings_verbose,
+                        ).reset_index()
+                    except Exception as er:
+                        logging.error(f"Failed to vectorize comments")
+                        logging.error(er)
+                        new_batch_size = int(tf_batch_inference_rows * 0.6)
+                        info(f"*** Retrying with smaller batch size {new_batch_size}***")
+                        df_vect_comments = get_embeddings_as_df(
+                            model=model,
+                            df=df_comments,
+                            col_text=col_text_,
+                            cols_index=cols_index_,
+                            lowercase_text=tokenize_lowercase,
+                            batch_size=new_batch_size,
+                            limit_first_n_chars=tf_limit_first_n_chars,
+                            verbose_init=get_embeddings_verbose,
+                        ).reset_index()
+
                 total_time_comms_vect += (
                     elapsed_time(t_start_comms_vect, log_label='df_comms-batch vectorizing', verbose=False) /
                     timedelta(minutes=1)
@@ -559,6 +600,7 @@ def vectorize_text_to_embeddings(
                       )
     # load log file into mlflow
     mlflow.log_artifact(f_log.f_log_file)
+    f_log.remove_file_logger()
     mlflow.end_run()
     # Don't return anything b/c it's hard to predict output, instead check mlflow for artifacts
 
