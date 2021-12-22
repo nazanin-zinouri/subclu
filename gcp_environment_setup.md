@@ -465,15 +465,29 @@ pip install -r base_requirements.txt --use-deprecated=legacy-resolver
 ## Step 1: Run this command in the **GCP Notebok/VM**.
 The new pattern is to call the mlflow DB for the current host name:
 ### Tensorflow Inference VM
-```
-mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
+```bash
+mlflow server \
+  --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db \
+  --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
 ```
 
 ### CPU-based VM with lots of RAM & CPUs:
-```
-mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-100-2021-04-28-djb-eda-german-subs/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
+```bash
+mlflow server \
+  --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-100-2021-04-28-djb-eda-german-subs/mlruns.db \
+  --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
 ```
 
+### local (laptop)
+Use this command to run mlflow server from manually synchronized DB. Use it to check on status of runs without having to start a VM.
+```bash
+cd ~/repos/subreddit_clustering_i18n
+source .venv/bin/activate
+
+mlflow server \
+  --backend-store-uri sqlite:///mlflow_sync/manually_merged/mlruns.db \
+  --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
+```
 
 ## Step 2: SSH into VM from your local
 I created a custom function to tunnel into your VM:
