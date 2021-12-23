@@ -81,6 +81,7 @@ git push
 
 ## 2. Update VM's settings & start the VM
 If needed, change the VM's vCPU or memory. Check your VM in one of the consoles:
+
 `data-prod` project, VM instances:
 - https://console.cloud.google.com/compute/instances?project=data-prod-165221
 
@@ -93,20 +94,32 @@ Once you start the VM, go to the VM's proxy URL to access the jupyterlab UI. Com
 - Notebook for EDA, clustering, and aggregation: 
   - https://1185e8680f9b40ca-dot-us-west1.notebooks.googleusercontent.com/lab?
 
-## 2. Sync git/github for `jupyter` user
+## 2. Sync github repo for `jupyter` user
 The default user in the notebook GUI is `jupyter`, so we need to sync the code in the VM with the latest code.
 
 - Go to the jupyterlab UI 
 - Start a console session
+- 1) Start the ssh-agent
+- 2) Add the ssh-key you registered with github to the ssh-agent
+  - This way we can use git commands to push, pull, etc. without having to add our password after each command
+```bash
+eval "$(ssh-agent -s)"
+
+ssh-add ~/.ssh/id_ed25519
+```
+Note: you'll be prompted for your git-ssh passphrase.
+
 - Change directory to the repo
 ```bash
 cd subreddit_clustering_i18n
 ```
+
 - Check if there are any uncommited changes & pull latest changes in origin/remote repo
 ```bash
 git status
 git pull
 ```
+
 
 - _[OPTIONAL]_ commit & push changes as needed
 ```bash
@@ -127,7 +140,7 @@ git checkout <branch_name>
 git pull
 ```
 
-## 3. Set VM as "deploymnet"/remote for PyCharm
+## 3. Set VM as "deployment"/remote for PyCharm
 We need to set as active "deployment" VM so that whenever we write and save code on PyCharm it automagically uploads it to our VM. You can find most of these options under the `deployment` menu:
 <br>https://www.jetbrains.com/help/pycharm/creating-a-remote-server-configuration.html
 
@@ -176,7 +189,7 @@ _NOTE_: See more detailed instructions on `editable mode` in the [gcp_environmen
 
 ```bash
 # Continue in previous console where we already assumed the user identity, or open a new one
-sudo su - david.bermejo
+# sudo su - david.bermejo
 
 # Each VM might have slightly different uses & requirements, so it's best
 #  to install the specific VM's requirements using [extras]

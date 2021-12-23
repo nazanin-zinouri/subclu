@@ -200,13 +200,13 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 
 ## Add SSH key to ssh-agent
 After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
-```
+```bash
 eval "$(ssh-agent -s)"
 
 ssh-add ~/.ssh/id_ed25519
 ```
 
-Note: you'll be prompted for your git passphrase.
+Note: you'll be prompted for your git-ssh passphrase.
 
 ## Add key to github
 github's guide:
