@@ -1,0 +1,7 @@
+min_comment_text_len: 4
+
+agg_comments_to_post_weight_col: null  # 'comment_text_len'
+agg_post_to_subreddit_weight_col: null
+agg_post_post_weight: 70
+agg_post_comment_weight: 20
+agg_post_subreddit_desc_weight: 10

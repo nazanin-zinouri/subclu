@@ -1,0 +1,12 @@
+# Use this config to get aggregate embeddings
+defaults:
+  - data_text_and_metadata:  v0.4.1_2021_12_fix
+  - data_embeddings_to_aggregate: v0.4.1_2021-12-21_muse_lower_case_false
+  - aggregate_params: v0.4.1_agg
+
+mlflow_tracking_uri: 'sqlite'
+# 'v0.4.0_use_multi_aggregates'  'v0.3.2_use_multi_aggregates_test'
+mlflow_experiment: 'v0.4.1_mUSE_aggregates'
+n_sample_posts_files: null
+n_sample_comments_files: null
+calculate_similarites: true
