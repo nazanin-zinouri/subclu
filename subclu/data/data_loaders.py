@@ -85,7 +85,8 @@ class LoadPosts:
                 'upvotes',
                 # 'successful',
                 # 'app_name',
-                'combined_topic_and_rating',  # Needed for new manual label
+
+                # 'combined_topic_and_rating',  # Deprecated since v0.4.1
                 'post_type',  # For post aggs
                 # 'post_nsfw',
                 # 'geolocation_country_code',
@@ -273,7 +274,7 @@ class LoadSubreddits(LoadPosts):
         #  over-ride cols, subs are usually small enough that we
         #  don't have to worry about loading only some cols, but keep in mind for later
         if columns == 'aggregate_embeddings_':
-            self.columns = columns
+            self.columns = [c for c in columns if c != 'combined_topic_and_rating']
         else:
             self.columns = columns
 
