@@ -433,3 +433,34 @@ AS (
 -- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214`
 -- ORDER BY subreddit_id DESC, rank_post_in_sub DESC
 -- ;
+
+-- FIX: there was one duplicate post_id, so we need to drop it to prevent weird things downstream
+--  seems like dupe happened because it had multiple OCR image text
+-- FIX: there was one duplicate post_id, so we need to drop it to prevent weird things downstream
+--  seems like dupe happened because it had multiple OCR image text
+EXPORT DATA OPTIONS(
+  uri='gs://i18n-subreddit-clustering/posts/top/2021-12-14_fix/*.parquet',
+  format='PARQUET',
+  overwrite=true
+  ) AS
+
+SELECT
+    * EXCEPT (created_timestamp, post_row_num)
+
+    -- check counts
+    -- COUNT(*) AS row_count
+    -- , COUNT(DISTINCT post_id)  AS post_count_unique
+
+FROM (
+    SELECT
+        *
+        , ROW_NUMBER() OVER(
+            PARTITION BY post_id, user_id
+            ORDER BY created_timestamp ASC, text_len DESC
+        ) AS post_row_num
+    FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214`
+)
+WHERE post_row_num = 1
+ORDER BY subreddit_id DESC, rank_post_in_sub DESC
+;
+
