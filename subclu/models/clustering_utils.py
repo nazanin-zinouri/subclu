@@ -305,25 +305,31 @@ def fancy_dendrogram(
 def plot_elbow_and_get_k(
         Z: Union[pd.DataFrame, np.ndarray],
         n_clusters_to_check: int = 500,
-        figsize: tuple = (14, 8),
+        figsize: tuple = (16, 9),
         plot_title: str = 'Cluster Distances & Optimal k',
         xlabel: str = 'Number of clusters (k)',
-        ylabel: str = 'Distance',
+        ylabel1: str = 'Distance between clusters',
+        ylabel2: str = 'Acceleration of distances',
         col_optimal_k: str = 'optimal_k_for_interval',
         save_path: Union[str, Path] = None,
         return_optimal_ks: bool = False,
+        xlim: tuple = (-4, 104),
 ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, dict]]:
     """Use 'elbow' method to get an optimal value of k-clusters"""
-    fig = plt.figure(figsize=figsize)
+    # create a 2ndary y-axis because the acceleration units tend to be
+    #  much smaller than distance, which makes it hard to see the differences
+    fig, ax1 = plt.subplots(sharex='all', figsize=figsize)
+    ax2 = ax1.twinx()
 
     try:
         last = Z[-n_clusters_to_check:, 2]
     except TypeError:
         last = Z.to_numpy()[-n_clusters_to_check:, 2]
 
+    # reverse order of distances (low-k first)
     last_rev = last[::-1]
     idxs = np.arange(1, len(last) + 1)
-    plt.plot(idxs, last_rev, label='distances')
+    ax1.plot(idxs, last_rev, label='distance')
 
     acceleration = np.diff(last, 2)  # 2nd derivative of the distances
     acceleration_rev = acceleration[::-1]
@@ -341,18 +347,31 @@ def plot_elbow_and_get_k(
     k_intervals = [
         # (2, 10),  # This one is so generic it's kind of useless
         (10, 20),
-        (20, 50),
-        (50, 100),
+        (20, 40),
+        (40, 60),
+        (60, 80),
+        (80, 100),
+
         (100, 200),
         (200, 300),
         (300, 400),
         (400, 600),
+        (600, 800),
+        (800, 1000),
+
+        (1000, 1200),
+        (1200, 1400),
+        (1400, 1600),
+        (1600, 1800),
+        (1800, 2000),
+        (2000, 2200),
     ]
-    viridis = cm.get_cmap('viridis', len(k_intervals))
+    k_intervals_below_xlim = len([tup_ for tup_ in k_intervals if tup_[1] <= xlim[1]])
+    viridis = cm.get_cmap('viridis', k_intervals_below_xlim)
 
     d_optimal_k = dict()
     for i, k_tup_ in enumerate(k_intervals):
-        mask_interval_coT = df_accel['k'].between(*k_tup_)
+        mask_interval_coT = df_accel['k'].between(*k_tup_, inclusive='left')
         interval_name = f"{k_tup_[0]:03d}_to_{k_tup_[1]:03d}"
         d_optimal_k[interval_name] = dict()
         try:
@@ -366,18 +385,28 @@ def plot_elbow_and_get_k(
                 'k'
             ].values[0]
             d_optimal_k[interval_name]['k'] = int(k_)  # convert to int b/c np.int can create errors
-            d_optimal_k[interval_name]['col_prefix'] = f"{k_:03d}_k"
+            d_optimal_k[interval_name]['col_prefix'] = f"k{k_:03d}"
 
-            plt.axvline(x=k_, linestyle="--", label=f"k={k_}", color=viridis(i / len(k_intervals)))
+            if k_tup_[1] <= xlim[1]:
+                plt.axvline(x=k_, linestyle="--", label=f"k={k_}", color=viridis(i / k_intervals_below_xlim))
         except Exception as e:
             logging.warning(f"{e}")
 
     plt.title(plot_title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel(ylabel1)
 
-    plt.plot(idxs[:-2] + 1, acceleration_rev, label='acceleration')
-    plt.legend(loc=(1.02, 0.42))
+    ax2.plot(idxs[:-2] + 1, acceleration_rev, label='acceleration', color='orange')
+    ax2.set_ylabel(ylabel2)
+
+    # set xlim at lower bound than 2k clusters because the scale makes comparing them useless
+    ax2.set_xlim(xlim)
+    ax1.legend(loc='upper left', bbox_to_anchor=(1.06, .94))
+    ax2.legend(loc='upper left', bbox_to_anchor=(1.06, .84))
+
+    # change order - make sure distance is above acceleration
+    ax1.set_zorder(ax2.get_zorder() + 1)
+    ax1.set_frame_on(False)  # prevents ax1 from hiding ax2
 
     if save_path is not None:
         plt.savefig(

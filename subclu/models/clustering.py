@@ -56,7 +56,7 @@ log = logging.getLogger(__name__)
 
 
 @hydra.main(config_path='../config', config_name="clustering_v0.4.0_base")
-def culster_embeddings(cfg: DictConfig) -> object:
+def cluster_embeddings(cfg: DictConfig) -> object:
     """
     The hydra runner will call the clustering class and apply all the needed
     hyperparameters
@@ -65,18 +65,19 @@ def culster_embeddings(cfg: DictConfig) -> object:
 
     log.info(f"Define cluster class...")
     cluster = ClusterEmbeddings(
-        dict_data_embeddings_to_cluster=cfg['data_embeddings_to_cluster'],
-        dict_clustering_algo=cfg['clustering_algo'],
-        dict_data_text_and_metadata=cfg['data_text_and_metadata'],
+        data_embeddings_to_cluster=cfg['data_embeddings_to_cluster'],
+        clustering_algo=cfg['clustering_algo'],
+        data_text_and_metadata=cfg['data_text_and_metadata'],
         embeddings_to_cluster=cfg['embeddings_to_cluster'],
+        mlflow_experiment_name=cfg['mlflow_experiment_name'],
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
+        n_max_clusters_to_check_for_optimal_k=cfg.get('n_max_clusters_to_check_for_optimal_k', 2200),
         n_sample_embedding_rows=cfg.get('n_sample_embedding_rows', None),
-        mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
         mlflow_run_name=(
             f"{cfg.get('mlflow_run_name', 'embedding_clustering')}-{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
         ),
-        dict_filter_embeddings=cfg.get('filter_embeddings', None),
-        pipeline_config=cfg.get('pipeline', None),
+        filter_embeddings=cfg.get('filter_embeddings', None),
+        pipeline_config=cfg.get('pipeline', cfg.get('pipeline_config', None)),
         logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
     )
 
@@ -92,27 +93,29 @@ class ClusterEmbeddings:
     """
     def __init__(
             self,
-            dict_data_embeddings_to_cluster: dict,
-            dict_clustering_algo: dict,
-            dict_data_text_and_metadata: dict,
+            data_embeddings_to_cluster: dict,
+            clustering_algo: dict,
+            data_text_and_metadata: dict,
+            mlflow_experiment_name: str,
             embeddings_to_cluster: str = 'df_sub_level_agg_c_post_comments_and_sub_desc',
             n_sample_embedding_rows: int = None,
+            n_max_clusters_to_check_for_optimal_k: int = 2200,
             mlflow_tracking_uri: str = 'sqlite',
-            mlflow_experiment_name: str = 'v0.4.0_use_multi_clustering_test',
             mlflow_run_name: str = 'embedding_clustering',
             pipeline_config: dict = None,
-            dict_filter_embeddings: dict = None,
+            filter_embeddings: dict = None,
             logs_path: str = 'logs/ClusterEmbeddings',
             col_model_leaves_order: str = 'model_leaves_list_order_left_to_right',
             # **kwargs
     ):
         """"""
-        self.dict_data_embeddings_to_cluster = dict_data_embeddings_to_cluster
-        self.dict_clustering_algo = dict_clustering_algo
-        self.dict_data_text_and_metadata = dict_data_text_and_metadata
+        self.dict_data_embeddings_to_cluster = data_embeddings_to_cluster
+        self.dict_clustering_algo = clustering_algo
+        self.dict_data_text_and_metadata = data_text_and_metadata
 
         self.embeddings_to_cluster = embeddings_to_cluster
         self.n_sample_embedding_rows = n_sample_embedding_rows
+        self.n_max_clusters_to_check_for_optimal_k = n_max_clusters_to_check_for_optimal_k
 
         self.mlflow_experiment_name = mlflow_experiment_name
         self.mlflow_run_name = mlflow_run_name
@@ -126,7 +129,7 @@ class ClusterEmbeddings:
         # pipeline to store model
         self.pipeline_config = pipeline_config
         self.pipeline = None
-        self.dict_filter_embeddings = dict_filter_embeddings
+        self.dict_filter_embeddings = filter_embeddings
 
         # attributes to save outputs
         self.df_accel = None
@@ -239,9 +242,11 @@ class ClusterEmbeddings:
                     log.error(f"Couldn't log file: {f_}\n  {e}")
             mlflow.end_run()
 
-        if os.getcwd() == get_original_cwd():
+        try:
             log.info(f"    Removing fileHandler...")
             self._remove_file_logger()
+        except Exception as er:
+            log.error(f"Couldn't remove file logger\n {er}")
 
     def _create_pipeline(self):
         """Create pipeline with steps from pipeline config
@@ -403,7 +408,7 @@ class ClusterEmbeddings:
             fig = plt.figure(figsize=(14, 8))
             self.df_accel, self.optimal_ks = plot_elbow_and_get_k(
                 self.X_linkage,
-                n_clusters_to_check=500,
+                n_clusters_to_check=self.n_max_clusters_to_check_for_optimal_k,
                 return_optimal_ks=True,
             )
             plt.savefig(
@@ -681,8 +686,13 @@ class ClusterEmbeddings:
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
-        if os.getcwd() != get_original_cwd():
-            # hydra takes care of creating a custom working directory
+        try:
+            get_original_cwd()
+            hydra_initialized = True
+        except ValueError:
+            hydra_initialized = False
+
+        if hydra_initialized:
             log.info(f"Using hydra's path")
             print(f"  Current working directory : {os.getcwd()}")
             print(f"  Orig working directory    : {get_original_cwd()}")
@@ -785,7 +795,7 @@ class ClusterEmbeddings:
 
 
 if __name__ == "__main__":
-    culster_embeddings()
+    cluster_embeddings()
 
 
 #

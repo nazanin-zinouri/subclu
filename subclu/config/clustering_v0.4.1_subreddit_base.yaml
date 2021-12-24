@@ -9,6 +9,7 @@ defaults:
 
 embeddings_to_cluster: 'df_sub_level_agg_c_post_comments_and_sub_desc'
 n_sample_embedding_rows: null
+n_max_clusters_to_check_for_optimal_k: 2200
 
 # Filter out posts or subreddits BEFORE aplying clustering algo.
 #  Useful when some subreddits only have 1 or 2 posts so there's not
@@ -22,7 +23,7 @@ filter_embeddings:
 mlflow_tracking_uri: 'sqlite'
 mlflow_experiment_name: 'v0.4.1_mUSE_clustering'  # 'v0.4.1_mUSE_clusteringtest'
 
-pipeline:
+pipeline_config:
   # If normalize=True then cosine_distance=(normalize + euclidean distance)
   #  Needed for AgglomerativeClustering(ward) and other clustering algos that
   #  are limited to euclidean distance
