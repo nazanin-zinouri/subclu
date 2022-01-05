@@ -27,6 +27,11 @@ CPU / EDA:
 - https://1185e8680f9b40ca-dot-us-west1.notebooks.googleusercontent.com/lab?
 
 
+# Jupyterlab settings
+For jupyterlab configuration, see:
+[jupyterlab_configuration.md](references/jupyterlab_configuration.md)
+
+
 # Sync an existing GCP notebook VM
 Before running a new job on a VM, use this checklist to make sure that the VM has the latest:
 - mlruns database (latest experiments data from mlflow)

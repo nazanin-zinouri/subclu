@@ -10,6 +10,18 @@ Then you can click on one of the settings tabs to update your `User Preferences`
 
 More info: https://jupyter-notebook.readthedocs.io/en/stable/extending/keymaps.html
 
+# Theme
+By default, jupyter's theme is Light (white background). We can change it to dark mode under:<br>
+`Settings > Theme`
+
+```
+{
+    // Selected Theme
+    // Application-level visual styling theme
+    "theme": "JupyterLab Dark",
+}
+```
+
 # Keyboard shortcuts
 User preferences:
 ```
