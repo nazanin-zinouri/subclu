@@ -55,7 +55,7 @@ from .clustering_registry import (
 log = logging.getLogger(__name__)
 
 
-@hydra.main(config_path='../config', config_name="clustering_v0.4.0_base")
+@hydra.main(config_path='../config', config_name="clustering_v0.4.1_subreddit_base")
 def cluster_embeddings(cfg: DictConfig) -> object:
     """
     The hydra runner will call the clustering class and apply all the needed
@@ -78,7 +78,7 @@ def cluster_embeddings(cfg: DictConfig) -> object:
         ),
         filter_embeddings=cfg.get('filter_embeddings', None),
         pipeline_config=cfg.get('pipeline', cfg.get('pipeline_config', None)),
-        logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
+        logs_path=cfg.get('logs_path', 'logs'),
     )
 
     cluster.run_clustering()
@@ -104,8 +104,8 @@ class ClusterEmbeddings:
             mlflow_run_name: str = 'embedding_clustering',
             pipeline_config: dict = None,
             filter_embeddings: dict = None,
-            logs_path: str = 'logs/ClusterEmbeddings',
-            col_model_leaves_order: str = 'model_leaves_list_order_left_to_right',
+            logs_path: str = 'logs',
+            col_model_leaves_order: str = 'model_sort_order',
             # **kwargs
     ):
         """"""
@@ -203,17 +203,18 @@ class ClusterEmbeddings:
             self._log_pipeline_to_mlflow()
 
             # TODO(djb): Get metrics: elbow & "optimal" k's
-            #  Only applies to agg-clutering models
+            #  Only applies to agg-clustering models
             # TODO(djb): Create, save & log dendrograms
             self._get_linkage_and_optimal_ks()
             self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
-            # TODO(djb): Get predictions for each row (subreddit or post)
-            # TODO(djb): Get metrics to compare clusters:
-            #  - classification report
+            # Use the majority label for a cluster to compute supervised metrics
+            #  We can use these to compare and find the "best" clusters:
             #  - adjusted metrics (rand index, mutual info)
+            # TODO(djb):
+            #  - TODO(djb) classification report (not implemented)
             #  - homegeneity
-            self._get_cluster_ids_and_labels(
+            self._get_cluster_ids_and_labels_and_supervised_metrics(
                 df_embeddings=df_embeddings,
                 df_subs=df_subs,
             )
@@ -451,10 +452,10 @@ class ClusterEmbeddings:
             p_vals = {40}
             try:
                 p_vals.add(
-                    int(self.optimal_ks['050_to_100']['k'] + 1)
+                    int(self.optimal_ks['0060_to_0080']['k'] + 1)
                 )
                 p_vals.add(
-                    int(self.optimal_ks['100_to_200']['k'] + 1)
+                    int(self.optimal_ks['0100_to_0200']['k'] + 1)
                 )
             except Exception as e:
                 log.error(f"  {e}")
@@ -490,7 +491,7 @@ class ClusterEmbeddings:
         except Exception as e:
             log.error(f"Dendrogram failed:\n  {e}")
 
-    def _get_cluster_ids_and_labels(
+    def _get_cluster_ids_and_labels_and_supervised_metrics(
             self,
             df_embeddings: pd.DataFrame,
             df_subs: pd.DataFrame = None,
@@ -498,7 +499,7 @@ class ClusterEmbeddings:
         """For a number of K-values, we need to get the labels"""
         # try to add other columns from the df_subs meta
         l_cols_ground_truth = [
-            # 'rating_name',  # ignore rating, it's useles/noisy for clustering
+            # 'rating_name',  # ignore rating, it's noisy for clustering
             'primary_topic',
         ]
         l_cols_to_add = l_cols_ground_truth + [
@@ -541,14 +542,43 @@ class ClusterEmbeddings:
         except Exception as e:
             log.error(f"Failed to append model leaves order\n  {e}")
 
-        s_k_to_evaluate = set(np.arange(10, 260, 10))
+        # for plots we'd like a smoother or more constant interval between k's,
+        #  but for the final df_labels table (which will be uploaded to bigquery)
+        #  we want fewer k's because each k will be a column and we want to make it easier
+        #  for people to pick one k -- they could get overwhelmed if we give them a ton
+        #  of columns and they wouldn't pick any of them
+        s_k_to_evaluate = (
+            set(np.arange(10, 100, 10)) |
+            set(np.arange(100, 200, 25))
+        )
+        # increase interval between k's as we go bigger
+        if 200 <= self.n_max_clusters_to_check_for_optimal_k:
+            s_k_to_evaluate = (
+                s_k_to_evaluate |
+                set(np.arange(200, 1 + min(1000, self.n_max_clusters_to_check_for_optimal_k), 100))
+            )
+        if 1000 <= self.n_max_clusters_to_check_for_optimal_k:
+            s_k_to_evaluate = (
+                s_k_to_evaluate |
+                set(np.arange(1000, 1 + min(3000, self.n_max_clusters_to_check_for_optimal_k), 250))
+            )
+        if 3000 <= self.n_max_clusters_to_check_for_optimal_k:
+            s_k_to_evaluate = (
+                s_k_to_evaluate |
+                set(np.arange(3000, 1 + self.n_max_clusters_to_check_for_optimal_k, 200))
+            )
+        # explicitly add n_max clusters in case intervals missed it
+        s_k_to_evaluate = s_k_to_evaluate | {self.n_max_clusters_to_check_for_optimal_k}
+
         # add the 'optimal' k_ values:
         for interval_, d_ in self.optimal_ks.items():
             s_k_to_evaluate.add(int(d_['k']))
 
         log.info(f"Get cluster IDs for each designated k...")
+        label_col_prefix = 'k_'
+        label_col_suffix = '_label'
         for k_ in LogTQDM(sorted(s_k_to_evaluate)):
-            self.df_labels_[f"{k_:03d}_k_labels"] = fcluster(self.X_linkage, k_, criterion='maxclust')
+            self.df_labels_[f"{label_col_prefix}{k_:04d}{label_col_suffix}"] = fcluster(self.X_linkage, k_, criterion='maxclust')
 
         log.info(self.df_labels_.shape)
 
@@ -566,9 +596,12 @@ class ClusterEmbeddings:
             for interval_, d_ in self.optimal_ks.items():
                 d_optimal_ks_lookup[d_['k']] = interval_
 
-            for col_cls_labels in LogTQDM([c for c in self.df_labels_.columns if '_k_labels' in c], mininterval=.8, ):
-                k_int = int(col_cls_labels.split('_k_')[0])
-                k_col_prefix = col_cls_labels.replace('_labels', '')
+            for col_cls_labels in LogTQDM(
+                    [c for c in self.df_labels_.columns if c.endswith(label_col_suffix)],
+                    mininterval=.8,
+            ):
+                k_int = int(col_cls_labels.replace(label_col_suffix, '').replace(label_col_prefix, ''))
+                k_col_prefix = col_cls_labels.replace(label_col_suffix, '')
                 log.info(f"  k: {k_col_prefix}")
 
                 d_df_crosstab_labels[col_cls_labels] = dict()
@@ -586,7 +619,8 @@ class ClusterEmbeddings:
                     )
 
                     # Create new predicted column
-                    col_pred_ = f"{k_col_prefix}-predicted-{c_tl}"
+                    # TODO(djb) instead of "predicted" change it to "majority" or similar
+                    col_pred_ = f"{k_col_prefix}_majority_{c_tl}"
                     l_cols_predicted.append(col_pred_)
                     self.df_labels_ = self.df_labels_.merge(
                         (
@@ -704,8 +738,8 @@ class ClusterEmbeddings:
             )
             Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
             log.info(f"  Local model saving directory: {self.path_local_model}")
-            self._init_file_log()
 
+        self._init_file_log()
         self.path_local_model_figures = self.path_local_model / 'figures'
         Path(self.path_local_model_figures).mkdir(exist_ok=True, parents=True)
 
@@ -765,7 +799,7 @@ class ClusterEmbeddings:
         if self.logs_path is not None:
             logger = logging.getLogger()
 
-            path_logs = Path(self.logs_path)
+            path_logs = Path(self.path_local_model) / self.logs_path
             Path.mkdir(path_logs, parents=False, exist_ok=True)
             self.f_log_file = str(
                 path_logs /

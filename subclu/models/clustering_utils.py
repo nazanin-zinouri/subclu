@@ -353,27 +353,37 @@ def plot_elbow_and_get_k(
         (80, 100),
 
         (100, 200),
-        (200, 300),
-        (300, 400),
+        # (200, 300),
+        # (300, 400),
         (400, 600),
-        (600, 800),
+        # (600, 800),
         (800, 1000),
 
         (1000, 1200),
-        (1200, 1400),
+        # (1200, 1400),
         (1400, 1600),
-        (1600, 1800),
+        # (1600, 1800),
         (1800, 2000),
         (2000, 2200),
+
+        (2800, 3000),
+        (3000, 3200),
+        (3400, 3600),
+        (3800, 4000),
+        (4000, 4200),
     ]
     k_intervals_below_xlim = len([tup_ for tup_ in k_intervals if tup_[1] <= xlim[1]])
     viridis = cm.get_cmap('viridis', k_intervals_below_xlim)
 
     d_optimal_k = dict()
     for i, k_tup_ in enumerate(k_intervals):
-        mask_interval_coT = df_accel['k'].between(*k_tup_, inclusive='left')
-        interval_name = f"{k_tup_[0]:03d}_to_{k_tup_[1]:03d}"
-        d_optimal_k[interval_name] = dict()
+        # there seems to be a bug where "between" will always match both edges of the boundary
+        #  so we need to manually reduce boundaries ourselves *sigh*
+        k_min = k_tup_[0]
+        k_max = k_tup_[1] - 1
+        mask_interval_coT = df_accel['k'].between(k_min, k_max, inclusive='both')
+        interval_name = f"{k_tup_[0]:04d}_to_{k_tup_[1]:04d}"
+
         try:
             df_accel.loc[
                 (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
@@ -384,8 +394,11 @@ def plot_elbow_and_get_k(
                 (df_accel.index == df_accel[mask_interval_coT]['acceleration'].idxmax()),
                 'k'
             ].values[0]
+
+            # only add values to optimal dict if k is within the range we're searching
+            d_optimal_k[interval_name] = dict()
             d_optimal_k[interval_name]['k'] = int(k_)  # convert to int b/c np.int can create errors
-            d_optimal_k[interval_name]['col_prefix'] = f"k{k_:03d}"
+            d_optimal_k[interval_name]['col_prefix'] = f"k{k_:04d}"
 
             if k_tup_[1] <= xlim[1]:
                 plt.axvline(x=k_, linestyle="--", label=f"k={k_}", color=viridis(i / k_intervals_below_xlim))
@@ -399,7 +412,7 @@ def plot_elbow_and_get_k(
     ax2.plot(idxs[:-2] + 1, acceleration_rev, label='acceleration', color='orange')
     ax2.set_ylabel(ylabel2)
 
-    # set xlim at lower bound than 2k clusters because the scale makes comparing them useless
+    # set xlim at lower bound than ~500 clusters because the scale makes comparing them useless
     ax2.set_xlim(xlim)
     ax1.legend(loc='upper left', bbox_to_anchor=(1.06, .94))
     ax2.legend(loc='upper left', bbox_to_anchor=(1.06, .84))

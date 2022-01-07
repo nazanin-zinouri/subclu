@@ -434,8 +434,7 @@ AS (
 -- ORDER BY subreddit_id DESC, rank_post_in_sub DESC
 -- ;
 
--- FIX: there was one duplicate post_id, so we need to drop it to prevent weird things downstream
---  seems like dupe happened because it had multiple OCR image text
+
 -- FIX: there was one duplicate post_id, so we need to drop it to prevent weird things downstream
 --  seems like dupe happened because it had multiple OCR image text
 EXPORT DATA OPTIONS(
@@ -463,4 +462,3 @@ FROM (
 WHERE post_row_num = 1
 ORDER BY subreddit_id DESC, rank_post_in_sub DESC
 ;
-
