@@ -624,10 +624,12 @@ def save_and_log_config(
     f_json = Path(local_path) / f'{name_for_artifact_folder}.json'
     f_yaml = Path(local_path) / f'{name_for_artifact_folder}.yaml'
 
-    joblib.dump(config, f_joblib)
-
-    info(f"  Logging config to mlflow with joblib...")
-    mlflow.log_artifact(str(f_joblib), name_for_artifact_folder)
+    try:
+        info(f"  Logging config to mlflow with joblib...")
+        joblib.dump(config, f_joblib)
+        mlflow.log_artifact(str(f_joblib), name_for_artifact_folder)
+    except TypeError as er:
+        logging.error(f"  Could not safe config with joblib.\n{er}")
 
     try:
         with open(str(f_json), 'w') as f:
