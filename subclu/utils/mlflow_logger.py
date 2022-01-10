@@ -896,7 +896,6 @@ def log_clf_report_and_conf_matrix(
         log_metrics_to_mlflow: bool = True,
         log_artifacts_to_mlflow: bool = False,
         log_to_console: bool = True,
-        remove_files_from_local_path: bool = False,
         print_clf_df: bool = False,
         return_confusion_mx: bool = False,
 ) -> Union[None, pd.DataFrame]:
@@ -948,6 +947,7 @@ def log_clf_report_and_conf_matrix(
     df_rep.loc['accuracy', 'support'] = df_rep.loc['weighted avg', 'support']
     df_rep.loc['accuracy', 'f1-score'] = log_metrics['accuracy']
     df_rep['support'] = df_rep['support'].astype(int)
+
     if print_clf_df:
         with pd.option_context('display.float_format', '{:,.3f}'.format):
             print(df_rep.fillna(''))
@@ -960,25 +960,9 @@ def log_clf_report_and_conf_matrix(
 
     # create confusion matrix & save it too
     if y_true.ndim > 1:
+        # Unclear why we needed to reshape y_true...
         y_true = pd.Series(np.argmax(y_true, axis=-1)).map({i: val for i, val in enumerate(class_labels)})
     conf_mx = confusion_matrix(y_true, y_pred)
-
-    # Add PPV & NPV calculation
-    tn, fp, fn, tp = conf_mx.ravel()
-    d_extra_metrics = {
-        f"{data_fold_name.lower()}-ppv": (tp / (tp + fp)),
-        f"{data_fold_name.lower()}-npv": (tn / (tn + fn)),
-
-        f"{data_fold_name.lower()}-tn": tn,
-        f"{data_fold_name.lower()}-fp": fp,
-        f"{data_fold_name.lower()}-fn": fn,
-        f"{data_fold_name.lower()}-tp": tp,
-    }
-    if log_to_console:
-        for metric, val in d_extra_metrics.items():
-            info(f"{data_fold_name.lower()}-{metric}: {val}")
-    if log_metrics_to_mlflow:
-        mlflow.log_metrics(d_extra_metrics)
 
     df_conf_mx = pd.DataFrame(conf_mx,
                               index=[rename_for_mlflow(lab) for lab in class_labels],
@@ -987,10 +971,28 @@ def log_clf_report_and_conf_matrix(
         df_conf_mx.to_csv(Path(save_path) / f"{data_fold_name}-confusion_matrix.csv",
                           index=True)
 
+    # Add PPV & NPV calculation, this might only work for properly for binary classification
+    if len(class_labels) == 2:
+        tn, fp, fn, tp = conf_mx.ravel()
+        d_extra_metrics = {
+            f"{data_fold_name.lower()}-ppv": (tp / (tp + fp)),
+            f"{data_fold_name.lower()}-npv": (tn / (tn + fn)),
+
+            f"{data_fold_name.lower()}-tn": tn,
+            f"{data_fold_name.lower()}-fp": fp,
+            f"{data_fold_name.lower()}-fn": fn,
+            f"{data_fold_name.lower()}-tp": tp,
+        }
+
+        if log_to_console:
+            for metric, val in d_extra_metrics.items():
+                info(f"{data_fold_name.lower()}-{metric}: {val}")
+
+        if log_metrics_to_mlflow:
+            mlflow.log_metrics(d_extra_metrics)
+
     if log_artifacts_to_mlflow:
         mlflow.log_artifacts(save_path)
-    if remove_files_from_local_path:
-        shutil.rmtree(save_path, ignore_errors=True)
 
     if return_confusion_mx:
         return df_conf_mx
