@@ -109,9 +109,9 @@ class ClusterEmbeddings:
             # **kwargs
     ):
         """"""
-        self.dict_data_embeddings_to_cluster = data_embeddings_to_cluster
-        self.dict_clustering_algo = clustering_algo
-        self.dict_data_text_and_metadata = data_text_and_metadata
+        self.data_embeddings_to_cluster = data_embeddings_to_cluster
+        self.clustering_algo = clustering_algo
+        self.data_text_and_metadata = data_text_and_metadata
 
         self.embeddings_to_cluster = embeddings_to_cluster
         self.n_sample_embedding_rows = n_sample_embedding_rows
@@ -129,7 +129,7 @@ class ClusterEmbeddings:
         # pipeline to store model
         self.pipeline_config = pipeline_config
         self.pipeline = None
-        self.dict_filter_embeddings = filter_embeddings
+        self.filter_embeddings = filter_embeddings
 
         # attributes to save outputs
         self.df_accel = None
@@ -157,12 +157,6 @@ class ClusterEmbeddings:
             self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
             self._set_path_local_model()
-
-            # TODO(djb): fix -- log configs for nested dictionaries
-            #  examples:
-            #   - pipeline input configs
-            #   - clustering algo inputs
-            #   - filter embeddings config
             self._create_and_log_config()
 
             log.info(f"Creating pipeline...")
@@ -171,8 +165,8 @@ class ClusterEmbeddings:
             log.info(f"Loading embeddings...")
             df_embeddings = self._load_embeddings()
 
-            if self.dict_filter_embeddings is not None:
-                if self.dict_filter_embeddings.get('filter_subreddits', False):
+            if self.filter_embeddings is not None:
+                if self.filter_embeddings.get('filter_subreddits', False):
                     log.info(f"-- Loading data to filter SUBREDDITS")
                     df_subs = self._load_metadata_for_filtering()
 
@@ -202,9 +196,8 @@ class ClusterEmbeddings:
 
             self._log_pipeline_to_mlflow()
 
-            # TODO(djb): Get metrics: elbow & "optimal" k's
-            #  Only applies to agg-clustering models
-            # TODO(djb): Create, save & log dendrograms
+            # Linkage and optimal Ks only applies to hierarchical clustering
+            # TODO(djb): need a different method else when using a different cluster type
             self._get_linkage_and_optimal_ks()
             self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
@@ -261,8 +254,8 @@ class ClusterEmbeddings:
             ('cluster', AgglomerativeClustering(n_clusters=30, affinity='euclidean', connectivity=False)),
         ])
         """
-        cls = D_CLUSTER_MODELS[self.dict_clustering_algo['model_name']](
-            **self.dict_clustering_algo['model_kwargs']
+        cls = D_CLUSTER_MODELS[self.clustering_algo['model_name']](
+            **self.clustering_algo['model_kwargs']
         )
         # start with only the clustering algo
         self.pipeline = Pipeline([
@@ -298,8 +291,8 @@ class ClusterEmbeddings:
     def _load_embeddings(self):
         """Load embeddings for clustering"""
         df_embeddings = self.mlf.read_run_artifact(
-            run_id=self.dict_data_embeddings_to_cluster['run_uuid'],
-            artifact_folder=self.dict_data_embeddings_to_cluster[self.embeddings_to_cluster],
+            run_id=self.data_embeddings_to_cluster['run_uuid'],
+            artifact_folder=self.data_embeddings_to_cluster[self.embeddings_to_cluster],
             read_function='pd_parquet',
             cache_locally=True,
         )
@@ -322,12 +315,11 @@ class ClusterEmbeddings:
 
     def _load_metadata_for_filtering(self) -> pd.DataFrame:
         """Load metadata to filter embeddings"""
-        pass
         log.warning(f"** Loading metadata **")
         return LoadSubreddits(
-            bucket_name=self.dict_data_text_and_metadata['bucket_name'],
-            folder_path=self.dict_data_text_and_metadata['folder_subreddits_text_and_meta'],
-            folder_posts=self.dict_data_text_and_metadata['folder_posts_text_and_meta'],
+            bucket_name=self.data_text_and_metadata['bucket_name'],
+            folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
+            folder_posts=self.data_text_and_metadata['folder_posts_text_and_meta'],
             columns=None,
             # col_new_manual_topic=col_manual_labels,
         ).read_apply_transformations_and_merge_post_aggs(
@@ -347,8 +339,8 @@ class ClusterEmbeddings:
         those embeddings very much.
         """
         log.info(f"** Applying filters... **")
-        col_filter_ = self.dict_filter_embeddings['filter_subreddits']['filter_column']
-        min_value = self.dict_filter_embeddings['filter_subreddits']['minimum_column_value']
+        col_filter_ = self.filter_embeddings['filter_subreddits']['filter_column']
+        min_value = self.filter_embeddings['filter_subreddits']['minimum_column_value']
         log.info(f"  {col_filter_} >= {min_value}")
 
         df_embeddings = (
@@ -728,8 +720,8 @@ class ClusterEmbeddings:
 
         if hydra_initialized:
             log.info(f"Using hydra's path")
-            print(f"  Current working directory : {os.getcwd()}")
-            print(f"  Orig working directory    : {get_original_cwd()}")
+            # log.info(f"  Current working directory : {os.getcwd()}")
+            # log.info(f"  Orig working directory    : {get_original_cwd()}")
             self.path_local_model = Path(os.getcwd())
         else:
             # create local path to store artifacts before logging to mlflow
@@ -757,11 +749,13 @@ class ClusterEmbeddings:
         self.config_to_log_and_store = dict()
         for k_, v_ in vars(self).items():
             try:
-                if any([k_.startswith('df_'), k_ == 'mlf', k_ == 'pipeline']):
+                if any([k_.startswith('df_')] +
+                       [k_ == c for c in ['mlf', 'pipeline', 'f_log_file', 'optimal_ks']],
+                       ):
                     # skip dataframes & some objects that aren't params
                     continue
                 elif k_ == 'config_to_log_and_store':
-                    # skip this config file b/c it can lead to weird nested recursion
+                    # skip itself config file b/c it can lead to weird nested recursion
                     continue
                 elif any([isinstance(v_, pd.DataFrame),
                           isinstance(v_, logging.FileHandler),
