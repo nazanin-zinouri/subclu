@@ -1,16 +1,18 @@
 """
 Utilities to standardize getting & logging ML metrics
 """
-from collections import defaultdict
+from collections import defaultdict, Counter
 from logging import info
+import logging
 from pathlib import Path
-from typing import Union
-
+from typing import Union, Optional
 
 import mlflow
 import numpy as np
 import pandas as pd
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
+
+from .mlflow_logger import rename_for_mlflow
 
 
 # TODO(djb): create two separate & streamlined functions:
@@ -21,7 +23,7 @@ def log_precision_recall_fscore_support(
         y_pred: Union[pd.Series, np.array],
         data_fold_name: str,
         beta: Union[float, int] = 1,
-        average: str = 'macro_and_weighted',
+        average: Optional[str] = 'macro_and_weighted',
         class_labels: iter = None,
         col_class_labels: str = 'class',
         save_path: str = None,
@@ -30,6 +32,7 @@ def log_precision_recall_fscore_support(
         log_metrics_to_console: bool = True,
         log_df_to_console: bool = False,
         log_support: bool = False,
+        sort_labels_by_support: bool = False,
 ) -> pd.DataFrame:
     """
     Wrapper around `precision_recall_fscore_support` that includes
@@ -66,6 +69,9 @@ def log_precision_recall_fscore_support(
             whether to log support "metric" - this might not change if we're using
             the same labels on different k (clusters) so it doesn't make sense to log
             all of them
+        sort_labels_by_support:
+            If True, then show the most common y_true labels first (at top).
+            Only gets applied if class_labels=None.
 
     Returns:
         pd.DataFrame with metrics
@@ -90,10 +96,15 @@ def log_precision_recall_fscore_support(
     else:
         # this branch is for getting metrics for each class individually
         d_class_metrics = dict()
-        if class_labels is not None:
-            d_class_metrics[col_class_labels] = class_labels
-        else:
-            d_class_metrics[col_class_labels] = [f'class_{i}' for i in range(len(set(y_true)))]
+        if sort_labels_by_support & (class_labels is None):
+            x = Counter(y_true)
+            # update values in case there are y_pred values missing in y_true
+            x.update(Counter(set(y_pred)))
+            class_labels = [k for k, v in x.most_common()]
+        elif class_labels is None:
+            class_labels = sorted(set(y_true) | set(y_pred))
+
+        d_class_metrics[col_class_labels] = class_labels
         (
             d_class_metrics['precision'],
             d_class_metrics['recall'],
@@ -145,12 +156,55 @@ def log_confusion_matrix(
         save_path: str = None,
         log_artifacts_to_mlflow: bool = False,
         log_df_to_console: bool = False,
+        sort_labels_by_support: bool = False,
 ) -> pd.DataFrame:
     """Wrapper around confusion matrix to save as a dataframe for
-    downstream analysis
+    downstream analysis.
+
+    class_labels:
+        If None is given, labels that appear at least once in y_true
+        or y_pred are used in sorted order.
+
+    sort_labels_by_support:
+        If True, then show the most common y_true labels first (at top).
+        Only gets applied if class_labels=None.
     """
-    # TODO(djb)
-    pass
+    if sort_labels_by_support & (class_labels is None):
+        x = Counter(y_true)
+        # update values in case there are y_pred values missing in y_true
+        x.update(Counter(set(y_pred)))
+        class_labels = [k for k, v in x.most_common()]
+    elif class_labels is None:
+        class_labels = sorted(set(y_true) | set(y_pred))
+
+    conf_mx = confusion_matrix(y_true, y_pred, labels=class_labels)
+
+    try:
+        df_conf_mx = pd.DataFrame(
+            conf_mx,
+            index=class_labels,
+            columns=class_labels
+        )
+    except Exception as er:
+        logging.error(f"Can't save confusion matrix as df\n  {er}")
+        df_conf_mx = pd.DataFrame(
+            conf_mx,
+            index=[rename_for_mlflow(lab) for lab in class_labels],
+            columns=[rename_for_mlflow(lab) for lab in class_labels]
+        )
+
+    if log_df_to_console:
+        info(f"confusion matrix {data_fold_name}:\n{df_conf_mx}")
+
+    if save_path is not None:
+        Path.mkdir(Path(save_path), parents=True, exist_ok=True)
+        df_conf_mx.to_csv(Path(save_path) / f"{data_fold_name}-confusion_matrix.csv",
+                          index=True)
+
+    if log_artifacts_to_mlflow:
+        mlflow.log_artifacts(save_path)
+
+    return df_conf_mx
 
 
 def log_classification_report_and_confusion_matrix(
@@ -158,15 +212,16 @@ def log_classification_report_and_confusion_matrix(
         y_pred: Union[pd.Series, np.array],
         data_fold_name: str,
         beta: Union[float, int] = 1,
-        average: str = 'macro_and_weighted',
         class_labels: iter = None,
+        sort_labels_by_support: bool = True,
         col_class_labels: str = 'class',
         save_path: str = None,
         log_metrics_to_mlflow: bool = True,
         log_artifacts_to_mlflow: bool = False,
         log_metrics_to_console: bool = True,
         log_df_to_console: bool = False,
-        log_support: bool = False,
+        log_support_avg: bool = False,
+        log_support_per_class: bool = False,
 ) -> None:
     """Wrapper around log_precision_recall_fscore_support & log_confusion_matrix
     To run with a single call.
@@ -175,8 +230,58 @@ def log_classification_report_and_confusion_matrix(
     call to reduce the number of times we have to copy/paste shared inputs like:
      - path for saving the data
      - class labels
-
     """
+    # log per-class metrics
+    log_precision_recall_fscore_support(
+        y_true=y_true,
+        y_pred=y_pred,
+        data_fold_name=data_fold_name,
+        beta=beta,
+        average=None,
+        class_labels=class_labels,
+        col_class_labels=col_class_labels,
+        save_path=save_path,
+        log_metrics_to_mlflow=log_metrics_to_mlflow,
+        log_artifacts_to_mlflow=False,
+        log_metrics_to_console=log_metrics_to_console,
+        log_df_to_console=log_df_to_console,
+        log_support=log_support_per_class,
+        sort_labels_by_support=sort_labels_by_support,
+    )
+
+    # log average data
+    log_precision_recall_fscore_support(
+        y_true=y_true,
+        y_pred=y_pred,
+        data_fold_name=data_fold_name,
+        beta=beta,
+        average='macro_and_weighted',
+        class_labels=class_labels,
+        col_class_labels=col_class_labels,
+        save_path=save_path,
+        log_metrics_to_mlflow=log_metrics_to_mlflow,
+        log_artifacts_to_mlflow=False,
+        log_metrics_to_console=log_metrics_to_console,
+        log_df_to_console=log_df_to_console,
+        log_support=log_support_avg,
+        sort_labels_by_support=sort_labels_by_support,
+    )
+
+    log_confusion_matrix(
+        y_true=y_true,
+        y_pred=y_pred,
+        data_fold_name=data_fold_name,
+        class_labels=class_labels,
+        save_path=save_path,
+        log_df_to_console=log_df_to_console,
+        log_artifacts_to_mlflow=False,
+        sort_labels_by_support=sort_labels_by_support,
+    )
+
+    # only make a single call to log artifacts mlflow, instead of one call per item
+    if log_artifacts_to_mlflow:
+        mlflow.log_artifacts(save_path)
+
 
 #
 # ~ fin
