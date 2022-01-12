@@ -36,12 +36,15 @@ from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import (
     MlflowLogger,  # save_pd_df_to_parquet_in_chunks,
-    save_df_and_log_to_mlflow
+    save_df_and_log_to_mlflow,
 )
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
 from ..data.data_loaders import LoadSubreddits  # , LoadPosts
-
+from ..utils.ml_metrics import (
+    log_precision_recall_fscore_support,
+    log_classification_report_and_confusion_matrix,
+)
 from .clustering_utils import (
     create_linkage_for_dendrogram, fancy_dendrogram,
     plot_elbow_and_get_k
@@ -197,7 +200,7 @@ class ClusterEmbeddings:
             self._log_pipeline_to_mlflow()
 
             # Linkage and optimal Ks only applies to hierarchical clustering
-            # TODO(djb): need a different method else when using a different cluster type
+            # TODO(djb): need a different method when using a different cluster type
             self._get_linkage_and_optimal_ks()
             self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
@@ -206,7 +209,6 @@ class ClusterEmbeddings:
             #  - adjusted metrics (rand index, mutual info)
             # TODO(djb):
             #  - TODO(djb) classification report (not implemented)
-            #  - homegeneity
             self._get_cluster_ids_and_labels_and_supervised_metrics(
                 df_embeddings=df_embeddings,
                 df_subs=df_subs,
@@ -580,7 +582,6 @@ class ClusterEmbeddings:
             d_metrics = dict()
             l_cols_predicted = list()
             l_metrics_for_df = list()
-            # val_fill_pred_nulls = 'Meta/Reddit'
 
             log.info(f"-- Get true labels & metrics --")
             # use list of optimal k's to log
@@ -611,7 +612,6 @@ class ClusterEmbeddings:
                     )
 
                     # Create new predicted column
-                    # TODO(djb) instead of "predicted" change it to "majority" or similar
                     col_pred_ = f"{k_col_prefix}_majority_{c_tl}"
                     l_cols_predicted.append(col_pred_)
                     self.df_labels_ = self.df_labels_.merge(
@@ -629,22 +629,44 @@ class ClusterEmbeddings:
                     # Should be rare, but fill just in case?
                     # self.df_labels_[col_pred_] = self.df_labels_[col_pred_].fillna(val_fill_pred_nulls)
 
-                    # =====================
-                    # Classification report
-                    # ===
-                    #         print(
-                    #             classification_report(
-                    #                 y_true=self.df_labels_[mask_not_null_gt][c_tl],
-                    #                 y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
-                    #                 zero_division=0,
-                    #             )
-                    #         )
-
+                    # store metrics for this k in this dict & combine all of them in a df later
                     d_metrics_this_split = {
                         'predicted_col': col_cls_labels,
                         'truth_col': c_tl,
                         'k': k_int,
                     }
+                    # =====================
+                    # Classification report
+                    # ===
+                    # Log aggregate classification scores for all K's so we can compare & plot them
+                    d_metrics_this_split.update(
+                        log_precision_recall_fscore_support(
+                            y_true=self.df_labels_[mask_not_null_gt][c_tl],
+                            y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            data_fold_name=f"k_int",
+                            beta=1,
+                            average='macro_and_weighted',
+                            class_labels=None,
+                            save_path=None,
+                            log_metrics_to_console=False,
+                            log_metrics_to_mlflow=False,
+                            log_artifacts_to_mlflow=False,
+                            log_df_to_console=False,
+                            log_support=False,
+                            output_dict=True,
+                            append_fold_name_to_output_dict=False,
+                        )
+                    )
+
+
+
+                    # Save confusion matrices & per-class metrics only for optimal K's
+                    # if k_int in d_optimal_ks_lookup.keys():
+
+
+                    # ===============
+                    # Other metrics
+                    # ===
                     for m_name, metric_ in D_CLUSTER_METRICS_WITH_KNOWN_LABELS.items():
                         try:
                             d_metrics_this_split[m_name] = metric_(
@@ -657,6 +679,7 @@ class ClusterEmbeddings:
                                 labels_pred=self.df_labels_[mask_not_null_gt][col_pred_],
                             )
 
+                        # Only log to MLflow metrics for optimal Ks
                         if k_int in d_optimal_ks_lookup.keys():
                             mlflow.log_metric(
                                 f"{c_tl}-{d_optimal_ks_lookup[k_int]}-{m_name}",
@@ -684,23 +707,14 @@ class ClusterEmbeddings:
                 df_plot = self.df_supervised_metrics_[
                     self.df_supervised_metrics_['truth_col'] == tc_val
                 ]
-                fig = plt.figure(figsize=(14, 8))
-                for c_ in [c for c in self.df_supervised_metrics_.columns if c.endswith('_score')]:
+                for metrics_group in ['_score', '_avg']:
+                    self._plot_metric_scores(
+                        df_plot=df_plot,
+                        true_col=tc_val,
+                        metric_cols_suffix=metrics_group,
+                        save_path=folder_full_,
+                    )
 
-                    sns.lineplot(data=df_plot, x='k', y=c_,
-                                 label=c_)
-
-                plt.title(f"Scores for: {tc_val}")
-                plt.ylabel(f"score")
-                plt.xlabel(f"k (number of clusters)")
-                plt.savefig(
-                    folder_full_ / (
-                        f"metrics_for_known_labels-{tc_val}.png"
-                    ),
-                    dpi=200, bbox_inches='tight', pad_inches=0.2
-                )
-                plt.close(fig)
-                del fig
             mlflow.log_artifacts(folder_full_, artifact_path=folder_)
 
         save_df_and_log_to_mlflow(
@@ -709,6 +723,53 @@ class ClusterEmbeddings:
             subfolder='df_labels',
             index=True,
         )
+
+    def _plot_metric_scores(
+            self,
+            df_plot: pd.DataFrame,
+            true_col: str,
+            metric_cols_suffix: str,
+            save_path: Path,
+    ):
+        """Plot metric scores at different k-values
+        Since we'll be plotting a lot of different metrics, better to use it to split into
+        two plots:
+        - one for clustering metrics (homogeneity, adjusted mutual info, adjusted rand score)
+        - another one for classification metrics (precision, recall, f1)
+        """
+        fig = plt.figure(figsize=(14, 8))
+
+        if metric_cols_suffix == '_score':
+            save_suffix = 'clustering'
+        elif metric_cols_suffix == '_avg':
+            save_suffix = 'classification'
+        else:
+            raise NotImplementedError
+
+        # only plot cols known to end in a metric suffix
+        metric_cols = [
+            c for c in self.df_supervised_metrics_.columns if
+            c.endswith(metric_cols_suffix)
+        ]
+        # legend order will be based on order that column was aded to plot
+        #  We can make it easier to read by adding metrics in ascending order
+        metric_cols = df_plot[metric_cols].max().sort_values(ascending=False).index.to_list()
+        for c_ in metric_cols:
+            sns.lineplot(data=df_plot, x='k', y=c_,
+                         label=c_)
+
+        plt.title(f"Scores for: {true_col}")
+        plt.ylabel(f"score")
+        plt.xlabel(f"k (number of clusters)")
+        plt.savefig(
+            save_path / (
+                f"metrics_for_known_labels-{true_col}-{save_suffix}.png"
+            ),
+            dpi=200, bbox_inches='tight', pad_inches=0.2
+        )
+        plt.show()
+        plt.close(fig)
+        del fig
 
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
