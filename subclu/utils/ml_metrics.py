@@ -5,7 +5,7 @@ from collections import defaultdict, Counter
 from logging import info
 import logging
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, Dict
 
 import mlflow
 import numpy as np
@@ -33,7 +33,9 @@ def log_precision_recall_fscore_support(
         log_df_to_console: bool = False,
         log_support: bool = False,
         sort_labels_by_support: bool = False,
-) -> pd.DataFrame:
+        append_fold_name_to_output_dict: bool = True,
+        output_dict: bool = False,
+) -> Union[pd.DataFrame, Dict[str, float]]:
     """
     Wrapper around `precision_recall_fscore_support` that includes
     - logging metrics to mlflow & console
@@ -72,9 +74,11 @@ def log_precision_recall_fscore_support(
         sort_labels_by_support:
             If True, then show the most common y_true labels first (at top).
             Only gets applied if class_labels=None.
+        output_dict:
+            If True, return a dictionary with metrics. Otherwise return a df
 
     Returns:
-        pd.DataFrame with metrics
+        pd.DataFrame or dict with metrics
     """
     if average in ['macro_and_weighted', 'macro', 'weighted']:
         d_class_metrics = defaultdict(list)
@@ -114,10 +118,9 @@ def log_precision_recall_fscore_support(
                                             labels=class_labels, zero_division=0,
                                             average=average)
 
-    # TODO(djb): is it worth addin NPV, PPV, and other metrics in case of binary classification?
-
     df = pd.DataFrame(d_class_metrics)
 
+    d_output_metrics = dict()
     for metric_ in [k for k in d_class_metrics.keys() if k != col_class_labels]:
         if all([not log_support, metric_ == 'support']):
             # support should be constant for many cases, so only log it when
@@ -125,6 +128,14 @@ def log_precision_recall_fscore_support(
             continue
         for class_, val_ in zip(d_class_metrics[col_class_labels], d_class_metrics[metric_]):
             metric_name = f"{metric_}-{class_}-{data_fold_name}"
+            # Note that output dict and (console & mlflow) metrics may have different names!
+            #  We sometimes want to keep the metric name constant and store the fold in a different
+            #  column
+            if append_fold_name_to_output_dict:
+                d_output_metrics[metric_name] = val_
+            else:
+                d_output_metrics[f"{metric_}-{class_}"] = val_
+
             if log_metrics_to_console:
                 info(f"{metric_name}: {val_}")
             if log_metrics_to_mlflow:
@@ -145,7 +156,10 @@ def log_precision_recall_fscore_support(
     if log_artifacts_to_mlflow:
         mlflow.log_artifacts(save_path)
 
-    return df
+    if output_dict:
+        return d_output_metrics
+    else:
+        return df
 
 
 def log_confusion_matrix(
@@ -222,6 +236,7 @@ def log_classification_report_and_confusion_matrix(
         log_df_to_console: bool = False,
         log_support_avg: bool = False,
         log_support_per_class: bool = False,
+        output_dict: bool = True,
 ) -> None:
     """Wrapper around log_precision_recall_fscore_support & log_confusion_matrix
     To run with a single call.

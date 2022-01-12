@@ -7,7 +7,6 @@ from sklearn.cluster import KMeans, DBSCAN, OPTICS, AgglomerativeClustering
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import Normalizer
 from sklearn.metrics import (
-    classification_report,
     adjusted_mutual_info_score, adjusted_rand_score,
     homogeneity_score,
 )
