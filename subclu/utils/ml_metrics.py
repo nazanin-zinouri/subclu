@@ -267,7 +267,7 @@ def log_classification_report_and_confusion_matrix(
         sort_labels_by_support=sort_labels_by_support,
     )
 
-    log_confusion_matrix(
+    df_conf_mx = log_confusion_matrix(
         y_true=y_true,
         y_pred=y_pred,
         data_fold_name=data_fold_name,
@@ -281,6 +281,29 @@ def log_classification_report_and_confusion_matrix(
     # only make a single call to log artifacts mlflow, instead of one call per item
     if log_artifacts_to_mlflow:
         mlflow.log_artifacts(save_path)
+
+    # Add PPV & NPV calculation, this is expected to only work for binary classification
+    if len(df_conf_mx) == 2:
+        try:
+            tn, fp, fn, tp = df_conf_mx.to_numpy().ravel()
+            d_extra_metrics = {
+                f"{data_fold_name.lower()}-ppv": (tp / (tp + fp)),
+                f"{data_fold_name.lower()}-npv": (tn / (tn + fn)),
+
+                f"{data_fold_name.lower()}-tn": tn,
+                f"{data_fold_name.lower()}-fp": fp,
+                f"{data_fold_name.lower()}-fn": fn,
+                f"{data_fold_name.lower()}-tp": tp,
+            }
+
+            if log_metrics_to_console:
+                for metric, val in d_extra_metrics.items():
+                    info(f"{metric}: {val}")
+
+            if log_metrics_to_mlflow:
+                mlflow.log_metrics(d_extra_metrics)
+        except Exception as er:
+            logging.error(f"Can't log binary metrics: {er}")
 
 
 #
