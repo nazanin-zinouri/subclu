@@ -33,6 +33,7 @@ from ..utils.mlflow_logger import MlflowLogger, save_pd_df_to_parquet_in_chunks
 from ..utils import mlflow_logger
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time, value_counts_and_pcts
+from ..utils.tqdm_logger import LogTQDM
 
 
 class AggregateEmbeddings:
@@ -135,6 +136,7 @@ class AggregateEmbeddings:
             df_comments_meta:
             calculate_similarites:
             logs_path:
+                this should be a file or subfolder inside the job's run
             unique_checks:
             calculate_b_agg: whether to calculate post + comment aggregation (and simliarities)
                 Set to False by default b/c it takes a long time to calculate
@@ -196,7 +198,7 @@ class AggregateEmbeddings:
         self.calculate_b_agg_posts_and_comments = calculate_b_agg_posts_and_comments
 
         # Save logs here
-        self.logs_path = logs_path
+        self.f_log_file = None
 
         # When sampling, set this to True to compute unique checks
         self.unique_checks = unique_checks
@@ -233,16 +235,30 @@ class AggregateEmbeddings:
         self.df_subs_agg_b_similarity_top_pair = None
         self.df_subs_agg_c_similarity_top_pair = None
 
+    def _init_path_local_model(self) -> None:
+        """Create the default path to log local artifacts from where we'll upload to mlflow"""
+        if self.path_local_model is None:
+            self.path_local_model = get_project_subfolder(
+                f"data/models/aggregate_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{self.run_name}"
+            )
+            Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
+            info(f"  Local model saving directory: {self.path_local_model}")
+        else:
+            info(f"  Local model saving directory already exists: {self.path_local_model}")
+
     def _init_file_log(self) -> None:
-        """Create a file & FileHandler to log data"""
+        """Create a file & FileHandler to log data
+        This gets called AFTER creating the path_local_model
+        """
         # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
-        if self.logs_path is not None:
+        if self.path_local_model is None:
+            self._init_path_local_model()
+
+        if self.f_log_file is None:
             logger = logging.getLogger()
 
-            path_logs = Path(self.logs_path)
-            Path.mkdir(path_logs, parents=False, exist_ok=True)
             self.f_log_file = str(
-                path_logs /
+                self.path_local_model /
                 f"{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}_{self.run_name}.log"
             )
 
@@ -277,8 +293,11 @@ class AggregateEmbeddings:
           re-run embeddings process on old posts, only need to update new posts (and give less weight to old posts)
           right?
         """
+        self._init_path_local_model()
+
         # set & add logger for file
         self._init_file_log()
+
         t_start_agg_embed = datetime.utcnow()
         info(f"== Start run_aggregation() method ==")
 
@@ -291,12 +310,7 @@ class AggregateEmbeddings:
         self.mlf.log_cpu_count()
         self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
-        # create local path to store artifacts before logging to mlflow
-        self.path_local_model = get_project_subfolder(
-            f"data/models/aggregate_embeddings/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}-{self.run_name}"
-        )
-        Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
-        info(f"  Local model saving directory: {self.path_local_model}")
+
 
         # Log configuration so we can replicate run
         self._create_and_log_config()
@@ -307,6 +321,7 @@ class AggregateEmbeddings:
         # ---
         self._load_raw_embeddings()
         self.mlf.log_ram_stats(only_memory_used=True)
+        self._send_log_file_to_mlflow()
 
         # ---------------------
         # Load metadata from files
@@ -318,6 +333,7 @@ class AggregateEmbeddings:
         # ---
         self._load_metadata()
         self.mlf.log_ram_stats(only_memory_used=True)
+        self._send_log_file_to_mlflow()
 
         # Filter out short comments using metadata
         # ---
@@ -343,6 +359,7 @@ class AggregateEmbeddings:
         # ---
         self._agg_comments_to_post_level()
         self.mlf.log_ram_stats(only_memory_used=True)
+        self._send_log_file_to_mlflow()
 
         # ---------------------
         # Merge at post-level basic
@@ -359,6 +376,7 @@ class AggregateEmbeddings:
 
         self._agg_posts_comments_and_sub_descriptions_to_post_level()
         self.mlf.log_ram_stats(only_memory_used=True)
+        self._send_log_file_to_mlflow()
 
         # ---------------------
         # TODO(djb): Merge at post-level with subreddit lag
@@ -393,6 +411,7 @@ class AggregateEmbeddings:
         # TODO(djb): log and save C) before B or A (C is what gives the best outputs)
         self._save_and_log_aggregate_and_similarity_dfs()
         self.mlf.log_ram_stats(only_memory_used=True)
+        self._send_log_file_to_mlflow()
 
         # ---------------------
         # Calculate subreddit similarity/distance
@@ -894,8 +913,10 @@ class AggregateEmbeddings:
         # ETA for ~468k posts is 8 minutes
         #  ETA for 7 million posts: 2.5 hours, just on this aggregation step...
         d_weighted_mean_agg = dict()
-        for id_, df in tqdm(df_posts_for_weights.groupby('post_id'),
-                            ascii=True, ncols=80, position=0, mininterval=3):
+        for id_, df in LogTQDM(
+                df_posts_for_weights.groupby('post_id'),
+                ascii=True, ncols=80, position=0, mininterval=3
+        ):
             d_weighted_mean_agg[id_] = np.average(
                 df[self.l_embedding_cols],
                 weights=df[col_weights],
