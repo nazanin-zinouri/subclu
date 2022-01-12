@@ -113,6 +113,7 @@ class MlflowLogger:
             'v0.4.1_mUSE_aggregates',
             'v0.4.1_mUSE_clustering_test',
             'v0.4.1_mUSE_clustering',
+            'v0.4.1_mUSE_clustering_new_metrics',
 
         ]
         for i, exp in enumerate(l_experiments):

@@ -21,7 +21,7 @@ filter_embeddings:
     minimum_column_value: 3
 
 mlflow_tracking_uri: 'sqlite'
-mlflow_experiment_name: 'v0.4.1_mUSE_clustering'  # 'v0.4.1_mUSE_clusteringtest'
+mlflow_experiment_name: 'v0.4.1_mUSE_clustering_new_metrics'  # 'v0.4.1_mUSE_clustering_test'
 
 pipeline_config:
   # If normalize=True then cosine_distance=(normalize + euclidean distance)
