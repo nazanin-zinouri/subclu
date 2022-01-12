@@ -589,6 +589,12 @@ class ClusterEmbeddings:
             for interval_, d_ in self.optimal_ks.items():
                 d_optimal_ks_lookup[d_['k']] = interval_
 
+            # create folder to save supervised artifacts
+            folder_ = 'df_supervised_metrics'
+            folder_full_ = self.path_local_model / folder_
+            folder_classifxn_ = 'df_classification_reports'
+            folder_classifxn_full_ = self.path_local_model / folder_classifxn_
+
             for col_cls_labels in LogTQDM(
                     [c for c in self.df_labels_.columns if c.endswith(label_col_suffix)],
                     mininterval=.8,
@@ -638,18 +644,43 @@ class ClusterEmbeddings:
                     # =====================
                     # Classification report
                     # ===
-                    # Log aggregate classification scores for all K's so we can compare & plot them
+                    # Save confusion matrices & per-class metrics only for optimal K's
+                    if k_int in d_optimal_ks_lookup.keys():
+                        data_fold_name_ = f"{c_tl}-{d_optimal_ks_lookup[k_int]}"
+                        log_clf_metrics_to_mlflow_ = True
+                        log_classification_report_and_confusion_matrix(
+                            y_true=self.df_labels_[mask_not_null_gt][c_tl],
+                            y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            data_fold_name=f"{c_tl}-{d_optimal_ks_lookup[k_int]}-{k_int}",
+                            beta=1,
+                            class_labels=None,
+                            sort_labels_by_support=True,
+                            save_path=folder_classifxn_full_,
+                            log_metrics_to_console=False,
+                            log_df_to_console=False,
+                            log_metrics_to_mlflow=False,
+                            log_artifacts_to_mlflow=False,
+                            log_support_avg=True,
+                            log_support_per_class=True,
+                        )
+                    else:
+                        data_fold_name_ = f"{c_tl}-{k_int}"
+                        log_clf_metrics_to_mlflow_ = False
+
+                    # Save aggregate classification scores for all K's so we can compare & plot them
+                    #  Only log to mlflow optimal k's (see check above)
                     d_metrics_this_split.update(
                         log_precision_recall_fscore_support(
                             y_true=self.df_labels_[mask_not_null_gt][c_tl],
                             y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
-                            data_fold_name=f"k_int",
+                            data_fold_name=data_fold_name_,
+                            append_fold_name_as_metric_prefix=True,
                             beta=1,
                             average='macro_and_weighted',
                             class_labels=None,
                             save_path=None,
                             log_metrics_to_console=False,
-                            log_metrics_to_mlflow=False,
+                            log_metrics_to_mlflow=log_clf_metrics_to_mlflow_,
                             log_artifacts_to_mlflow=False,
                             log_df_to_console=False,
                             log_support=False,
@@ -657,12 +688,6 @@ class ClusterEmbeddings:
                             append_fold_name_to_output_dict=False,
                         )
                     )
-
-
-
-                    # Save confusion matrices & per-class metrics only for optimal K's
-                    # if k_int in d_optimal_ks_lookup.keys():
-
 
                     # ===============
                     # Other metrics
@@ -691,8 +716,6 @@ class ClusterEmbeddings:
             log.info(f"{self.df_supervised_metrics_.shape} <- df_supervised metrics shape")
 
             log.info(f"  Saving df_supervised_metrics...")
-            folder_ = 'df_supervised_metrics'
-            folder_full_ = self.path_local_model / folder_
             save_df_and_log_to_mlflow(
                 df=self.df_supervised_metrics_,
                 path=self.path_local_model,
@@ -715,7 +738,11 @@ class ClusterEmbeddings:
                         save_path=folder_full_,
                     )
 
+            # Log general supervised metrics
             mlflow.log_artifacts(folder_full_, artifact_path=folder_)
+
+            # Log classification report dataframes
+            mlflow.log_artifacts(folder_classifxn_full_, folder_classifxn_)
 
         save_df_and_log_to_mlflow(
             df=self.df_labels_,
