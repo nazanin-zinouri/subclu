@@ -22,6 +22,7 @@ def log_precision_recall_fscore_support(
         y_true: Union[pd.Series, np.array],
         y_pred: Union[pd.Series, np.array],
         data_fold_name: str,
+        append_fold_name_as_metric_prefix: bool = False,
         beta: Union[float, int] = 1,
         average: Optional[str] = 'macro_and_weighted',
         class_labels: iter = None,
@@ -127,7 +128,11 @@ def log_precision_recall_fscore_support(
             #  requested explicitly
             continue
         for class_, val_ in zip(d_class_metrics[col_class_labels], d_class_metrics[metric_]):
-            metric_name = f"{metric_}-{class_}-{data_fold_name}"
+            if append_fold_name_as_metric_prefix:
+                # fold name in prefix matches the expected output in clustering jobs
+                metric_name = f"{data_fold_name}-{metric_}-{class_}"
+            else:
+                metric_name = f"{metric_}-{class_}-{data_fold_name}"
             # Note that output dict and (console & mlflow) metrics may have different names!
             #  We sometimes want to keep the metric name constant and store the fold in a different
             #  column
