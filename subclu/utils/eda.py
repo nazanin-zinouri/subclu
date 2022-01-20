@@ -552,6 +552,8 @@ def style_df_numeric(
 
     native_int_cols = {c for c in df.select_dtypes(include=['int']).columns}
     all_num_cols = {c for c in df.select_dtypes('number').columns} - native_int_cols
+    # TODO(djb): calculate set of int & pct cols by label upfront & then exclude int_cols & pct_cols
+    #  from them so that int_cols & pct_cols always override int_labels & pct_labels
 
     if int_cols is True:
         int_cols = set(all_num_cols)

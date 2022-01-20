@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 from pathlib import Path
+from typing import Union
 
 import joblib
 import mlflow
@@ -35,7 +36,7 @@ from sklearn.pipeline import Pipeline
 from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import (
-    MlflowLogger,  # save_pd_df_to_parquet_in_chunks,
+    MlflowLogger,
     save_df_and_log_to_mlflow,
 )
 from ..utils import get_project_subfolder
@@ -59,10 +60,26 @@ log = logging.getLogger(__name__)
 
 
 @hydra.main(config_path='../config', config_name="clustering_v0.4.1_subreddit_base")
-def cluster_embeddings(cfg: DictConfig) -> object:
+def cluster_embeddings(
+        cfg: DictConfig,
+        return_object: bool = False
+) -> Union[None, object]:
     """
     The hydra runner will call the clustering class and apply all the needed
     hyperparameters
+    Note: by default we DO NOT return the cluster object because at some point around
+       December something changed and we started getting a joblib/hydra error
+
+    Args:
+        cfg: hydra/omegaconf dictionary configuration
+
+        return_object:
+            whether to return the clustering object. By default, set to False
+            because setting to True can result in errors when doing multi-run
+
+    Returns:
+        By default, set to False
+            because setting to True can result in errors when doing multi-run
     """
     print(f"CFG keys: {cfg.keys()}")
 
@@ -85,7 +102,30 @@ def cluster_embeddings(cfg: DictConfig) -> object:
     )
 
     cluster.run_clustering()
-    return cluster
+
+    if return_object:
+        return cluster
+
+    """
+    Error from hydra/joblib in multi-run details.
+    Fix for now by returning None (nothing)
+    ```
+    Traceback (most recent call last):
+      File "/opt/conda/lib/python3.7/site-packages/hydra/_internal/utils.py", line 211, in run_and_report
+        return func()
+      File "/opt/conda/lib/python3.7/site-packages/hydra/_internal/hydra.py", line 139, in multirun
+        ret = sweeper.sweep(arguments=task_overrides)
+      File "/opt/conda/lib/python3.7/site-packages/hydra/_internal/core_plugins/basic_sweeper.py", line 157, in sweep
+        results = self.launcher.launch(batch, initial_job_idx=initial_job_idx)
+      File "/opt/<same_as_above>/site-packages/hydra_plugins/hydra_joblib_launcher/joblib_launcher.py", line 46, in launch
+      ...
+      File "/opt/conda/lib/python3.7/concurrent/futures/_base.py", line 435, in result
+        return self.__get_result()
+      File "/opt/conda/lib/python3.7/concurrent/futures/_base.py", line 384, in __get_result
+        raise self._exception
+      TypeError: can't pickle _thread.RLock objects
+    ```
+    """
 
 
 class ClusterEmbeddings:
@@ -207,8 +247,6 @@ class ClusterEmbeddings:
             # Use the majority label for a cluster to compute supervised metrics
             #  We can use these to compare and find the "best" clusters:
             #  - adjusted metrics (rand index, mutual info)
-            # TODO(djb):
-            #  - TODO(djb) classification report (not implemented)
             self._get_cluster_ids_and_labels_and_supervised_metrics(
                 df_embeddings=df_embeddings,
                 df_subs=df_subs,
@@ -227,22 +265,26 @@ class ClusterEmbeddings:
             mlflow.log_metric('vectorizing_time_minutes',
                               total_fxn_time / timedelta(minutes=1)
                               )
-            log.info(f"=== END clustering ===")
-            self.mlf.log_ram_stats(param=False, only_memory_used=True)
-            log.info(f"  Uploading logs to mlflow...")
-            l_logs = list(Path(os.getcwd()).glob('*.log'))
-            for f_ in l_logs:
-                try:
-                    mlflow.log_artifact(str(f_))
-                except Exception as e:
-                    log.error(f"Couldn't log file: {f_}\n  {e}")
-            mlflow.end_run()
+            log.info(f"--- END clustering metrics---")
 
-        try:
-            log.info(f"    Removing fileHandler...")
-            self._remove_file_logger()
-        except Exception as er:
-            log.error(f"Couldn't remove file logger\n {er}")
+            log.info(f"  Uploading logs to mlflow...")
+            try:
+                self.mlf.log_ram_stats(param=False, only_memory_used=True)
+                l_logs = list(Path(os.getcwd()).glob('*.log'))
+                for f_ in l_logs:
+                    try:
+                        mlflow.log_artifact(str(f_))
+                    except Exception as e:
+                        log.error(f"Couldn't log file: {f_}\n  {e}")
+            except Exception as er:
+                logging.error(f" Could not upload logs to mlflow {er}")
+
+            # no need for mlflow.end_run() because we're running in a `with ...` block context
+
+        # Remove fileHandler to prevent edge case: one file captures logs from multiple runs
+        self._remove_file_logger()
+
+        logging.info(f"=== END clustering full job ===")
 
     def _create_pipeline(self):
         """Create pipeline with steps from pipeline config
@@ -412,7 +454,7 @@ class ClusterEmbeddings:
                 ),
                 dpi=200, bbox_inches='tight', pad_inches=0.2
             )
-            plt.show()  # show AFTER saving, otherwise we'll save an empty plot
+            # plt.show()  # show AFTER saving, otherwise we'll save an empty plot
             plt.close(fig)
             del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
@@ -477,7 +519,7 @@ class ClusterEmbeddings:
                     ),
                     dpi=200, bbox_inches='tight', pad_inches=0.2
                 )
-                plt.show()
+                # plt.show()
                 plt.close(fig)
                 del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
@@ -598,10 +640,11 @@ class ClusterEmbeddings:
             for col_cls_labels in LogTQDM(
                     [c for c in self.df_labels_.columns if c.endswith(label_col_suffix)],
                     mininterval=.8,
+                    desc='select k-values',
             ):
                 k_int = int(col_cls_labels.replace(label_col_suffix, '').replace(label_col_prefix, ''))
                 k_col_prefix = col_cls_labels.replace(label_col_suffix, '')
-                log.info(f"  k: {k_col_prefix}")
+                # log.info(f"  k: {k_col_prefix}")
 
                 d_df_crosstab_labels[col_cls_labels] = dict()
                 d_metrics[col_cls_labels] = dict()
@@ -877,7 +920,7 @@ class ClusterEmbeddings:
 
     def _init_file_log(self) -> None:
         """Create a file & FileHandler to log data"""
-        # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
+        # TODO(djb): make sure to remove fileHandler after job completes run_aggregation()
         if self.logs_path is not None:
             logger = logging.getLogger()
 
@@ -902,12 +945,18 @@ class ClusterEmbeddings:
         """After completing job, remove logging handler to prevent
         info from other jobs getting logged to the same log file
         """
-        if self.fileHandler is not None:
-            logger = logging.getLogger()
-            try:
-                logger.removeHandler(self.fileHandler)
-            except Exception as e:
-                logging.warning(f"Can't remove logger\n{e}")
+        try:
+            log.info(f"    Removing fileHandler...")
+            if self.fileHandler is not None:
+                logger = logging.getLogger()
+                try:
+                    logger.removeHandler(self.fileHandler)
+                except Exception as e:
+                    logging.error(f"Can't remove logger\n{e}")
+            else:
+                logging.info(f"There is NO fileHandler to remove")
+        except Exception as er:
+            logging.error(f"Can't remove file logger\n {er}")
 
 
 if __name__ == "__main__":
