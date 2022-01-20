@@ -9,7 +9,7 @@ DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and No
 
 -- Setting lower includes more subreddits, do EDA to figure out what's a good threshold
 --  b/c some general subs (soccer, cricket) wouldn't show up as relevent b/c their country visits are split between too many countries
-DECLARE min_pct_country NUMERIC DEFAULT 0.002;
+DECLARE MIN_USERS_IN_SUBREDDIT_FROM_COUNTRY NUMERIC DEFAULT 9;
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_pct_of_country_20211214`
 AS (
@@ -48,7 +48,7 @@ AS (
             )
             GROUP BY 1
         ),
-        -- Add count of users PER COUNTRY
+        -- Add count of users in subreddit PER COUNTRY
         geo_sub AS (
             SELECT
                 -- tot.pt
@@ -87,7 +87,7 @@ AS (
                 , SAFE_DIVIDE(users_in_subreddit_from_country, total_users_in_country) AS users_percent_by_country
                 , SAFE_DIVIDE(users_in_subreddit_from_country, total_users_in_subreddit) AS users_percent_by_subreddit
             FROM geo_sub
-            WHERE SAFE_DIVIDE(users_in_subreddit_from_country, total_users_in_country) >= min_pct_country
+            WHERE users_in_subreddit_from_country >= MIN_USERS_IN_SUBREDDIT_FROM_COUNTRY
         ),
         -- Merge with subreddit_lookup for additional filters
         --  Add country names (instead of only codes)
