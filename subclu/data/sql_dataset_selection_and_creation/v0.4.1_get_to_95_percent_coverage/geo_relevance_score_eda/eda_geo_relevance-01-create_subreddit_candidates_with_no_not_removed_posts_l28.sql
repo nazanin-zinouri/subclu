@@ -9,14 +9,12 @@
 --   - over 4 non-removed posts
 -- Companion table to: subclu_geo_subreddit_candidates_20211214
 
-DECLARE partition_date DATE DEFAULT '2021-12-15';
-DECLARE GEO_PT_START DATE DEFAULT '2021-11-30';
-DECLARE GEO_PT_END DATE DEFAULT '2021-12-14';
+DECLARE PARTITION_DATE DATE DEFAULT '2022-01-22';
 
 DECLARE MIN_USERS_L7 NUMERIC DEFAULT 1;
 DECLARE MIN_POSTS_L28_NOT_REMOVED NUMERIC DEFAULT 1;
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_geo_subreddit_candidates_posts_no_removed_20211214`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_geo_subreddit_candidates_posts_no_removed_20220122`
 AS (
     WITH
         subs_with_views_and_posts_raw AS (
@@ -32,7 +30,7 @@ AS (
                 LEFT JOIN (
                         SELECT *
                         FROM `data-prod-165221.cnc.successful_posts`
-                        WHERE (dt) BETWEEN (partition_date - 29) AND partition_date
+                        WHERE (dt) BETWEEN (PARTITION_DATE - 29) AND partition_date
                             AND removed = 0
                     ) AS sp
                         ON LOWER(asr.subreddit_name) = (sp.subreddit_name)
@@ -44,16 +42,13 @@ AS (
             WHERE
                 users_l7 >=MIN_USERS_L7
                 AND posts_not_removed_l28 >= MIN_POSTS_L28_NOT_REMOVED
-
         )
 
     SELECT
         *
         , partition_date
-        , GEO_PT_START
-        , GEO_PT_END
+        , (partition_date - 29) AS successful_post_start_date
     FROM subs_above_view_and_post_threshold
     ORDER BY users_l7, posts_not_removed_l28
 )
 ;
-
