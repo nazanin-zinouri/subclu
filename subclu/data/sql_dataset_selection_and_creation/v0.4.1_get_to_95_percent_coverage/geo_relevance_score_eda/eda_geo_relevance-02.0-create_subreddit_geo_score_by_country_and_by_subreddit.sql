@@ -1,17 +1,17 @@
 -- Get new geo-relevance score: % DAU per country (instead of per subreddit)
 --  The table actually calculates both scores so we can compare side by side
 
-DECLARE partition_date DATE DEFAULT '2021-12-15';
-DECLARE GEO_PT_START DATE DEFAULT '2021-11-30';
-DECLARE GEO_PT_END DATE DEFAULT '2021-12-14';
+DECLARE PARTITION_DATE DATE DEFAULT '2022-01-22';
+DECLARE GEO_PT_START DATE DEFAULT PARTITION_DATE - 29;
 
 DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and Northern Ireland| of America|";
 
 -- Setting lower includes more subreddits, do EDA to figure out what's a good threshold
 --  b/c some general subs (soccer, cricket) wouldn't show up as relevent b/c their country visits are split between too many countries
-DECLARE MIN_USERS_IN_SUBREDDIT_FROM_COUNTRY NUMERIC DEFAULT 9;
+-- Previously we had a minimum of 45 users for geo-relevant subs, so 5/45 = 11.1%, 4/45 = 8.89%, 3/45 = 6.67%
+DECLARE MIN_USERS_IN_SUBREDDIT_FROM_COUNTRY NUMERIC DEFAULT 3;
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_pct_of_country_20211214`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_pct_of_country_20220122`
 AS (
     WITH
         -- Get count of all users for each subreddit
@@ -21,7 +21,7 @@ AS (
                 subreddit_name,
                 SUM(l1) AS total_users_in_subreddit
             FROM `data-prod-165221.all_reddit.all_reddit_subreddits_daily` arsub
-            WHERE pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(GEO_PT_END)
+            WHERE pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(PARTITION_DATE)
                 AND subreddit_name IS NOT NULL
             GROUP BY subreddit_name
         ),
@@ -42,13 +42,13 @@ AS (
                 -- arsub gives us info at subreddit_id + user_id
                 --  so we need stop double counting by grouping by user_id + country
                 FROM `data-prod-165221.all_reddit.all_reddit_subreddits_daily` arsub
-                WHERE arsub.pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(GEO_PT_END)
+                WHERE arsub.pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(PARTITION_DATE)
                     AND l1 = 1
                 GROUP BY arsub.geo_country_code, arsub.user_id
             )
             GROUP BY 1
         ),
-        -- Add count of users in subreddit PER COUNTRY
+        -- Add count of users in subreddit PER COUNTRY & PER SUBREDDIT
         geo_sub AS (
             SELECT
                 -- tot.pt
@@ -69,7 +69,7 @@ AS (
             LEFT JOIN tot_subreddit AS tot2
                 ON arsub.subreddit_name = tot2.subreddit_name
 
-            WHERE arsub.pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(GEO_PT_END)
+            WHERE arsub.pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(PARTITION_DATE)
 
             GROUP BY
                 arsub.subreddit_name, arsub.geo_country_code, tot.total_users_in_country,
@@ -107,11 +107,11 @@ AS (
                 , cm.region AS geo_region
                 , r.users_percent_by_country
                 , r.users_percent_by_subreddit
+                , r.users_in_subreddit_from_country
                 , r.total_users_in_country
                 , r.total_users_in_subreddit
-                , r.users_in_subreddit_from_country
-                , GEO_PT_START   AS views_dt_start
-                , GEO_PT_END     AS views_dt_end
+                , GEO_PT_START AS views_dt_start
+                , PARTITION_DATE        AS views_dt_end
                 , over_18
                 , verdict
                 , type
@@ -120,7 +120,7 @@ AS (
             INNER JOIN (
                 SELECT *
                 FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-                WHERE dt = DATE(GEO_PT_END)
+                WHERE dt = DATE(PARTITION_DATE)
             ) AS s
                 ON LOWER(r.subreddit_name) = LOWER(s.name)
 
@@ -141,12 +141,16 @@ AS (
                 AND NOT REGEXP_CONTAINS(LOWER(s.name), r'^u_.*')
                 -- AND a.active = TRUE
 
-
         )
 
     -- final selection
-    SELECT *
-    FROM final_geo_output
+    SELECT
+        posts_not_removed_l28
+        , geo.*
+    FROM final_geo_output AS geo
+        LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_geo_subreddit_candidates_posts_no_removed_20220122` AS c
+            ON geo.subreddit_id = c.subreddit_id
+
     ORDER BY total_users_in_subreddit DESC, subreddit_name, users_percent_by_country DESC
 );  -- Close create table parens
 
