@@ -146,6 +146,7 @@ AS (
     -- final selection
     SELECT
         posts_not_removed_l28
+        , users_l7
         , geo.*
     FROM final_geo_output AS geo
         LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_candidates_posts_no_removed_20220122` AS c
