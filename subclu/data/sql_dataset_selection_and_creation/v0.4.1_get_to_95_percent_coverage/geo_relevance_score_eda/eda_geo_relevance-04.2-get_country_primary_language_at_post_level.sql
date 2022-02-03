@@ -58,3 +58,19 @@ WHERE 1=1
 
 ORDER BY geolocation_country_name ASC, language_rank ASC
 );  -- Close CREATE TABLE statement
+
+
+-- Select language for target i18n countries
+--  Run query in EDA notebook
+-- SELECT *
+-- FROM `reddit-employee-datasets.david_bermejo.subclu_posts_primary_language_by_country_20220122` as geo
+-- WHERE 1=1
+--     AND (
+--         geolocation_country_name IN (
+--             'Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy',
+--             'Mexico', 'Argentina', 'Chile',
+--             'Canada', 'Australia', 'United Kingdom'
+--         )
+--     )
+-- ORDER BY geolocation_country_name ASC, language_rank ASC
+-- ;
