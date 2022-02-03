@@ -67,6 +67,9 @@ EXTRAS_REQUIRE = {
         "jupyterlab <= 3.1.18",
         "markupsafe <= 1.1.1",
 
+        # Extentions to make jupyter notebook closer to jupyter lab
+        "jupyter_contrib_nbextensions == 0.5.1",
+
         "numpy == 1.19.5",
         "pyarrow == 5.0.0",
         "pandas == 1.2.4",
@@ -80,7 +83,11 @@ EXTRAS_REQUIRE = {
         "google-api-python-client == 2.22.0",
         "google-apitools == 0.5.31",
         "google-auth == 1.35.0",
+        "google-cloud-bigquery < 2.32.0",
+        "google-cloud-bigquery-storage < 2.11.0",
 
+        # visualize sets
+        "matplotlib-venn == 0.11.6",
     ],
 
     "cpu_eda": [
@@ -138,6 +145,9 @@ EXTRAS_REQUIRE = {
 
         # Graphvis to visualize dask jobs
         "graphviz >= 0.17",
+
+        # visualize sets
+        "matplotlib-venn == 0.11.6",
     ],
 
     "pytorch": [
