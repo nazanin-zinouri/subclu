@@ -57,7 +57,7 @@ EXTRAS_REQUIRE = {
 
     "colab": [
         # Extra installs needed in colab notebooks
-        "gcsfs >= 2021.11.1"
+        "gcsfs >= 2021.11.1",
     ],
 
     "latop_dev": [
@@ -85,6 +85,10 @@ EXTRAS_REQUIRE = {
         "google-auth == 1.35.0",
         "google-cloud-bigquery < 2.32.0",
         "google-cloud-bigquery-storage < 2.11.0",
+
+        # load data from GCS & BigQuery
+        "gcsfs >= 2021.11.1",
+        "pandas-gbq == 0.17.0",
 
         # visualize sets
         "matplotlib-venn == 0.11.6",
