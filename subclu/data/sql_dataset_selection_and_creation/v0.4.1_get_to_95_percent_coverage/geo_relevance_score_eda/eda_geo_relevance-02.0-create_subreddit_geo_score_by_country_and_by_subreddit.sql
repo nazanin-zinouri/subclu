@@ -1,5 +1,7 @@
 -- Get new geo-relevance score: % DAU per country (instead of per subreddit)
 --  The table actually calculates both scores so we can compare side by side
+--  * % of users from a country / subreddit users
+--  * % of users from a country / users from country
 
 DECLARE PARTITION_DATE DATE DEFAULT '2022-01-22';
 DECLARE GEO_PT_START DATE DEFAULT PARTITION_DATE - 29;
