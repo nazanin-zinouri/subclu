@@ -19,13 +19,12 @@ import logging
 from logging import info
 import os
 from pathlib import Path
-import shutil
+# import shutil
 import socket
 import subprocess
 from typing import List, Union
 
 import joblib
-import numpy as np
 import pandas as pd
 import yaml
 
@@ -35,7 +34,6 @@ from omegaconf import DictConfig, OmegaConf
 import mlflow
 from mlflow.utils import mlflow_tags
 from mlflow.exceptions import MlflowException
-from sklearn.metrics import classification_report, confusion_matrix
 from tqdm import tqdm
 
 
@@ -59,10 +57,20 @@ class MlflowLogger:
 
         if tracking_uri in [None, 'sqlite']:
             # TODO(djb): update path to config file?
-            path_mlruns_db = Path(f"/home/jupyter/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
-            Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
-            tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
-            mlflow.set_tracking_uri(tracking_uri)
+            try:
+                # remove VMs:
+                path_mlruns_db = Path(f"/home/jupyter/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
+                Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
+                tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
+                mlflow.set_tracking_uri(tracking_uri)
+            except (OSError, FileNotFoundError):
+                # local (laptop)
+                'C02FD08QMD6V'
+                path_mlruns_db = Path(f"/Users/david.bermejo/repos/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
+                Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
+                tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
+                mlflow.set_tracking_uri(tracking_uri)
+
         else:
             mlflow.set_tracking_uri(tracking_uri)
 
