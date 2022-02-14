@@ -1,5 +1,5 @@
--- default geo-relevance subreddits
-DECLARE PARTITION_DATE DATE DEFAULT '2022-01-22';
+-- Create table with default geo-relevance subreddits
+DECLARE PARTITION_DATE DATE DEFAULT '2022-02-12';
 DECLARE GEO_PT_START DATE DEFAULT PARTITION_DATE - 29;
 DECLARE GEO_PT_END DATE DEFAULT PARTITION_DATE;
 DECLARE RATING_DATE DATE DEFAULT PARTITION_DATE;
@@ -10,6 +10,8 @@ DECLARE MIN_POSTS_L28_NOT_REMOVED NUMERIC DEFAULT 4;
 
 DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and Northern Ireland| of America|";
 
+
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_default_daily_20220212`
 WITH
     subs_geo_default_raw AS (
         SELECT
@@ -80,4 +82,4 @@ FROM subs_geo_w_post_count AS a
 WHERE
     posts_not_removed_l28 >= MIN_POSTS_L28_NOT_REMOVED
 ORDER BY users_l7 DESC, subreddit_name
-;
+);  -- close CREATE TABLE parens
