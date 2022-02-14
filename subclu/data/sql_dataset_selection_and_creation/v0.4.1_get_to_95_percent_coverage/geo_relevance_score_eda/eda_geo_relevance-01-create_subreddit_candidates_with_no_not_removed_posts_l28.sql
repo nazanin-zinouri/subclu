@@ -9,12 +9,12 @@
 --   - over 4 non-removed posts
 -- Companion table to: subclu_geo_subreddit_candidates_20211214
 
-DECLARE PARTITION_DATE DATE DEFAULT '2022-01-22';
+DECLARE PARTITION_DATE DATE DEFAULT '2022-02-12';
 
 DECLARE MIN_USERS_L7 NUMERIC DEFAULT 1;
 DECLARE MIN_POSTS_L28_NOT_REMOVED NUMERIC DEFAULT 1;
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_candidates_posts_no_removed_20220122`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_candidates_posts_no_removed_20220212`
 AS (
     WITH
         subs_with_views_and_posts_raw AS (
