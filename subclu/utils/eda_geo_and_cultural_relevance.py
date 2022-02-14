@@ -4,6 +4,7 @@ Utilities to explore geo & cultural relevance metrics
 Note that this requires ipython/jupyter, which may not be listed as a
 requirement in some VMs
 """
+from functools import partial
 from typing import Union
 
 import pandas as pd
@@ -13,6 +14,27 @@ from .eda import (
     style_df_numeric, reorder_array,
     # counts_describe, value_counts_and_pcts,
 )
+
+
+def color_boolean(val):
+    if val == True:
+        return "background-color: #01B500; font-weight: bold;"  # green
+    else:
+        return ''
+
+
+def highlight_b(val, threshold=0.15):
+    if val >= threshold:
+        return "color:red; font-weight: bold;"
+    else:
+        return ''
+
+
+def highlight_e(val, threshold=2.0):
+    if val >= threshold:
+        return "color:red; font-weight: bold;"
+    else:
+        return ''
 
 
 def display_top_subs_in_country(
@@ -83,6 +105,11 @@ def show_geo_score_for_sub_single_table_new_metrics(
         top_n_pct_subreddit: int = 5,
         top_n_pct_country: int = 5,
         return_merged_df: bool = False,
+        col_a: str = 'geo_relevance_default',
+        col_b: str = 'b_users_percent_by_subreddit',
+        col_e: str = 'e_users_percent_by_country_standardized',
+        b_threshold: float = 0.14,
+        e_threshold: float = 2.0,
 ) -> Union[None, pd.DataFrame]:
     """display geo-relevance scores for input sub
     include the standardized geo-relevance score
@@ -100,9 +127,9 @@ def show_geo_score_for_sub_single_table_new_metrics(
     if l_cols_new_pcts is None:
         l_cols_new_pcts = l_cols_base_merge + [
             'b_users_percent_by_subreddit',
+            'e_users_percent_by_country_standardized',
             'c_users_percent_by_country',
             'd_users_percent_by_country_rank',
-            'e_users_percent_by_country_standardized',
             'users_percent_by_country_avg',
             'num_of_countries_with_visits_l28',
             'users_in_subreddit_from_country_l28',
@@ -144,7 +171,8 @@ def show_geo_score_for_sub_single_table_new_metrics(
                           'c_users_percent_by_country',
                           'd_users_percent_by_country_rank',
                           ],
-        ).hide_index()
+        )
+        .hide_index()
     )
 
     # print(f"Geo-relevance default [40% users in subreddit, daily]")
@@ -205,6 +233,8 @@ def show_geo_score_for_sub_single_table_new_metrics(
         reorder_array(l_cols_base_merge, df_merged.columns)
     ]
 
+    partial_b = partial(highlight_b, threshold=b_threshold)
+    partial_e = partial(highlight_e, threshold=e_threshold)
     display(
         style_df_numeric(
             df_merged
@@ -221,7 +251,11 @@ def show_geo_score_for_sub_single_table_new_metrics(
                           'd_users_percent_by_country_rank',
                           'e_users_percent_by_country_standardized',
                           ],
-        )  # .hide_index()
+        )
+        .applymap(color_boolean, subset=[col_a.replace('_', ' ')])
+        .applymap(partial_b, subset=[col_b.replace('_', ' ')])
+        .applymap(partial_e, subset=[col_e.replace('_', ' ')])
+        # .hide_index()
     )
     if return_merged_df:
         return df_merged
@@ -307,7 +341,7 @@ def show_geo_score_for_sub_single_table(
         .assign(geo_relevance_default=True)
     )
     if len(df_base_) == 0:
-        df_base_ = pd.DataFrame(columns=l_cols_base_merge + ['geo_relevance_default'])
+        df_base_ = pd.DataFrame(columns=l_cols_base_merge + ['a_geo_relevance_default'])
 
     # print(f"\nTop by % of subreddit [L28]")
     s_top_pct_sub = (
