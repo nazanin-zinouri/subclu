@@ -3,7 +3,7 @@
 --  * % of users from a country / subreddit users
 --  * % of users from a country / users from country
 
-DECLARE PARTITION_DATE DATE DEFAULT '2022-01-22';
+DECLARE PARTITION_DATE DATE DEFAULT '2022-02-12';
 DECLARE GEO_PT_START DATE DEFAULT PARTITION_DATE - 29;
 
 DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and Northern Ireland| of America|";
@@ -13,15 +13,15 @@ DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and No
 -- Previously we had a minimum of 45 users for geo-relevant subs, so 5/45 = 11.1%, 4/45 = 8.89%, 3/45 = 6.67%
 DECLARE MIN_USERS_IN_SUBREDDIT_FROM_COUNTRY NUMERIC DEFAULT 3;
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_pct_of_country_20220122`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_pct_of_country_20220212`
 AS (
     WITH
-        -- Get count of all users for each subreddit
+        -- Get count of all UNIQUE users for each subreddit
         tot_subreddit AS (
             SELECT
                 -- pt,
                 subreddit_name,
-                SUM(l1) AS total_users_in_subreddit
+                COUNT(DISTINCT user_id) AS total_users_in_subreddit
             FROM `data-prod-165221.all_reddit.all_reddit_subreddits_daily` arsub
             WHERE pt BETWEEN TIMESTAMP(GEO_PT_START) AND TIMESTAMP(PARTITION_DATE)
                 AND subreddit_name IS NOT NULL
@@ -58,7 +58,8 @@ AS (
                 , arsub.geo_country_code
                 , tot2.total_users_in_subreddit
                 , tot.total_users_in_country
-                , SUM(l1) AS users_in_subreddit_from_country
+                -- Fixed: need UNIQUE users, otherwise we can double count someone who visits multiple times in a month
+                , COUNT(DISTINCT user_id) AS users_in_subreddit_from_country
 
             -- subreddit_name can be null, so exclude those
             FROM (
@@ -136,11 +137,13 @@ AS (
             WHERE 1=1
                 AND COALESCE(verdict, 'f') <> 'admin_removed'
                 AND COALESCE(is_spam, FALSE) = FALSE
-                AND COALESCE(over_18, 'f') = 'f'
                 AND COALESCE(is_deleted, FALSE) = FALSE
                 AND deleted IS NULL
                 AND type IN ('public', 'private', 'restricted')
                 AND NOT REGEXP_CONTAINS(LOWER(s.name), r'^u_.*')
+                -- Exclude over_18, going forward, we don't need this filter because
+                --   we might want to include recommendations for NSFW listing below
+                -- AND COALESCE(over_18, 'f') = 'f'
                 -- AND a.active = TRUE
 
         )
