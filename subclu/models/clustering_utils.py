@@ -33,6 +33,7 @@ def create_dynamic_clusters(
         append_columns: bool = True,
         verbose: bool = False,
         redo_orphans: bool = True,
+        orphan_increase: int = 2,
 ) -> pd.DataFrame:
     """For country to country clusters (DE to DE, FR to FR)
     we need to resize the clusters because some might be too big and others too small
@@ -70,8 +71,7 @@ def create_dynamic_clusters(
                 )
             )
 
-    # Current algo works from smallest cluster to highest cluster (bottom up)
-    # TODO(djb): create cluster that works at 052 and splits only if subsets meet criteria
+    # Default algo works from smallest cluster to highest cluster (bottom up)
     if agg_strategy == 'aggregate_small_clusters':
         # print(f"initial label: {l_cols_labels_new[-1]}")
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
@@ -108,6 +108,13 @@ def create_dynamic_clusters(
                 mask_subs_to_reassign,
                 col_new_cluster_prim_topic
             ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
+
+        if redo_orphans:
+            # TODO(djb)
+            # Try to reassign ONLY the clusters where we have orphans
+            df_vc_orphans = df_vc[df_vc <= 1]
+            cluster_id_orphans = df_vc_orphans.index
+
     elif agg_strategy == 'split_large_clusters':
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[1]]
         df_new_labels[col_new_cluster_name] = l_cols_labels_new[1].replace('_nested', '')
@@ -174,6 +181,77 @@ def create_dynamic_clusters(
         ]
 
     return df_new_labels
+
+
+def reshape_df_to_get_1_cluster_per_row(
+        df_labels: pd.DataFrame,
+        col_counterpart_count: str = 'counterpart_count',
+        col_list_cluster_names: str = 'list_cluster_subreddit_names',
+        col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
+        l_cols_for_seeds: List[str] = None,
+        l_cols_for_clusters: List[str] = None,
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_model_sort_order: str = 'model_sort_order',
+        col_primary_topic: str = 'primary_topic',
+        get_one_column_per_sub_id: bool = False,
+        verbose: bool = False,
+) -> pd.DataFrame:
+    """Take a df with clusters and reshape it so it's easier to review
+    by taking a long df (1 row=1 subredddit) and reshaping so that
+    1=row = 1 cluster
+    """
+    if l_cols_for_seeds is None:
+        l_cols_for_seeds = [
+            'subreddit_id', 'subreddit_name',
+            col_model_sort_order, col_primary_topic,
+            col_new_cluster_val, 'cluster_label_k', col_new_cluster_prim_topic,
+        ]
+    if l_cols_for_clusters is None:
+        l_cols_for_clusters = [
+            'subreddit_id', 'subreddit_name',
+            col_new_cluster_val
+        ]
+
+    df_cluster_per_row = (
+        df_labels
+        .groupby([col_new_cluster_name, col_new_cluster_val, col_new_cluster_prim_topic])
+        .agg(
+            **{
+                col_counterpart_count: ('subreddit_id', 'nunique'),
+                col_list_cluster_names: ('subreddit_name', list),
+                col_list_cluster_ids: ('subreddit_id', list),
+            }
+        )
+        .reset_index()
+    )
+    print(df_cluster_per_row.shape)
+
+    if get_one_column_per_sub_id:
+        # Convert the list of subs into a df & merge back with original sub (each sub should be in a new column)
+        df_cluster_per_row = (
+            df_cluster_per_row
+            .merge(
+                pd.DataFrame(df_cluster_per_row[col_list_cluster_ids].to_list()).fillna(''),
+                how='left',
+                left_index=True,
+                right_index=True,
+            )
+            .drop(['list_of_subs'], axis=1)
+        )
+
+        # when convertion to JSON for gspread, it's better to conver the list into a string
+        # and to remove the brackets
+        df_cluster_per_row_list['list_of_subs'] = (
+            df_cluster_per_row_list['list_of_subs']
+                .astype(str)
+                .str[1:-1]
+                .str.replace("'", "")
+        )
+
+
+    return df_cluster_per_row
 
 
 def convert_distance_or_ab_to_list_for_fpr(
