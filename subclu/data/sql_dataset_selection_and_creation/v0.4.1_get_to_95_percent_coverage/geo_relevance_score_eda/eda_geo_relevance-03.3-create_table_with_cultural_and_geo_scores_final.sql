@@ -14,13 +14,13 @@ DECLARE min_users_geo_l7 NUMERIC DEFAULT 45;
 -- Set minimum thresholds for calculating standardized score
 --  because Some small islands screw up standard scores
 DECLARE MIN_USERS_IN_SUBREDDIT_BY_COUNTRY DEFAULT 4;
-DECLARE MIN_USERS_IN_COUNTRY_FOR_STDEV DEFAULT 25000;  -- Min coutry size to calculate stdev
+DECLARE MIN_USERS_IN_COUNTRY_FOR_STDEV DEFAULT 80000;  -- Min coutry size to calculate stdev
 DECLARE MIN_USERS_IN_COUNTRY DEFAULT 5000;  -- Min country size to display
 DECLARE STANDARD_VALUE_WHEN_STDEV_ZERO DEFAULT 4;
 
 -- Set minimum thresholds for scores: b & e
 DECLARE B_MIN_USERS_PCT_BY_SUB DEFAULT 0.14;
-DECLARE E_MIN_USERS_PCT_BY_COUNTRY_STANDARDIZED DEFAULT 2.3;
+DECLARE E_MIN_USERS_PCT_BY_COUNTRY_STANDARDIZED DEFAULT 2.0;
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_standardized_20220212`
