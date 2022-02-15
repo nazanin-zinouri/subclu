@@ -139,12 +139,18 @@ FULL OUTER JOIN (
 WHERE 1=1
     AND posts_not_removed_l28 >= MIN_POSTS_L28_NOT_REMOVED
     AND users_l7 >= min_users_geo_l7
-    AND (
-        s.e_users_percent_by_country_standardized >= E_MIN_USERS_PCT_BY_COUNTRY_STANDARDIZED
-        OR s.b_users_percent_by_subreddit >= B_MIN_USERS_PCT_BY_SUB
-        -- Include geo-default subs for target countries, even if they're below the thresholds
-        OR base.geo_relevance_default = True
-        -- Do country filtering in a separate call
+
+    -- We can apply other filters AFTERWARDS. Exclude these from table
+    --  creation because otherwise we'll need to re-run the whole table every time
+    --  we want to compare why a subreddit didn't make the cut
+    -- AND (
+    --     -- Include geo-default subs for target countries, even if they're below the thresholds
+    --     base.geo_relevance_default = True
+    --     -- Include only subs that meet either threshold
+    --     OR s.e_users_percent_by_country_standardized >= E_MIN_USERS_PCT_BY_COUNTRY_STANDARDIZED
+    --     OR s.b_users_percent_by_subreddit >= B_MIN_USERS_PCT_BY_SUB
+
+        -- Do country filtering in a separate call so we don't have to recreate this table over and over
         -- OR (
         --     s.country_name IN (
         --         'Germany', 'Austria', 'Switzerland',
@@ -156,7 +162,7 @@ WHERE 1=1
         --     -- Could use country code for places where country name might not be standardized (e.g., UK & US)
         --     -- OR geo_country_code IN ('CA', 'GB', 'AU')
         -- )
-    )
+    -- )
 
 ORDER BY users_l7 DESC, subreddit_name, c_users_percent_by_country DESC
 );  -- close create view parens
