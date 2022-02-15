@@ -80,6 +80,55 @@ def get_venn_sets2(
     return d_
 
 
+def get_venn_sets3(
+        iter_a: iter,
+        iter_b: iter,
+        iter_c: iter,
+        a_name: str = 'a',
+        b_name: str = 'b',
+        c_name: str = 'c',
+        print_counts: bool = True,
+        return_dict: bool = True,
+) -> Dict[str, set]:
+    """Input 3 iterables and return a dictionary with
+    the items in one
+    """
+    if not isinstance(iter_a, set):
+        set_a = set(iter_a)
+    else:
+        set_a = iter_a
+    if not isinstance(iter_b, set):
+        set_b = set(iter_b)
+    else:
+        set_b = iter_b
+    if not isinstance(iter_c, set):
+        set_c = set(iter_c)
+    else:
+        set_c = iter_c
+
+    if print_counts:
+        print(f"{len(set_a):6,.0f} <- {a_name}")
+        print(f"{len(set_b):6,.0f} <- {b_name}")
+        print(f"{len(set_c):6,.0f} <- {c_name}")
+        print(f"---")
+        print(f"{len(set_a | set_b | set_c):6,.0f} <- {a_name} OR {b_name} OR {c_name}")
+        print(f"")
+        print(f"{len(set_a | set_b):6,.0f} <- {a_name} OR {b_name}")
+        print(f"{len(set_a | set_c):6,.0f} <- {a_name} OR {c_name}")
+        print(f"{len(set_b | set_c):6,.0f} <- {b_name} OR {c_name}")
+
+    if return_dict:
+        d_ = dict()
+        d_[f"{a_name}_only"] = set_a - set_b - set_c
+        d_[f"{b_name}_only"] = set_b - set_a - set_c
+        d_[f"{c_name}_only"] = set_c - set_b - set_a
+
+        # TODO(djb): calculate all set intersections?
+        d_[f"{a_name}_and_{b_name}_and_{c_name}"] = set_a & set_b & set_c
+
+        return d_
+
+
 def setup_logging(
         log_format: str = 'basic_with_time',
         console_level=logging.INFO,
