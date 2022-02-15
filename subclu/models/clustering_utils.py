@@ -165,20 +165,24 @@ def create_dynamic_clusters(
             right_index=True,
         ).copy()
 
-        l_cols_to_front = [
-            'subreddit_id',
-            'subreddit_name',
-            'model_distance_order',
-            'posts_for_modeling_count',
-            'primary_topic_0921',
-            col_new_cluster_val,
-            col_new_cluster_name,
-            col_new_cluster_prim_topic,
-        ]
-        l_cols_to_front = [c for c in l_cols_to_front if c in df_new_labels.columns]
-        df_new_labels = df_new_labels[
-            reorder_array(l_cols_to_front, df_new_labels.columns)
-        ]
+    l_cols_to_front = [
+        'subreddit_id',
+        'subreddit_name',
+        col_new_cluster_prim_topic,
+        'primary_topic',
+        'rating_short',
+        'rating_name',
+        'over_18',
+        col_new_cluster_val,
+        col_new_cluster_name,
+
+        'model_sort_order',
+        'posts_for_modeling_count',
+    ]
+    l_cols_to_front = [c for c in l_cols_to_front if c in df_new_labels.columns]
+    df_new_labels = df_new_labels[
+        reorder_array(l_cols_to_front, df_new_labels.columns)
+    ]
 
     return df_new_labels
 
