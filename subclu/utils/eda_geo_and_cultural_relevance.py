@@ -25,14 +25,14 @@ def color_boolean(val):
 
 def highlight_b(val, threshold=0.15):
     if val >= threshold:
-        return "color:red; font-weight: bold;"
+        return "color:purple; font-weight: bold;"
     else:
         return ''
 
 
 def highlight_e(val, threshold=2.0):
     if val >= threshold:
-        return "color:red; font-weight: bold;"
+        return "color:purple; font-weight: bold;"
     else:
         return ''
 

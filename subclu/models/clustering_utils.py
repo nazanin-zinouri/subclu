@@ -68,44 +68,45 @@ def create_dynamic_clusters(
 
     # Current algo works from smallest cluster to highest cluster (bottom up)
     # TODO(djb): create cluster that works at 052 and splits only if subsets meet criteria
-    # if agg_strategy == 'aggregate_small_clusters':
-    df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
-    df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
-    df_new_labels[col_new_cluster_prim_topic] = df_labels[
-        l_cols_labels_new[-1].replace('_label_nested', '_majority_primary_topic')
-    ]
+    if agg_strategy == 'aggregate_small_clusters':
+        df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
+        df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
+        df_new_labels[col_new_cluster_prim_topic] = df_labels[
+            l_cols_labels_new[-1].replace('_label_nested', '_majority_primary_topic')
+        ]
 
-    for c_ in sorted(l_cols_labels_new[:-1], reverse=True):
-        c_name_new = c_.replace('_nested', '')
-        col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
+        for c_ in sorted(l_cols_labels_new[:-1], reverse=True):
+            print(c_)
+            c_name_new = c_.replace('_nested', '')
+            col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
 
-        # find which current clusters are below threshold
-        df_vc = df_new_labels[col_new_cluster_val].value_counts()
-        dv_vc_below_threshold = df_vc[df_vc <= min_subreddits_in_cluster]
-        print(f"{dv_vc_below_threshold.shape} <- Shape of clusters below threshold")
+            # find which current clusters are below threshold
+            df_vc = df_new_labels[col_new_cluster_val].value_counts()
+            dv_vc_below_threshold = df_vc[df_vc <= min_subreddits_in_cluster]
+            print(f"  {dv_vc_below_threshold.shape} <- Shape of clusters below threshold")
 
-        # Replace cluster labels & names for current clusters that have too few subs in a cluster
-        mask_subs_to_reassign = df_new_labels[col_new_cluster_val].isin(dv_vc_below_threshold.index)
-        df_new_labels.loc[
-            mask_subs_to_reassign,
-            col_new_cluster_val
-        ] = df_new_labels[mask_subs_to_reassign][c_]
+            # Replace cluster labels & names for current clusters that have too few subs in a cluster
+            mask_subs_to_reassign = df_new_labels[col_new_cluster_val].isin(dv_vc_below_threshold.index)
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_val
+            ] = df_new_labels[mask_subs_to_reassign][c_]
 
-        df_new_labels.loc[
-            mask_subs_to_reassign,
-            col_new_cluster_name
-        ] = c_name_new
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_name
+            ] = c_name_new
 
-        df_new_labels.loc[
-            mask_subs_to_reassign,
-            col_new_cluster_prim_topic
-        ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
-    # elif agg_strategy == 'split_large_clusters':
-    #     pass
-    # else:
-    #     l_expected_aggs = ['aggregate_small_clusters', 'split_large_clusters']
-    #     raise NotImplementedError(f"Agg strategy not implemented: {agg_strategy}.\n"
-    #                               f"  Expected one of: {l_expected_aggs}")
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_prim_topic
+            ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
+    elif agg_strategy == 'split_large_clusters':
+        pass
+    else:
+        l_expected_aggs = ['aggregate_small_clusters', 'split_large_clusters']
+        raise NotImplementedError(f"Agg strategy not implemented: {agg_strategy}.\n"
+                                  f"  Expected one of: {l_expected_aggs}")
 
     if append_columns:
         df_new_labels = df_labels.merge(
@@ -144,6 +145,8 @@ def convert_distance_or_ab_to_list_for_fpr(
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_model_sort_order: str = 'model_sort_order',
+        col_primary_topic: str = 'primary_topic',
         verbose: bool = False,
 ) -> pd.DataFrame:
     """Take a df_distances or df_ab and reshape it to get output needed for an FPR
@@ -154,7 +157,7 @@ def convert_distance_or_ab_to_list_for_fpr(
         if l_cols_for_seeds is None:
             l_cols_for_seeds = [
                 'subreddit_id', 'subreddit_name',
-                'model_distance_order', 'primary_topic_0921',
+                col_model_sort_order, col_primary_topic,
                 col_new_cluster_val, 'cluster_label_k', col_new_cluster_prim_topic,
             ]
         if l_cols_for_clusters is None:
@@ -192,7 +195,7 @@ def convert_distance_or_ab_to_list_for_fpr(
 
     df_a_to_b_list = (
         df_ab
-        .groupby(['model_distance_order', col_sub_name_a, col_sub_id_a,
+        .groupby([col_model_sort_order, col_sub_name_a, col_sub_id_a,
                   col_new_cluster_val, col_new_cluster_name])
         .agg(
             **{
@@ -204,8 +207,8 @@ def convert_distance_or_ab_to_list_for_fpr(
         .reset_index()
         # .rename(columns={'subreddit_name_a': 'subreddit_name_de',
         #                  'subreddit_id_a': 'subreddit_id_de'})
-        .sort_values(by=['model_distance_order', ], ascending=True)
-        .drop(['model_distance_order'], axis=1)
+        .sort_values(by=[col_model_sort_order, ], ascending=True)
+        .drop([col_model_sort_order], axis=1)
     )
 
     # when converting to JSON for gspread it's better to convert the list into a string
