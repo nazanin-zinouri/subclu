@@ -24,13 +24,15 @@ from ..utils.eda import reorder_array
 
 def create_dynamic_clusters(
         df_labels: pd.DataFrame,
-        agg_strategy: str = 'split_large_clusters',
+        agg_strategy: str = 'aggregate_small_clusters',
         min_subreddits_in_cluster: int = 5,
         l_cols_labels_input: list = None,
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
         append_columns: bool = True,
+        verbose: bool = False,
+        redo_orphans: bool = True,
 ) -> pd.DataFrame:
     """For country to country clusters (DE to DE, FR to FR)
     we need to resize the clusters because some might be too big and others too small
@@ -41,11 +43,13 @@ def create_dynamic_clusters(
     """
     if l_cols_labels_input is None:
         l_cols_labels_input = [c for c in df_labels.columns if c.endswith('_label')]
+
     # Create new cols that have zero-padding so we can concat and sort them
     l_cols_labels_new = [f"{c}_nested" for c in l_cols_labels_input]
-
+    # print(l_cols_labels_input)
+    # print(l_cols_labels_new)
     df_new_labels = pd.DataFrame(index=df_labels.index)
-    df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:03.0f}".format))
+    df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:04.0f}".format))
 
     # Concat the values of the new columns so it's easier to tell depth of each cluster
     for i in range(len(l_cols_labels_new)):
@@ -69,6 +73,7 @@ def create_dynamic_clusters(
     # Current algo works from smallest cluster to highest cluster (bottom up)
     # TODO(djb): create cluster that works at 052 and splits only if subsets meet criteria
     if agg_strategy == 'aggregate_small_clusters':
+        # print(f"initial label: {l_cols_labels_new[-1]}")
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
         df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
         df_new_labels[col_new_cluster_prim_topic] = df_labels[
@@ -76,14 +81,16 @@ def create_dynamic_clusters(
         ]
 
         for c_ in sorted(l_cols_labels_new[:-1], reverse=True):
-            print(c_)
+            if verbose:
+                print(c_)
             c_name_new = c_.replace('_nested', '')
             col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
 
             # find which current clusters are below threshold
             df_vc = df_new_labels[col_new_cluster_val].value_counts()
             dv_vc_below_threshold = df_vc[df_vc <= min_subreddits_in_cluster]
-            print(f"  {dv_vc_below_threshold.shape} <- Shape of clusters below threshold")
+            if verbose:
+                print(f"  {dv_vc_below_threshold.shape} <- Shape of clusters below threshold")
 
             # Replace cluster labels & names for current clusters that have too few subs in a cluster
             mask_subs_to_reassign = df_new_labels[col_new_cluster_val].isin(dv_vc_below_threshold.index)
@@ -102,7 +109,42 @@ def create_dynamic_clusters(
                 col_new_cluster_prim_topic
             ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
     elif agg_strategy == 'split_large_clusters':
-        pass
+        df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[1]]
+        df_new_labels[col_new_cluster_name] = l_cols_labels_new[1].replace('_nested', '')
+        df_new_labels[col_new_cluster_prim_topic] = df_labels[
+            l_cols_labels_new[1].replace('_label_nested', '_majority_primary_topic')
+        ]
+
+        for c_ in sorted(l_cols_labels_new[1:]):
+            if verbose:
+                print(c_)
+            c_name_new = c_.replace('_nested', '')
+            col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
+
+            # find which current clusters are ABOVE threshold
+            df_vc = df_new_labels[col_new_cluster_val].value_counts()
+            # multiply min by 2 so that we only split up a cluster if we have a high chance
+            #  of getting at least 2 clusters from it
+            dv_vc_above_threshold = df_vc[df_vc > (2 * min_subreddits_in_cluster)]
+            if verbose:
+                print(f"  {dv_vc_above_threshold.shape} <- Shape of clusters ABOVE threshold")
+
+            # Replace cluster labels & names for current clusters that have too few subs in a cluster
+            mask_subs_to_reassign = df_new_labels[col_new_cluster_val].isin(dv_vc_above_threshold.index)
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_val
+            ] = df_new_labels[mask_subs_to_reassign][c_]
+
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_name
+            ] = c_name_new
+
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_prim_topic
+            ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
     else:
         l_expected_aggs = ['aggregate_small_clusters', 'split_large_clusters']
         raise NotImplementedError(f"Agg strategy not implemented: {agg_strategy}.\n"
