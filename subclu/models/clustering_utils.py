@@ -228,6 +228,7 @@ def reshape_df_to_get_1_cluster_per_row(
                 col_list_cluster_ids: ('subreddit_id', list),
             }
         )
+        .sort_values(by=[col_new_cluster_val], ascending=True)
         .reset_index()
     )
     print(df_cluster_per_row.shape)
@@ -245,15 +246,15 @@ def reshape_df_to_get_1_cluster_per_row(
             .drop(['list_of_subs'], axis=1)
         )
 
-        # when convertion to JSON for gspread, it's better to conver the list into a string
-        # and to remove the brackets
-        df_cluster_per_row_list['list_of_subs'] = (
-            df_cluster_per_row_list['list_of_subs']
-                .astype(str)
-                .str[1:-1]
-                .str.replace("'", "")
+    # when convertion to JSON for gspread, it's better to conver the list into a string
+    # and to remove the brackets
+    for col_list_ in [col_list_cluster_names, col_list_cluster_ids]:
+        df_cluster_per_row[col_list_] = (
+            df_cluster_per_row[col_list_]
+            .astype(str)
+            .str[1:-1]
+            .str.replace("'", "")
         )
-
 
     return df_cluster_per_row
 
