@@ -29,8 +29,10 @@ Array = Union[np.array, pd.Series, pd.DataFrame, List]
 # ===============
 # Logging & Misc
 # ===
-def reorder_array(items_to_front: list,
-                  array):
+def reorder_array(
+        items_to_front: list,
+        array
+):
     """
     if the array is a dataframe, re-order the columns
     if array is list-like, re-order it
@@ -542,7 +544,8 @@ def style_df_numeric(
         currency_cols: List[str] = None,
         currency_format: str = "${:,.2f}",
         d_custom_style: dict = None,
-        fillna: Any = None,
+        fillna_numeric: Any = None,
+        fillna_obj: Any = None,
         na_rep: str = '-',
         rename_cols_for_display: bool = False,
         rename_cols_pairs: List[Tuple] = None,
@@ -583,7 +586,8 @@ def style_df_numeric(
         currency_cols:
         currency_format:
         d_custom_style:
-        fillna:
+        fillna_numeric:
+        fillna_obj:
         na_rep:
         rename_cols_for_display:
             replace underscores so it's easier to view/display column names
@@ -645,8 +649,13 @@ def style_df_numeric(
     if d_custom_style is not None:
         d_format.update(d_custom_style)
 
-    if fillna is not None:
-        df[all_num_cols] = df[all_num_cols].fillna(fillna)
+    if fillna_numeric is not None:
+        df[all_num_cols] = df[all_num_cols].fillna(fillna_numeric)
+
+    if fillna_obj is not None:
+        df[df.drop(all_num_cols, axis=1).columns] = (
+            df[df.drop(all_num_cols, axis=1).columns].fillna(fillna_obj)
+        )
 
     if rename_cols_for_display:
         if rename_cols_pairs is None:
