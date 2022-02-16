@@ -94,9 +94,9 @@ def display_top_subs_in_country(
 
 def show_geo_score_for_sub_single_table_new_metrics(
         subreddit_name: str,
-        df_geo_baseline: pd.DataFrame,
         df_geo_new: pd.DataFrame,
-        df_lang_by_subreddit: pd.DataFrame,
+        df_geo_baseline: pd.DataFrame = None,
+        df_lang_by_subreddit: pd.DataFrame = None,
         l_cols_base_merge: iter = None,
         l_cols_new_pcts: iter = None,
         l_cols_lang_single: iter = None,
@@ -110,6 +110,7 @@ def show_geo_score_for_sub_single_table_new_metrics(
         col_e: str = 'e_users_percent_by_country_standardized',
         b_threshold: float = 0.14,
         e_threshold: float = 2.0,
+        print_section_titles: bool = True,
 ) -> Union[None, pd.DataFrame]:
     """display geo-relevance scores for input sub
     include the standardized geo-relevance score
@@ -157,34 +158,45 @@ def show_geo_score_for_sub_single_table_new_metrics(
     else:
         pct_labels = None
 
-    print(f"\n\n=== Subreddit: {subreddit_name} ===")
-    print(f"\nTop languages, by post [L28]")
-    display(
-        style_df_numeric(
-            df_lang_by_subreddit[df_lang_by_subreddit['subreddit_name'] == subreddit_name]
-            .sort_values(by=['language_rank'], ascending=True)
-            [l_cols_lang_single]
-            .head(5),
-            rename_cols_for_display=True,
-            int_cols=False,
-            l_bar_simple=['b_users_percent_by_subreddit',
-                          'c_users_percent_by_country',
-                          'd_users_percent_by_country_rank',
-                          ],
+    if print_section_titles:
+        print(f"\n\n=== Subreddit: {subreddit_name} ===")
+
+    if df_lang_by_subreddit is not None:
+        if print_section_titles:
+            print(f"\nTop languages, by post [L28]")
+        display(
+            style_df_numeric(
+                df_lang_by_subreddit[df_lang_by_subreddit['subreddit_name'] == subreddit_name]
+                    .sort_values(by=['language_rank'], ascending=True)
+                [l_cols_lang_single]
+                    .head(5),
+                rename_cols_for_display=True,
+                int_cols=False,
+                l_bar_simple=['b_users_percent_by_subreddit', 'c_users_percent_by_country'],
+            ).hide_index()
         )
-        .hide_index()
-    )
 
     # print(f"Geo-relevance default [40% users in subreddit, daily]")
     # We don't need additional filters in df_base_ because we assume that it already only
     #  includes subreddits that meet the 40% criteria
-    df_base_ = (
-        df_geo_baseline[df_geo_baseline['subreddit_name'] == subreddit_name]
-        [l_cols_base_merge]
-        .assign(geo_relevance_default=True)
-    )
+    if df_geo_baseline is not None:
+        df_base_ = (
+            df_geo_baseline[df_geo_baseline['subreddit_name'] == subreddit_name]
+            [l_cols_base_merge]
+            .assign(geo_relevance_default=True)
+        )
+    else:
+        # if we didn't get a df_baseline, we should expect the baseline col to be in df_geo_new
+        df_base_ = (
+            df_geo_new[
+                (df_geo_new['subreddit_name'] == subreddit_name) &
+                (df_geo_new['geo_relevance_default'] == True)
+            ]
+            [l_cols_base_merge]
+            .assign(geo_relevance_default=True)
+        )
     if len(df_base_) == 0:
-        # Need to create a df in case no geo-relevant countries
+        # Need to create a df in case no geo-relevant subs in country
         df_base_ = pd.DataFrame(columns=l_cols_base_merge + ['geo_relevance_default'])
 
     # print(f"\nTop by % of subreddit [L28]")
