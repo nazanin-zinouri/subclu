@@ -32,10 +32,18 @@ def create_dynamic_clusters(
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_new_cluster_topic_mix: str = 'cluster_topic_mix',
+        col_subreddit_topic_mix: str = 'subreddit_full_topic_mix',
         append_columns: bool = True,
         verbose: bool = False,
-        redo_orphans: bool = True,
-        orphan_increase: int = 2,
+        l_ix: list = None,
+        n_mix_start: int = 4,
+        suffix_primary_topic_col: str = '_majority_primary_topic',
+        suffix_new_topic_mix: str = '_topic_mix_nested',
+        col_full_depth_mix_count: str = 'topic_mix_full_depth_count',
+        l_cols_primary_topics: list = None,
+        # redo_orphans: bool = True,
+        # orphan_increase: int = 2,
 ) -> pd.DataFrame:
     """For country to country clusters (DE to DE, FR to FR)
     we need to resize the clusters because some might be too big and others too small
@@ -43,18 +51,53 @@ def create_dynamic_clusters(
 
     Use this function to create a new set of columns to use for FPRs
     and similar use cases.
+
+    Args:
+        df_labels:
+        agg_strategy:
+        min_subreddits_in_cluster:
+        l_cols_labels_input:
+        col_new_cluster_val:
+        col_new_cluster_name:
+        col_new_cluster_prim_topic:
+        col_new_cluster_topic_mix:
+            topic mix (concat primary topics) for a cluster
+        col_subreddit_topic_mix:
+            The deepest topic mix for a specific subreddit. Keep it so we can see it
+            even if a sub ends up in a cluster that is shallow.
+        append_columns:
+        verbose:
+        redo_orphans:
+        orphan_increase:
+        l_ix:
+        n_mix_start:
+        suffix_primary_topic_col:
+        suffix_new_topic_mix:
+        col_full_depth_mix_count:
+        l_cols_primary_topics:
+
+    Returns:
+        dataframe with new dynamic columns & nested label & topic columns
     """
     if l_cols_labels_input is None:
         l_cols_labels_input = [c for c in df_labels.columns if c.endswith('_label')]
 
+    # some cols for the fxn to get the nested topic mix:
+    if l_ix is None:
+        l_ix = ['subreddit_id', 'subreddit_name']
+
+    if l_cols_primary_topics is None:
+        l_cols_primary_topics = sorted([
+            c for c in df_labels.columns if all([c.startswith('k'), c.endswith(suffix_primary_topic_col)])
+        ])
+
     # Create new cols that have zero-padding so we can concat and sort them
     l_cols_labels_new = [f"{c}_nested" for c in l_cols_labels_input]
-    # print(l_cols_labels_input)
-    # print(l_cols_labels_new)
-    df_new_labels = pd.DataFrame(index=df_labels.index)
+    df_new_labels = df_labels[l_ix].copy()
 
-    # first conver the vals to string & apply zero padding to normalize them and make it
-    #  easy to sort them
+    logging.info(f"Concat'ing nested cluster labels...")
+    # First convert the label vals [1, 5, 328] to string & apply zero padding to normalize them and make it
+    #  easy to sort them as text
     df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:04.0f}".format))
     # Concat the values of the new columns so it's easier to tell depth of each cluster
     for i in range(len(l_cols_labels_new)):
@@ -75,24 +118,55 @@ def create_dynamic_clusters(
                 )
             )
 
+    logging.info(f"Getting topic mix at different depths...")
+    # Initialize nested topic mix columns. We can join on l_ix for any dynamic strategy
+    df_prim_topic_mix_cols = get_primary_topic_mix_cols(
+        df_labels=df_labels,
+        l_cols_primary_topics=l_cols_primary_topics,
+        n_mix_start=n_mix_start,
+        suffix_primary_topic_col=suffix_primary_topic_col,
+        suffix_new_topic_mix=suffix_new_topic_mix,
+        col_new_cluster_val=col_new_cluster_val,
+        col_new_cluster_name=col_new_cluster_name,
+        col_new_cluster_prim_topic=col_new_cluster_prim_topic,
+        col_full_depth_mix_count=col_full_depth_mix_count,
+        l_ix=l_ix
+    )
+    # use reset_index() "trick" so that we can keep the same index when using masks
+    # to copy data between df_new_labels & df_labels
+    df_new_labels = (
+        df_new_labels
+        .reset_index()
+        .merge(
+            df_prim_topic_mix_cols,
+            how='left',
+            on=l_ix,
+        )
+        .set_index('index')
+    )
+    l_cols_new_topic_mix = sorted([c for c in df_prim_topic_mix_cols.columns if c.endswith(suffix_new_topic_mix)])
+    df_new_labels[col_subreddit_topic_mix] = df_new_labels[l_cols_new_topic_mix[-1]]
+    del df_prim_topic_mix_cols
+
     # Default algo works from smallest cluster to highest cluster (bottom up)
     if agg_strategy == 'aggregate_small_clusters':
+        logging.info(f"Initializing values for strategy: {agg_strategy}")
         # initialize values for new columns (smallest cluster name & values)
-        # print(f"initial label: {l_cols_labels_new[-1]}")
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
         df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
         df_new_labels[col_new_cluster_prim_topic] = df_labels[
             l_cols_labels_new[-1].replace('_label_nested', '_majority_primary_topic')
         ]
-        # TODO(djb): add new cluster topic mix col that similar to the "label_nested" col
-        #  except it's for primary topics instead of labels. The wrinkle is that we don't
-        #  want repeats in the primary topic mix b/c we'd end up with super long strings
+        df_new_labels[col_new_cluster_topic_mix] = df_new_labels[l_cols_new_topic_mix[-1]]
 
-        for c_ in sorted(l_cols_labels_new[:-1], reverse=True):
+        logging.info(f"  Looping to roll group clusters from smallest to largest...")
+        for c_ in tqdm(sorted(l_cols_labels_new[:-1], reverse=True)):
             if verbose:
                 print(c_)
             c_name_new = c_.replace('_nested', '')
             col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
+            # TODO: assign new topic mix col
+            c_update_topic_mix_ = c_.replace('_label_nested', suffix_new_topic_mix)
 
             # find which current clusters are below threshold
             df_vc = df_new_labels[col_new_cluster_val].value_counts()
@@ -112,6 +186,12 @@ def create_dynamic_clusters(
                 col_new_cluster_name
             ] = c_name_new
 
+            df_new_labels.loc[
+                mask_subs_to_reassign,
+                col_new_cluster_topic_mix
+            ] = df_new_labels[mask_subs_to_reassign][c_update_topic_mix_]
+
+            # NOTE that this assignment will only work for sure if index of both dfs is the same
             df_new_labels.loc[
                 mask_subs_to_reassign,
                 col_new_cluster_prim_topic
@@ -169,16 +249,16 @@ def create_dynamic_clusters(
         df_new_labels = df_labels.merge(
             df_new_labels,
             how='left',
-            left_index=True,
-            right_index=True,
+            on=l_ix,
         ).copy()
 
     l_cols_to_front = [
         'subreddit_id',
         'subreddit_name',
-        col_new_cluster_prim_topic,
+        col_new_cluster_topic_mix,
         'primary_topic',
         'rating_short',
+        col_subreddit_topic_mix,
         'rating_name',
         'over_18',
 
@@ -193,6 +273,7 @@ def create_dynamic_clusters(
         'posts_for_modeling_count',
         col_new_cluster_val,
         col_new_cluster_name,
+        col_new_cluster_prim_topic,
         'c_users_percent_by_country',
         'users_in_subreddit_from_country_l28',
         'total_users_in_country_l28',
@@ -204,6 +285,7 @@ def create_dynamic_clusters(
         reorder_array(l_cols_to_front, df_new_labels.columns)
     ]
 
+    logging.info(f"{df_new_labels.shape} <- output shape")
     return df_new_labels
 
 
@@ -291,7 +373,6 @@ def get_primary_topic_mix_cols(
             }
         )
     )
-
     # Convert the list column to a string
     #  Use ' | '.join() instead of string replace to avoid replacing comas in primary topics
     df_topic_mix_deepest[col_topic_mix_deep] = (
@@ -309,7 +390,7 @@ def get_primary_topic_mix_cols(
     )
 
     # ===
-    # TODO(djb): iterate through other subs that have mixed topics
+    # Iterate through other subs that have mixed topics
     mask_constant_topic_mix = df_topic_mix_final[col_full_depth_mix_count] == 1
     mask_subreddits_with_multiple_topics = (
         df_labels['subreddit_id'].isin(
@@ -380,7 +461,6 @@ def get_primary_topic_mix_cols(
         l_cols_new_topic_mix[n_mix_start + 1: -1]
     ] = df_topic_mix_final[mask_constant_topic_mix][col_topic_mix_deep]
 
-    # TODO(djb): Final step: reorder columns?
     gc.collect()
     return df_topic_mix_final[
         reorder_array(l_ix + [col_full_depth_mix_count] + l_cols_new_topic_mix,
