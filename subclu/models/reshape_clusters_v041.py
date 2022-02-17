@@ -8,8 +8,13 @@ The SQL queries below need to run in a colab cell (bigquery magic) because that'
 the fastest way to get the queries from BQ into a pandas dataframe
 """
 import gc
+
+from tqdm import tqdm
 import pandas as pd
 
+from .clustering_utils import (
+    create_dynamic_clusters
+)
 from ..utils.eda import (
     reorder_array,
 )
@@ -89,6 +94,82 @@ def keep_only_target_labels(
 
     gc.collect()
     return df_labels_target
+
+
+def get_table_for_optimal_dynamic_cluster_params(
+        df_labels_target: pd.DataFrame,
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_new_cluster_topic_mix: str = 'cluster_topic_mix',
+        min_subs_in_cluster_list: list = None,
+) -> pd.DataFrame:
+    """We want to balance two things:
+    - prevent orphan subreddits
+    - prevent clusters that are too large to be meaningful
+
+    In order to do this at a country level, we'll be better off starting with smallest clusters
+    and rolling up until we have at least N subreddits in one cluster.
+    """
+    if min_subs_in_cluster_list is None:
+        min_subs_in_cluster_list = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    # even if cluster at k < 20 is generic, keep it to avoid orphan subs
+    #  For a while I used a slice to exclude the broadest clusters
+    #  but that left a lot of orphans
+    l_cols_labels = (
+        [c for c in df_labels_target.columns
+         if all([c != col_new_cluster_val, c.endswith('_label')])
+         ]
+        # [1:]  # use all the columns! helps prevent a orphan subs
+    )
+
+    l_iteration_results = list()
+    col_num_orph_subs = 'num_orphan_subreddits'
+    col_num_subs_mean = 'num_subreddits_per_cluster_mean'
+    col_num_subs_median = 'num_subreddits_per_cluster_median'
+
+    n_subs_in_target = df_labels_target['subreddit_id'].nunique()
+
+    for n_ in tqdm(min_subs_in_cluster_list):
+        d_run_clean = dict()
+        d_run_clean['subs_to_cluster_count'] = n_subs_in_target
+        d_run_clean['min_subreddits_in_cluster'] = n_
+
+        df_clusters_dynamic_ = create_dynamic_clusters(
+            df_labels_target,
+            agg_strategy='aggregate_small_clusters',
+            min_subreddits_in_cluster=n_,
+            l_cols_labels_input=l_cols_labels,
+            col_new_cluster_val=col_new_cluster_val,
+            col_new_cluster_name=col_new_cluster_name,
+            col_new_cluster_prim_topic=col_new_cluster_prim_topic,
+        )
+        d_run_clean['cluster_count'] = df_clusters_dynamic_[col_new_cluster_val].nunique()
+        df_vc_clean = df_clusters_dynamic_[col_new_cluster_val].value_counts()
+        dv_vc_below_threshold = df_vc_clean[df_vc_clean <= 1]
+        d_run_clean[col_num_orph_subs] = len(dv_vc_below_threshold)
+        d_run_clean[col_num_subs_mean] = df_vc_clean.mean()
+        d_run_clean[col_num_subs_median] = df_vc_clean.median()
+
+        # TODO(djb): get count of Mature clusters
+        df_unique_clusters = df_clusters_dynamic_.drop_duplicates(
+            subset=[col_new_cluster_val, col_new_cluster_name]
+        )
+        d_run_clean['num_clusters_with_mature_primary_topic'] = (
+            df_unique_clusters[col_new_cluster_prim_topic]
+            .str.contains('Mature')
+            .sum()
+        )
+
+        # convert list to string so we don't run into problems with pandas & styling
+        d_run_clean['cluster_ids_with_orphans'] = ', '.join(sorted(list(dv_vc_below_threshold.index)))
+
+        l_iteration_results.append(d_run_clean)
+
+    del df_clusters_dynamic_, d_run_clean, df_vc_clean
+    gc.collect()
+
+    return pd.DataFrame(l_iteration_results)
 
 
 # ==================
