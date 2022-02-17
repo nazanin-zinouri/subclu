@@ -214,6 +214,7 @@ def get_primary_topic_mix_cols(
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_full_depth_mix_count: str = 'topic_mix_full_depth_count',
         l_ix: list = None,
 ) -> pd.DataFrame:
     """For a given depth of the list of primary topic columns, return them
@@ -247,7 +248,7 @@ def get_primary_topic_mix_cols(
     )
 
     # =====================
-    # Now to go the deepest topic first
+    # Now get the deepest topic first
     # ===
     # This way we know which ones stay the same, so we don't need to loop a bunch
     # NOTE: slices & indexing do slightly different things
@@ -282,7 +283,7 @@ def get_primary_topic_mix_cols(
         .agg(
             **{
                 col_topic_mix_deep: (col_new_cluster_prim_topic, list),
-                'topic_mix_full_depth_count': (col_new_cluster_prim_topic, 'nunique'),
+                col_full_depth_mix_count: (col_new_cluster_prim_topic, 'nunique'),
             }
         )
     )
@@ -303,11 +304,21 @@ def get_primary_topic_mix_cols(
         on=l_ix,
     )
 
+    # ===
+    # TODO(djb): iterate through other subs that have mixed topics
+    mask_constant_topic_mix = df_topic_mix_final[col_full_depth_mix_count] == 1
+
+    # ===
+    # Finally, assign the topics for subs that have a constant topic
+    df_topic_mix_final.loc[
+        mask_constant_topic_mix,
+        l_cols_new_topic_mix[n_mix_start + 1: -2]
+    ] = df_topic_mix_final[mask_constant_topic_mix][col_topic_mix_deep]
+
     print(df_topic_mix_final.shape)
 
-    # TODO(djb): Final step: reorder columns
+    # TODO(djb): Final step: reorder columns?
     return df_topic_mix_final
-
 
 
 def reshape_df_to_get_1_cluster_per_row(
