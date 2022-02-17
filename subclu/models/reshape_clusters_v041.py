@@ -107,6 +107,7 @@ def get_table_for_optimal_dynamic_cluster_params(
         col_num_orph_subs: str = 'num_orphan_subreddits',
         col_num_subs_mean: str = 'num_subreddits_per_cluster_mean',
         col_num_subs_median: str = 'num_subreddits_per_cluster_median',
+        verbose: bool = False,
 ) -> pd.DataFrame:
     """We want to balance two things:
     - prevent orphan subreddits
@@ -143,6 +144,7 @@ def get_table_for_optimal_dynamic_cluster_params(
             col_new_cluster_val=col_new_cluster_val,
             col_new_cluster_name=col_new_cluster_name,
             col_new_cluster_prim_topic=col_new_cluster_prim_topic,
+            verbose=verbose,
         )
         d_run_clean = {
             **d_run_clean,

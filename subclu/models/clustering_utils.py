@@ -40,8 +40,9 @@ def create_dynamic_clusters(
         n_mix_start: int = 4,
         suffix_primary_topic_col: str = '_majority_primary_topic',
         suffix_new_topic_mix: str = '_topic_mix_nested',
-        col_full_depth_mix_count: str = 'topic_mix_full_depth_count',
+        col_full_depth_mix_count: str = 'subreddit_full_topic_mix_count',
         l_cols_primary_topics: list = None,
+        log_n_clusters_below_threshold: bool = False,
         # redo_orphans: bool = True,
         # orphan_increase: int = 2,
 ) -> pd.DataFrame:
@@ -67,14 +68,13 @@ def create_dynamic_clusters(
             even if a sub ends up in a cluster that is shallow.
         append_columns:
         verbose:
-        redo_orphans:
-        orphan_increase:
         l_ix:
         n_mix_start:
         suffix_primary_topic_col:
         suffix_new_topic_mix:
         col_full_depth_mix_count:
         l_cols_primary_topics:
+        log_n_clusters_below_threshold:
 
     Returns:
         dataframe with new dynamic columns & nested label & topic columns
@@ -95,7 +95,8 @@ def create_dynamic_clusters(
     l_cols_labels_new = [f"{c}_nested" for c in l_cols_labels_input]
     df_new_labels = df_labels[l_ix].copy()
 
-    logging.info(f"Concat'ing nested cluster labels...")
+    if verbose:
+        logging.info(f"Concat'ing nested cluster labels...")
     # First convert the label vals [1, 5, 328] to string & apply zero padding to normalize them and make it
     #  easy to sort them as text
     df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:04.0f}".format))
@@ -118,7 +119,8 @@ def create_dynamic_clusters(
                 )
             )
 
-    logging.info(f"Getting topic mix at different depths...")
+    if verbose:
+        logging.info(f"Getting topic mix at different depths...")
     # Initialize nested topic mix columns. We can join on l_ix for any dynamic strategy
     df_prim_topic_mix_cols = get_primary_topic_mix_cols(
         df_labels=df_labels,
@@ -126,11 +128,11 @@ def create_dynamic_clusters(
         n_mix_start=n_mix_start,
         suffix_primary_topic_col=suffix_primary_topic_col,
         suffix_new_topic_mix=suffix_new_topic_mix,
-        col_new_cluster_val=col_new_cluster_val,
         col_new_cluster_name=col_new_cluster_name,
         col_new_cluster_prim_topic=col_new_cluster_prim_topic,
         col_full_depth_mix_count=col_full_depth_mix_count,
-        l_ix=l_ix
+        l_ix=l_ix,
+        verbose=verbose,
     )
     # use reset_index() "trick" so that we can keep the same index when using masks
     # to copy data between df_new_labels & df_labels
@@ -150,7 +152,8 @@ def create_dynamic_clusters(
 
     # Default algo works from smallest cluster to highest cluster (bottom up)
     if agg_strategy == 'aggregate_small_clusters':
-        logging.info(f"Initializing values for strategy: {agg_strategy}")
+        if verbose:
+            logging.info(f"Initializing values for strategy: {agg_strategy}")
         # initialize values for new columns (smallest cluster name & values)
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
         df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
@@ -159,9 +162,10 @@ def create_dynamic_clusters(
         ]
         df_new_labels[col_new_cluster_topic_mix] = df_new_labels[l_cols_new_topic_mix[-1]]
 
-        logging.info(f"  Looping to roll group clusters from smallest to largest...")
+        if verbose:
+            logging.info(f"  Looping to roll-up clusters from smallest to largest...")
         for c_ in tqdm(sorted(l_cols_labels_new[:-1], reverse=True)):
-            if verbose:
+            if log_n_clusters_below_threshold:
                 print(c_)
             c_name_new = c_.replace('_nested', '')
             col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
@@ -171,7 +175,7 @@ def create_dynamic_clusters(
             # find which current clusters are below threshold
             df_vc = df_new_labels[col_new_cluster_val].value_counts()
             dv_vc_below_threshold = df_vc[df_vc <= min_subreddits_in_cluster]
-            if verbose:
+            if log_n_clusters_below_threshold:
                 print(f"  {dv_vc_below_threshold.shape} <- Shape of clusters below threshold")
 
             # Replace cluster labels & names for current clusters that have too few subs in a cluster
@@ -221,7 +225,7 @@ def create_dynamic_clusters(
             # multiply min by 2 so that we only split up a cluster if we have a high chance
             #  of getting at least 2 clusters from it
             dv_vc_above_threshold = df_vc[df_vc > (2 * min_subreddits_in_cluster)]
-            if verbose:
+            if log_n_clusters_below_threshold:
                 print(f"  {dv_vc_above_threshold.shape} <- Shape of clusters ABOVE threshold")
 
             # Replace cluster labels & names for current clusters that have too few subs in a cluster
@@ -278,14 +282,14 @@ def create_dynamic_clusters(
         'users_in_subreddit_from_country_l28',
         'total_users_in_country_l28',
         'total_users_in_subreddit_l28',
-
     ]
     l_cols_to_front = [c for c in l_cols_to_front if c in df_new_labels.columns]
     df_new_labels = df_new_labels[
         reorder_array(l_cols_to_front, df_new_labels.columns)
     ]
 
-    logging.info(f"{df_new_labels.shape} <- output shape")
+    if verbose:
+        logging.info(f"{df_new_labels.shape} <- output shape")
     return df_new_labels
 
 
@@ -295,11 +299,11 @@ def get_primary_topic_mix_cols(
         n_mix_start: int = 4,
         suffix_primary_topic_col: str = '_majority_primary_topic',
         suffix_new_topic_mix: str = '_topic_mix_nested',
-        col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
-        col_full_depth_mix_count: str = 'topic_mix_full_depth_count',
+        col_full_depth_mix_count: str = 'subreddit_full_topic_mix_count',
         l_ix: list = None,
+        verbose: bool = False,
 ) -> pd.DataFrame:
     """For a given depth of the list of primary topic columns, return them
     in a single column as a string that combines all the nested topics without repeats
@@ -326,7 +330,8 @@ def get_primary_topic_mix_cols(
     l_cols_new_topic_mix = [c.replace(suffix_primary_topic_col, suffix_new_topic_mix) for c in l_cols_primary_topics]
 
     # For the first N cols, primary topic is the same as the input primary topic
-    logging.info(f"  Assigning base topic mix cols")
+    if verbose:
+        logging.info(f"  Assigning base topic mix cols")
     df_topic_mix_final = df_labels[l_ix].copy()
     df_topic_mix_final[l_cols_new_topic_mix[:n_mix_start + 1]] = (
         df_labels[l_cols_primary_topics[:n_mix_start + 1]].copy()
@@ -338,7 +343,8 @@ def get_primary_topic_mix_cols(
     # This way we know which ones stay the same, so we don't need to loop a bunch
     # NOTE: slices & indexing do slightly different things
     #  so I need to add or subtract by one to get the correct col name
-    logging.info(f"  Creating deepest base topic mix col...")
+    if verbose:
+        logging.info(f"  Creating deepest base topic mix col...")
     ix_max_ = len(l_cols_primary_topics)  # max for slice = len(cols)
     ix_col_max_ = ix_max_ - 1  # max to get final col name = len(cols) - 1
     col_topic_mix_deep = l_cols_new_topic_mix[-1]
@@ -402,7 +408,8 @@ def get_primary_topic_mix_cols(
     #  calculate values for those that have multiple values... but for now
     #  just iterate through all of them
     # had to mess with +/- 1 here so that we don't calculate the same col twice
-    logging.info(f"  Iterating through additional subs with multiple topics...")
+    if verbose:
+        logging.info(f"  Iterating through additional subs with multiple topics...")
     for ix_col_ in tqdm(list(np.arange(n_mix_start + 1, ix_max_ - 1))[::-1]):
         ix_slice_end_ = ix_col_ + 1
         col_topic_mix_iter_ = l_cols_new_topic_mix[ix_col_]
