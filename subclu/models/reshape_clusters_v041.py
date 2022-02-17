@@ -8,6 +8,7 @@ The SQL queries below need to run in a colab cell (bigquery magic) because that'
 the fastest way to get the queries from BQ into a pandas dataframe
 """
 import gc
+from typing import Union
 
 from tqdm import tqdm
 import pandas as pd
@@ -103,6 +104,9 @@ def get_table_for_optimal_dynamic_cluster_params(
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
         col_new_cluster_topic_mix: str = 'cluster_topic_mix',
         min_subs_in_cluster_list: list = None,
+        col_num_orph_subs: str = 'num_orphan_subreddits',
+        col_num_subs_mean: str = 'num_subreddits_per_cluster_mean',
+        col_num_subs_median: str = 'num_subreddits_per_cluster_median',
 ) -> pd.DataFrame:
     """We want to balance two things:
     - prevent orphan subreddits
@@ -124,10 +128,6 @@ def get_table_for_optimal_dynamic_cluster_params(
     )
 
     l_iteration_results = list()
-    col_num_orph_subs = 'num_orphan_subreddits'
-    col_num_subs_mean = 'num_subreddits_per_cluster_mean'
-    col_num_subs_median = 'num_subreddits_per_cluster_median'
-
     n_subs_in_target = df_labels_target['subreddit_id'].nunique()
 
     for n_ in tqdm(min_subs_in_cluster_list):
@@ -144,32 +144,67 @@ def get_table_for_optimal_dynamic_cluster_params(
             col_new_cluster_name=col_new_cluster_name,
             col_new_cluster_prim_topic=col_new_cluster_prim_topic,
         )
-        d_run_clean['cluster_count'] = df_clusters_dynamic_[col_new_cluster_val].nunique()
-        df_vc_clean = df_clusters_dynamic_[col_new_cluster_val].value_counts()
-        dv_vc_below_threshold = df_vc_clean[df_vc_clean <= 1]
-        d_run_clean[col_num_orph_subs] = len(dv_vc_below_threshold)
-        d_run_clean[col_num_subs_mean] = df_vc_clean.mean()
-        d_run_clean[col_num_subs_median] = df_vc_clean.median()
-
-        # TODO(djb): get count of Mature clusters
-        df_unique_clusters = df_clusters_dynamic_.drop_duplicates(
-            subset=[col_new_cluster_val, col_new_cluster_name]
-        )
-        d_run_clean['num_clusters_with_mature_primary_topic'] = (
-            df_unique_clusters[col_new_cluster_prim_topic]
-            .str.contains('Mature')
-            .sum()
-        )
-
-        # convert list to string so we don't run into problems with pandas & styling
-        d_run_clean['cluster_ids_with_orphans'] = ', '.join(sorted(list(dv_vc_below_threshold.index)))
+        d_run_clean = {
+            **d_run_clean,
+            **get_dynamic_cluster_summary(
+                    df_dynamic_labels=df_clusters_dynamic_,
+                    col_new_cluster_val=col_new_cluster_val,
+                    col_new_cluster_name=col_new_cluster_name,
+                    col_new_cluster_prim_topic=col_new_cluster_prim_topic,
+                    col_new_cluster_topic_mix=col_new_cluster_topic_mix,
+                    col_num_orph_subs=col_num_orph_subs,
+                    col_num_subs_mean=col_num_subs_mean,
+                    col_num_subs_median=col_num_subs_median,
+                    return_dict=True,
+            )
+        }
 
         l_iteration_results.append(d_run_clean)
 
-    del df_clusters_dynamic_, d_run_clean, df_vc_clean
+    del df_clusters_dynamic_, d_run_clean
     gc.collect()
 
     return pd.DataFrame(l_iteration_results)
+
+
+def get_dynamic_cluster_summary(
+        df_dynamic_labels: pd.DataFrame,
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_new_cluster_topic_mix: str = 'cluster_topic_mix',
+        col_num_orph_subs: str = 'num_orphan_subreddits',
+        col_num_subs_mean: str = 'num_subreddits_per_cluster_mean',
+        col_num_subs_median: str = 'num_subreddits_per_cluster_median',
+        return_dict: bool = True,
+) -> Union[dict, pd.DataFrame]:
+    """Input a dynamic cluster and get a summary for the cluster"""
+    d_run = dict()
+
+    d_run['cluster_count'] = df_dynamic_labels[col_new_cluster_val].nunique()
+    df_vc_clean = df_dynamic_labels[col_new_cluster_val].value_counts()
+    dv_vc_below_threshold = df_vc_clean[df_vc_clean <= 1]
+    d_run[col_num_orph_subs] = len(dv_vc_below_threshold)
+    d_run[col_num_subs_mean] = df_vc_clean.mean()
+    d_run[col_num_subs_median] = df_vc_clean.median()
+
+    # get count of mature clusters
+    df_unique_clusters = df_dynamic_labels.drop_duplicates(
+        subset=[col_new_cluster_val, col_new_cluster_name]
+    )
+    d_run['num_clusters_with_mature_primary_topic'] = (
+        df_unique_clusters[col_new_cluster_prim_topic].str.lower()
+        .str.contains('mature')
+        .sum()
+    )
+
+    # convert list to string so we don't run into problems with pandas & styling
+    d_run['cluster_ids_with_orphans'] = ', '.join(sorted(list(dv_vc_below_threshold.index)))
+
+    if return_dict:
+        return d_run
+    else:
+        return pd.DataFrame([d_run])
 
 
 # ==================
