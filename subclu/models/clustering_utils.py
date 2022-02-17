@@ -173,11 +173,23 @@ def create_dynamic_clusters(
         'rating_short',
         'rating_name',
         'over_18',
-        col_new_cluster_val,
-        col_new_cluster_name,
+
+        'geo_relevance_default',
+        'relevance_percent_by_subreddit',
+        'relevance_percent_by_country_standardized',
+        'b_users_percent_by_subreddit',
+        'e_users_percent_by_country_standardized',
+        'd_users_percent_by_country_rank',
 
         'model_sort_order',
         'posts_for_modeling_count',
+        col_new_cluster_val,
+        col_new_cluster_name,
+        'c_users_percent_by_country',
+        'users_in_subreddit_from_country_l28',
+        'total_users_in_country_l28',
+        'total_users_in_subreddit_l28',
+
     ]
     l_cols_to_front = [c for c in l_cols_to_front if c in df_new_labels.columns]
     df_new_labels = df_new_labels[
