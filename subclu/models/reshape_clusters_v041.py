@@ -7,11 +7,96 @@ queries from BigQuery & read/write to google sheets.
 The SQL queries below need to run in a colab cell (bigquery magic) because that's
 the fastest way to get the queries from BQ into a pandas dataframe
 """
+import gc
+import pandas as pd
+
+from ..utils.eda import (
+    reorder_array,
+)
 
 
+def keep_only_target_labels(
+        df_labels: pd.DataFrame,
+        df_geo: pd.DataFrame,
+        col_sort_order: str = 'model_sort_order',
+        l_ix_subs: list = None,
+        l_cols_to_front: list = None,
+        geo_cols_to_drop: list = None,
+) -> pd.DataFrame:
+    """Keep only subs that are in BOTH:
+    - df-geo-relevance for target country
+    - df-lables (subreddits that have been clustered)
+    """
+    if l_ix_subs is None:
+        l_ix_subs = ['subreddit_name', 'subreddit_id']
+
+    if geo_cols_to_drop is None:
+        geo_cols_to_drop = ['primary_topic']
+    # make sure that cols to drop exist:
+    geo_cols_to_drop = [c for c in geo_cols_to_drop if c in df_geo.columns]
+
+    # move cols to front
+    if l_cols_to_front is None:
+        l_cols_to_front = [
+            col_sort_order,
+            'subreddit_id',
+            'subreddit_name',
+            'primary_topic',
+            'rating_short',
+            'over_18',
+            'rating_name',
+        ]
+
+    df_labels_target = (
+        df_labels.merge(
+            df_geo
+            .drop(geo_cols_to_drop, axis=1)
+            ,
+            how='right',
+            on=l_ix_subs,
+        )
+        .copy()
+        .sort_values(by=[col_sort_order], ascending=True)
+    )
+
+    # move some columns to the end of the df
+    l_cols_to_end = ['table_creation_date', 'mlflow_run_uuid']
+    l_cols_to_end = [c for c in l_cols_to_end if c in df_labels_target.columns]
+
+    df_labels_target = df_labels_target[
+        df_labels_target.drop(l_cols_to_end, axis=1).columns.to_list() +
+        l_cols_to_end
+    ]
+
+    # make sure cols to front exist in output
+    l_cols_to_front = [c for c in l_cols_to_front if c in df_labels_target.columns]
+    df_labels_target = df_labels_target[
+        reorder_array(l_cols_to_front, df_labels_target.columns)
+    ]
+
+    # Drop subs if they're not in cluster
+    mask_subs_not_in_model = df_labels_target[col_sort_order].isnull()
+    print(f"{mask_subs_not_in_model.sum():,.0f} <- subs to drop b/c they're not in model")
+    df_labels_target = df_labels_target[~mask_subs_not_in_model].copy()
+
+    # Change key columns to integer
+    df_labels_target[col_sort_order] = df_labels_target[col_sort_order].astype(int)
+
+    l_cols_label_int = [c for c in df_labels_target.columns if c.endswith('_label')]
+    df_labels_target[l_cols_label_int] = df_labels_target[l_cols_label_int].astype(int)
+
+    print(f"{df_labels_target.shape} <- df_labels_target.shape")
+
+    gc.collect()
+    return df_labels_target
+
+
+# ==================
+# SQL queries
+# ===
 _SQL_GET_RELEVANT_SUBS_FOR_COUNTRY = """
 %%time
-%%bigquery df_geo_and_lang --project data-science-prod-218515 
+%%bigquery df_geo --project data-science-prod-218515 
 
 -- Select geo+cultural subreddits for a target country
 --  And add latest rating & over_18 flags to exclude X-rated & over_18
@@ -54,7 +139,7 @@ FROM `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a
         ON s.subreddit_id = nt.subreddit_id
 
     -- Exclude popular US subreddits
-    -- Can't query this table from local notebook because of errors getting google drive permissions. smh, excludefor now
+    -- Can't query this table from local notebook because of errors getting google drive permissions. excludefor now
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddits_top_us_to_exclude_from_relevance` tus
         ON s.subreddit_name = LOWER(tus.subreddit_name)
 
