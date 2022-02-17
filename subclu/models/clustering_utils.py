@@ -8,6 +8,7 @@ reference:
 - Describe different ways to use scipy's tools
     - https://joernhees.de/blog/2015/08/26/scipy-hierarchical-clustering-and-dendrogram-tutorial/
 """
+import gc
 import logging
 from pathlib import Path
 from typing import Union, Tuple, List
@@ -16,6 +17,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from scipy.cluster.hierarchy import dendrogram
 
@@ -242,6 +244,7 @@ def get_primary_topic_mix_cols(
     l_cols_new_topic_mix = [c.replace(suffix_primary_topic_col, suffix_new_topic_mix) for c in l_cols_primary_topics]
 
     # For the first N cols, primary topic is the same as the input primary topic
+    logging.info(f"  Assigning base topic mix cols")
     df_topic_mix_final = df_labels[l_ix].copy()
     df_topic_mix_final[l_cols_new_topic_mix[:n_mix_start + 1]] = (
         df_labels[l_cols_primary_topics[:n_mix_start + 1]].copy()
@@ -253,6 +256,7 @@ def get_primary_topic_mix_cols(
     # This way we know which ones stay the same, so we don't need to loop a bunch
     # NOTE: slices & indexing do slightly different things
     #  so I need to add or subtract by one to get the correct col name
+    logging.info(f"  Creating deepest base topic mix col...")
     ix_max_ = len(l_cols_primary_topics)  # max for slice = len(cols)
     ix_col_max_ = ix_max_ - 1  # max to get final col name = len(cols) - 1
     col_topic_mix_deep = l_cols_new_topic_mix[-1]
@@ -307,18 +311,81 @@ def get_primary_topic_mix_cols(
     # ===
     # TODO(djb): iterate through other subs that have mixed topics
     mask_constant_topic_mix = df_topic_mix_final[col_full_depth_mix_count] == 1
+    mask_subreddits_with_multiple_topics = (
+        df_labels['subreddit_id'].isin(
+            df_topic_mix_final[~mask_constant_topic_mix]['subreddit_id']
+        )
+    )
+
+    # To optimize later, we could create columns in deepest to newest and only
+    #  calculate values for those that have multiple values... but for now
+    #  just iterate through all of them
+    # had to mess with +/- 1 here so that we don't calculate the same col twice
+    logging.info(f"  Iterating through additional subs with multiple topics...")
+    for ix_col_ in tqdm(list(np.arange(n_mix_start + 1, ix_max_ - 1))[::-1]):
+        ix_slice_end_ = ix_col_ + 1
+        col_topic_mix_iter_ = l_cols_new_topic_mix[ix_col_]
+
+        df_mix_iter_ = (
+            df_labels[mask_subreddits_with_multiple_topics]
+            [l_ix + l_cols_primary_topics[n_mix_start:ix_slice_end_]]
+            .set_index(l_ix, append=False)
+            .stack()
+            .to_frame()
+            .reset_index()
+            .rename(
+                columns={
+                    'level_0': 'index',
+                    'level_1': col_new_cluster_name,  # level_num depends on whether we drop index or include name
+                    'level_2': col_new_cluster_name,
+                    0: col_new_cluster_prim_topic
+                }
+            )
+            # sort by sub + majority topic level so we ensure order before dropping dupes
+            .sort_values(by=['subreddit_id', col_new_cluster_name], ascending=True)
+
+            # drop duplicates for sub + topic
+            .drop_duplicates(subset=['subreddit_id', col_new_cluster_prim_topic], keep='first')
+
+            # aggregate by subreddit & get a list of the topics
+            .groupby(l_ix)
+            .agg(
+                **{
+                    col_topic_mix_iter_: (col_new_cluster_prim_topic, list),
+                }
+            )
+        )
+
+        # Convert the list column to a string
+        #  Use ' | '.join() instead of string replace to avoid replacing comas in primary topics
+        df_mix_iter_[col_topic_mix_iter_] = (
+            df_mix_iter_[col_topic_mix_iter_]
+            .apply(lambda x: ' | '.join(x))
+            .astype(str)
+            .str.replace("'", "")
+        )
+
+        # merge base + current iter
+        df_topic_mix_final = df_topic_mix_final.merge(
+            df_mix_iter_,
+            how='outer',
+            on=l_ix,
+        )
+    del df_mix_iter_
 
     # ===
     # Finally, assign the topics for subs that have a constant topic
     df_topic_mix_final.loc[
         mask_constant_topic_mix,
-        l_cols_new_topic_mix[n_mix_start + 1: -2]
+        l_cols_new_topic_mix[n_mix_start + 1: -1]
     ] = df_topic_mix_final[mask_constant_topic_mix][col_topic_mix_deep]
 
-    print(df_topic_mix_final.shape)
-
     # TODO(djb): Final step: reorder columns?
-    return df_topic_mix_final
+    gc.collect()
+    return df_topic_mix_final[
+        reorder_array(l_ix + [col_full_depth_mix_count] + l_cols_new_topic_mix,
+                      df_topic_mix_final.columns)
+    ]
 
 
 def reshape_df_to_get_1_cluster_per_row(
