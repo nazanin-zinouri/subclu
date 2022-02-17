@@ -169,7 +169,6 @@ def create_dynamic_clusters(
                 print(c_)
             c_name_new = c_.replace('_nested', '')
             col_update_prim_topic = c_.replace('_label_nested', '_majority_primary_topic')
-            # TODO: assign new topic mix col
             c_update_topic_mix_ = c_.replace('_label_nested', suffix_new_topic_mix)
 
             # find which current clusters are below threshold
@@ -480,13 +479,9 @@ def reshape_df_to_get_1_cluster_per_row(
         col_counterpart_count: str = 'counterpart_count',
         col_list_cluster_names: str = 'list_cluster_subreddit_names',
         col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
-        l_cols_for_seeds: List[str] = None,
-        l_cols_for_clusters: List[str] = None,
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
-        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
-        col_model_sort_order: str = 'model_sort_order',
-        col_primary_topic: str = 'primary_topic',
+        col_new_cluster_topic: str = 'cluster_topic_mix',
         get_one_column_per_sub_id: bool = False,
         verbose: bool = False,
 ) -> pd.DataFrame:
@@ -494,26 +489,14 @@ def reshape_df_to_get_1_cluster_per_row(
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
     """
-    if l_cols_for_seeds is None:
-        l_cols_for_seeds = [
-            'subreddit_id', 'subreddit_name',
-            col_model_sort_order, col_primary_topic,
-            col_new_cluster_val, 'cluster_label_k', col_new_cluster_prim_topic,
-        ]
-    if l_cols_for_clusters is None:
-        l_cols_for_clusters = [
-            'subreddit_id', 'subreddit_name',
-            col_new_cluster_val
-        ]
-
     df_cluster_per_row = (
         df_labels
-        .groupby([col_new_cluster_name, col_new_cluster_val, col_new_cluster_prim_topic])
+        .groupby([col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic])
         .agg(
             **{
                 col_counterpart_count: ('subreddit_id', 'nunique'),
-                col_list_cluster_names: ('subreddit_name', list),
                 col_list_cluster_ids: ('subreddit_id', list),
+                col_list_cluster_names: ('subreddit_name', list),
             }
         )
         .sort_values(by=[col_new_cluster_val], ascending=True)
@@ -531,18 +514,20 @@ def reshape_df_to_get_1_cluster_per_row(
                 left_index=True,
                 right_index=True,
             )
-            .drop(['list_of_subs'], axis=1)
         )
 
     # when convertion to JSON for gspread, it's better to conver the list into a string
     # and to remove the brackets
     for col_list_ in [col_list_cluster_names, col_list_cluster_ids]:
-        df_cluster_per_row[col_list_] = (
-            df_cluster_per_row[col_list_]
-            .astype(str)
-            .str[1:-1]
-            .str.replace("'", "")
-        )
+        try:
+            df_cluster_per_row[col_list_] = (
+                df_cluster_per_row[col_list_]
+                .apply(lambda x: ', '.join(x))
+                .astype(str)
+                .str.replace("'", "")
+            )
+        except KeyError:
+            pass
 
     return df_cluster_per_row
 
