@@ -50,8 +50,10 @@ def create_dynamic_clusters(
     # print(l_cols_labels_input)
     # print(l_cols_labels_new)
     df_new_labels = pd.DataFrame(index=df_labels.index)
-    df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:04.0f}".format))
 
+    # first conver the vals to string & apply zero padding to normalize them and make it
+    #  easy to sort them
+    df_new_labels[l_cols_labels_new] = df_labels[l_cols_labels_input].apply(lambda x: x.map("{:04.0f}".format))
     # Concat the values of the new columns so it's easier to tell depth of each cluster
     for i in range(len(l_cols_labels_new)):
         if i == 0:
@@ -73,12 +75,16 @@ def create_dynamic_clusters(
 
     # Default algo works from smallest cluster to highest cluster (bottom up)
     if agg_strategy == 'aggregate_small_clusters':
+        # initialize values for new columns (smallest cluster name & values)
         # print(f"initial label: {l_cols_labels_new[-1]}")
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[-1]]
         df_new_labels[col_new_cluster_name] = l_cols_labels_new[-1].replace('_nested', '')
         df_new_labels[col_new_cluster_prim_topic] = df_labels[
             l_cols_labels_new[-1].replace('_label_nested', '_majority_primary_topic')
         ]
+        # TODO(djb): add new cluster topic mix col that similar to the "label_nested" col
+        #  except it's for primary topics instead of labels. The wrinkle is that we don't
+        #  want repeats in the primary topic mix b/c we'd end up with super long strings
 
         for c_ in sorted(l_cols_labels_new[:-1], reverse=True):
             if verbose:
@@ -109,11 +115,11 @@ def create_dynamic_clusters(
                 col_new_cluster_prim_topic
             ] = df_labels[mask_subs_to_reassign][col_update_prim_topic]
 
-        if redo_orphans:
-            # TODO(djb)
-            # Try to reassign ONLY the clusters where we have orphans
-            df_vc_orphans = df_vc[df_vc <= 1]
-            cluster_id_orphans = df_vc_orphans.index
+        # if redo_orphans:
+        #     # TODO(djb) this might be better done manually, though...
+        #     # Try to reassign ONLY the clusters where we have orphans
+        #     df_vc_orphans = df_vc[df_vc <= 1]
+        #     cluster_id_orphans = df_vc_orphans.index
 
     elif agg_strategy == 'split_large_clusters':
         df_new_labels[col_new_cluster_val] = df_new_labels[l_cols_labels_new[1]]
@@ -197,6 +203,111 @@ def create_dynamic_clusters(
     ]
 
     return df_new_labels
+
+
+def get_primary_topic_mix_cols(
+        df_labels: pd.DataFrame,
+        l_cols_primary_topics: list = None,
+        n_mix_start: int = 4,
+        suffix_primary_topic_col: str = '_majority_primary_topic',
+        suffix_new_topic_mix: str = '_topic_mix_nested',
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        l_ix: list = None,
+) -> pd.DataFrame:
+    """For a given depth of the list of primary topic columns, return them
+    in a single column as a string that combines all the nested topics without repeats
+
+    General idea:
+    get subreddit ID as index & stack all the cluster majority primary topics as a row (long)
+    exclude the first N primary topics b/c those will be broad & noisy
+    then for each  final cluster (last row),
+    - drop duplicates (keep first)
+    - groupby subreddit ID & get a list of the new primary topics (w/o dupes)
+    - convert primary topics to string (instead of list)
+    - assign the list to a new column
+
+    Only start appending after first few cols, otherwise we can get weird results
+    b/c labels change too quickly & get dominated by largest primary topics as we decrease k
+    """
+    if l_ix is None:
+        l_ix = ['subreddit_id', 'subreddit_name']
+    if l_cols_primary_topics is None:
+        l_cols_primary_topics = sorted([
+            c for c in df_labels.columns if all([c.startswith('k'), c.endswith(suffix_primary_topic_col)])
+        ])
+
+    l_cols_new_topic_mix = [c.replace(suffix_primary_topic_col, suffix_new_topic_mix) for c in l_cols_primary_topics]
+
+    # For the first N cols, primary topic is the same as the input primary topic
+    df_topic_mix_final = df_labels[l_ix].copy()
+    df_topic_mix_final[l_cols_new_topic_mix[:n_mix_start + 1]] = (
+        df_labels[l_cols_primary_topics[:n_mix_start + 1]].copy()
+    )
+
+    # =====================
+    # Now to go the deepest topic first
+    # ===
+    # This way we know which ones stay the same, so we don't need to loop a bunch
+    # NOTE: slices & indexing do slightly different things
+    #  so I need to add or subtract by one to get the correct col name
+    ix_max_ = len(l_cols_primary_topics)  # max for slice = len(cols)
+    ix_col_max_ = ix_max_ - 1  # max to get final col name = len(cols) - 1
+    col_topic_mix_deep = l_cols_new_topic_mix[-1]
+
+    df_topic_mix_deepest = (
+        df_labels
+        [l_ix + l_cols_primary_topics[n_mix_start:ix_col_max_]]
+        .set_index(l_ix, append=False)
+        .stack()
+        .to_frame()
+        .reset_index()
+        .rename(columns={
+            'level_0': 'index',
+            'level_1': col_new_cluster_name,  # level_num depends on whether we drop index or include name
+            'level_2': col_new_cluster_name,
+            0: col_new_cluster_prim_topic
+        }
+        )
+
+        # sort by sub + majority topic level so we ensure order before dropping dupes
+        .sort_values(by=['subreddit_id', col_new_cluster_name], ascending=True)
+
+        # drop duplicates for sub + topic
+        .drop_duplicates(subset=['subreddit_id', col_new_cluster_prim_topic], keep='first')
+
+        # aggregate by subreddit & get a list of the topics
+        .groupby(l_ix)
+        .agg(
+            **{
+                col_topic_mix_deep: (col_new_cluster_prim_topic, list),
+                'topic_mix_full_depth_count': (col_new_cluster_prim_topic, 'nunique'),
+            }
+        )
+    )
+
+    # Convert the list column to a string
+    #  Use ' | '.join() instead of string replace to avoid replacing comas in primary topics
+    df_topic_mix_deepest[col_topic_mix_deep] = (
+        df_topic_mix_deepest[col_topic_mix_deep]
+        .apply(lambda x: ' | '.join(x))
+        .astype(str)
+        .str.replace("'", "")
+    )
+
+    # merge base + deeepest
+    df_topic_mix_final = df_topic_mix_final.merge(
+        df_topic_mix_deepest,
+        how='outer',
+        on=l_ix,
+    )
+
+    print(df_topic_mix_final.shape)
+
+    # TODO(djb): Final step: reorder columns
+    return df_topic_mix_final
+
 
 
 def reshape_df_to_get_1_cluster_per_row(
