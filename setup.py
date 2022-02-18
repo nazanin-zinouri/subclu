@@ -42,7 +42,7 @@ INSTALL_REQUIRES = [
     "kaleido == 0.2.1",
 
     # Read & write to GCS & google sheets
-    "gspread >= 4.0.1",
+    "gspread >= 4.0.1, <5.0",
 
 ]
 
