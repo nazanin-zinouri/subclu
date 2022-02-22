@@ -1,5 +1,7 @@
 -- Create table with default geo-relevance subreddits
-DECLARE PARTITION_DATE DATE DEFAULT '2022-02-12';
+-- This updated table includes default geo-relevance for top 50 countries
+--  so that it includes tier 1 & tier 2 countries in a single location
+DECLARE PARTITION_DATE DATE DEFAULT '2022-02-20';
 DECLARE GEO_PT_START DATE DEFAULT PARTITION_DATE - 29;
 DECLARE GEO_PT_END DATE DEFAULT PARTITION_DATE;
 DECLARE RATING_DATE DATE DEFAULT PARTITION_DATE;
@@ -11,8 +13,7 @@ DECLARE MIN_POSTS_L28_NOT_REMOVED NUMERIC DEFAULT 4;
 DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and Northern Ireland| of America|";
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_default_daily_20220212`
-AS (
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_default_daily_20220222`
 WITH
     subs_geo_default_raw AS (
         SELECT
@@ -43,11 +44,24 @@ WITH
             -- Enforce definition that requires 100+ users in l7
             AND asr.users_l7 >= MIN_USERS_L7
             AND (
-                cm.country_name IN ('Germany', 'Austria', 'Switzerland', 'India', 'France', 'Spain', 'Brazil', 'Portugal', 'Italy')
-                OR cm.region = 'LATAM'
-                -- eng-i18n =  Canada, UK, Australia
-                OR geo.country IN ('CA', 'GB', 'AU')
-            )
+                -- tier 0
+                geo_country_code IN ('GB','AU','CA')
+
+                -- tier 1
+                OR geo_country_code IN ('DE','FR','BR','MX','IN')
+
+                -- tier 2
+                OR geo_country_code IN ('IT','ES','JP','KR','PH','NL','TR','RO','DK','SE','FI','PL','ID','RU')
+
+                -- Additional countries, PT=Portugal, AR=Argentina
+                OR country_name IN (
+                    'Portugal', 'Argentina'
+                )
+                -- other countries in top 50
+                OR geo_country_code IN (
+                    'SG', 'NZ', 'MY', 'NO', 'BE', 'IE', 'AR', 'AT', 'CH', 'PT', 'CZ', 'HU', 'ZA', 'CL', 'VN', 'HK', 'TH', 'CO', 'GR', 'UA', 'IL', 'AE', 'TW', 'SA', 'PE', 'RS', 'HR'
+                )
+          )
     ),
     subs_geo_w_post_count AS (
         SELECT
