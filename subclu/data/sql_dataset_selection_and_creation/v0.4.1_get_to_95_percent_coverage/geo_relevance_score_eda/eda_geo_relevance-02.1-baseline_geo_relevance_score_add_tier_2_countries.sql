@@ -14,6 +14,7 @@ DECLARE regex_cleanup_country_name_str STRING DEFAULT r" of Great Britain and No
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_default_daily_20220222`
+AS (
 WITH
     subs_geo_default_raw AS (
         SELECT
@@ -45,21 +46,19 @@ WITH
             AND asr.users_l7 >= MIN_USERS_L7
             AND (
                 -- tier 0
-                geo_country_code IN ('GB','AU','CA')
+                geo.country IN ('GB','AU','CA')
 
                 -- tier 1
-                OR geo_country_code IN ('DE','FR','BR','MX','IN')
+                OR geo.country IN ('DE','FR','BR','MX','IN')
 
                 -- tier 2
-                OR geo_country_code IN ('IT','ES','JP','KR','PH','NL','TR','RO','DK','SE','FI','PL','ID','RU')
+                OR geo.country IN ('IT','ES','JP','KR','PH','NL','TR','RO','DK','SE','FI','PL','ID','RU')
 
-                -- Additional countries, PT=Portugal, AR=Argentina
-                OR country_name IN (
-                    'Portugal', 'Argentina'
-                )
                 -- other countries in top 50
-                OR geo_country_code IN (
-                    'SG', 'NZ', 'MY', 'NO', 'BE', 'IE', 'AR', 'AT', 'CH', 'PT', 'CZ', 'HU', 'ZA', 'CL', 'VN', 'HK', 'TH', 'CO', 'GR', 'UA', 'IL', 'AE', 'TW', 'SA', 'PE', 'RS', 'HR'
+                OR geo.country IN (
+                    'SG', 'NZ', 'MY', 'NO', 'BE', 'IE', 'AR', 'AT', 'CH', 'PT',
+                    'CZ', 'HU', 'ZA', 'CL', 'VN', 'HK', 'TH', 'CO', 'GR', 'UA',
+                    'IL', 'AE', 'TW', 'SA', 'PE', 'RS', 'HR'
                 )
           )
     ),
@@ -86,7 +85,11 @@ SELECT
     nt.rating_short
     , nt.rating_name
     , nt.primary_topic
+    , TRUE AS geo_relevance_default
     , a.* EXCEPT(sub_geo_rank_no)
+    , PARTITION_DATE AS pt
+    , GEO_PT_START AS dt_start_post_count
+
 FROM subs_geo_w_post_count AS a
     LEFT JOIN (
         SELECT * FROM `data-prod-165221.cnc.shredded_crowdsource_topic_and_rating`
