@@ -20,7 +20,8 @@ def color_boolean(val):
     if val == True:
         return "background-color: #01B500; font-weight: bold;"  # green
     else:
-        return ''
+        # if False, lighten the color of the text
+        return "color: #8f8f8f"
 
 
 def highlight_b(val, threshold=0.15):
@@ -108,9 +109,12 @@ def show_geo_score_for_sub_single_table_new_metrics(
         col_a: str = 'geo_relevance_default',
         col_b: str = 'b_users_percent_by_subreddit',
         col_e: str = 'e_users_percent_by_country_standardized',
-        b_threshold: float = 0.14,
+        col_b_bool: str = 'relevance_percent_by_subreddit',
+        col_e_bool: str = 'relevance_percent_by_country_standardized',
+        b_threshold: float = 0.15,
         e_threshold: float = 2.0,
         print_section_titles: bool = True,
+        rename_cols_for_mode: bool = False,
 ) -> Union[None, pd.DataFrame]:
     """display geo-relevance scores for input sub
     include the standardized geo-relevance score
@@ -127,15 +131,17 @@ def show_geo_score_for_sub_single_table_new_metrics(
 
     if l_cols_new_pcts is None:
         l_cols_new_pcts = l_cols_base_merge + [
+            'relevance_percent_by_subreddit',
+            'relevance_percent_by_country_standardized',
             'b_users_percent_by_subreddit',
             'e_users_percent_by_country_standardized',
             'c_users_percent_by_country',
             'd_users_percent_by_country_rank',
             'users_percent_by_country_avg',
-            'num_of_countries_with_visits_l28',
             'users_in_subreddit_from_country_l28',
             # 'total_users_in_subreddit_l28',
             'total_users_in_country_l28',
+            'num_of_countries_with_visits_l28',
         ]
 
     if l_cols_lang_single is None:
@@ -245,6 +251,49 @@ def show_geo_score_for_sub_single_table_new_metrics(
         reorder_array(l_cols_base_merge, df_merged.columns)
     ]
 
+    l_bar_simple = [
+        'b_users_percent_by_subreddit',
+        'c_users_percent_by_country',
+        'd_users_percent_by_country_rank',
+        'e_users_percent_by_country_standardized',
+    ]
+    if rename_cols_for_mode:
+        d_rename_cols_sub_examples = {
+            col_a: col_a.replace('_', '<br>'),
+            col_b_bool: col_b_bool.replace('_', '<br>'),
+            col_e_bool: col_e_bool.replace('_', '<br>'),
+            col_b: 'b users<br>percent by<br>subreddit',
+            col_e: 'e users<br>percent by<br>country<br>standardized',
+            'c_users_percent_by_country': 'c users<br>percent by<br>country',
+            'd_users_percent_by_country_rank': 'd users<br>percent by<br>country rank',
+
+            'users_percent_by_country_avg': 'users<br>percent_by<br>country_avg',
+            'users_in_subreddit_from_country_l28': 'users<br>in_subreddit<br>from_country_l28',
+            'total_users_in_subreddit_l28': 'total_users<br>in_subreddit_l28',
+            'total_users_in_country_l28': 'total users<br>in country l28',
+            'num_of_countries_with_visits_l28': 'num_of<br>countries_with<br>visits_l28',
+        }
+        df_merged = df_merged.rename(columns=d_rename_cols_sub_examples)
+
+        pct_cols = [d_rename_cols_sub_examples.get(c, c) for c in pct_cols]
+        col_sort_by = d_rename_cols_sub_examples[col_sort_by]
+        l_bar_simple = [d_rename_cols_sub_examples.get(c, c) for c in l_bar_simple]
+        l_bool_style_map_ = [
+            d_rename_cols_sub_examples[col_a],
+            d_rename_cols_sub_examples[col_b_bool],
+            d_rename_cols_sub_examples[col_e_bool],
+        ]
+        l_b_style_map_ = [d_rename_cols_sub_examples[col_b]]
+        l_e_style_map_ = [d_rename_cols_sub_examples[col_e]]
+    else:
+        l_bool_style_map_ = [
+            col_a.replace('_', ' '),
+            col_b_bool.replace('_', ' '),
+            col_e_bool.replace('_', ' '),
+        ]
+        l_b_style_map_ = [col_b.replace('_', ' ')]
+        l_e_style_map_ = [col_e.replace('_', ' ')]
+
     partial_b = partial(highlight_b, threshold=b_threshold)
     partial_e = partial(highlight_e, threshold=e_threshold)
     display(
@@ -254,19 +303,21 @@ def show_geo_score_for_sub_single_table_new_metrics(
             .reset_index(drop=True)
             ,
             rename_cols_for_display=True,
-            int_cols=False,
+            # int_cols=False,
+            int_labels=[
+                'total_users_in', 'users_in_subreddit_from_country_l28',
+                'by_country_rank', 'users_l7',  'in_subreddit_l28',
+                'country rank', 'countries_with<br>visits_l28', 'not_removed<br>l28',
+                'from_country_l28', 'in country l28',
+            ],
             pct_cols=pct_cols,
             pct_labels=pct_labels,
             pct_digits=3,
-            l_bar_simple=['b_users_percent_by_subreddit',
-                          'c_users_percent_by_country',
-                          'd_users_percent_by_country_rank',
-                          'e_users_percent_by_country_standardized',
-                          ],
+            l_bar_simple=l_bar_simple,
         )
-        .applymap(color_boolean, subset=[col_a.replace('_', ' ')])
-        .applymap(partial_b, subset=[col_b.replace('_', ' ')])
-        .applymap(partial_e, subset=[col_e.replace('_', ' ')])
+        .applymap(color_boolean, subset=l_bool_style_map_)
+        .applymap(partial_b, subset=l_b_style_map_)
+        .applymap(partial_e, subset=l_e_style_map_)
         # .hide_index()
     )
     if return_merged_df:

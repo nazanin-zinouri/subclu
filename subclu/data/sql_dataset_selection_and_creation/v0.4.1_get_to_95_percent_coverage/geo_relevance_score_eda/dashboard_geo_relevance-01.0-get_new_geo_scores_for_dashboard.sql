@@ -32,7 +32,18 @@ WITH
         , COALESCE(s.geo_country_code, t2.geo_country_code) AS geo_country_code
         , COALESCE(s.subreddit_name, t2.subreddit_name) AS subreddit_name
         , COALESCE(s.country_name, t2.country_name) AS country_name
-        , COALESCE(s.geo_relevance_default, t2.geo_relevance_default) AS geo_relevance_default
+        , CASE
+            -- if it's a country in the t2 list, coalesce with t2 list first
+            WHEN
+                t2.geo_country_code IN (
+                    'JP','KR','PH','NL','TR','RO','DK','SE','FI','PL','ID','RU'
+                )
+                THEN COALESCE(t2.geo_relevance_default, s.geo_relevance_default)
+            -- for everything else, pick t1 value first
+            ELSE COALESCE(s.geo_relevance_default, t2.geo_relevance_default)
+            END
+            AS geo_relevance_default
+
         , s.* EXCEPT(subreddit_id,  subreddit_name, country_name, geo_relevance_default, geo_country_code)
 
     FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_standardized_20220212` AS s
@@ -82,8 +93,8 @@ WITH
 
     WHERE 1=1
         AND s.subreddit_name != 'profile'
-        AND COALESCE(s.type, '') = 'public'
-        AND COALESCE(s.verdict, 'f') <> 'admin_removed'
+        AND COALESCE(slo.type, '') = 'public'
+        AND COALESCE(slo.verdict, 'f') <> 'admin_removed'
 
     ),
     subs_and_countries_above_thresh AS (
