@@ -31,6 +31,7 @@ def create_dynamic_clusters(
         l_cols_labels_input: list = None,
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_val_int: str = 'cluster_label_int',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
         col_new_cluster_topic_mix: str = 'cluster_topic_mix',
         col_subreddit_topic_mix: str = 'subreddit_full_topic_mix',
@@ -60,6 +61,7 @@ def create_dynamic_clusters(
         l_cols_labels_input:
         col_new_cluster_val:
         col_new_cluster_name:
+        col_new_cluster_val_int:
         col_new_cluster_prim_topic:
         col_new_cluster_topic_mix:
             topic mix (concat primary topics) for a cluster
@@ -248,6 +250,12 @@ def create_dynamic_clusters(
         raise NotImplementedError(f"Agg strategy not implemented: {agg_strategy}.\n"
                                   f"  Expected one of: {l_expected_aggs}")
 
+    # create new col as int for label so we can add a color scale when doing QA
+    df_new_labels[col_new_cluster_val_int] = (
+        df_new_labels[col_new_cluster_val]
+        .str[-4:].astype(int)
+    )
+
     if append_columns:
         df_new_labels = df_labels.merge(
             df_new_labels,
@@ -258,6 +266,7 @@ def create_dynamic_clusters(
     l_cols_to_front = [
         'subreddit_id',
         'subreddit_name',
+        col_new_cluster_val_int,
         col_new_cluster_topic_mix,
         'primary_topic',
         'rating_short',
@@ -495,8 +504,8 @@ def reshape_df_to_get_1_cluster_per_row(
         .agg(
             **{
                 col_counterpart_count: ('subreddit_id', 'nunique'),
-                col_list_cluster_ids: ('subreddit_id', list),
                 col_list_cluster_names: ('subreddit_name', list),
+                col_list_cluster_ids: ('subreddit_id', list),
             }
         )
         .sort_values(by=[col_new_cluster_val], ascending=True)
