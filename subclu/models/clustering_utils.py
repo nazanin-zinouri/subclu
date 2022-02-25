@@ -301,6 +301,123 @@ def create_dynamic_clusters(
     return df_new_labels
 
 
+def create_dynamic_clusters_clean(
+        df_dynamic_raw: pd.DataFrame,
+        col_model_sort_order: str = 'model_sort_order',
+        col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_val_int: str = 'cluster_label_int',
+        col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_topic_mix: str = 'cluster_topic_mix',
+        col_subreddit_topic_mix: str = 'subreddit_full_topic_mix',
+        col_subs_in_cluster_count: str = 'subs_in_cluster_count',
+        col_list_cluster_names: str = 'list_cluster_subreddit_names',
+        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+        col_exclude_from_qa: str = 'exclude_from_qa',
+        val_exclude_from_qa: str = 'exclude from QA',
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """After we add some columns to identify NSFW subs run this fxn
+    to re-order columns & exclude subs that have been marked as NSFW
+    """
+    # create new column for reddit link, makes QA easier
+    col_link_to_sub = 'link_to_sub'
+    link_prefix_ = 'www.reddit.com/r/'
+    df_dynamic_raw[col_link_to_sub] = link_prefix_ + df_dynamic_raw['subreddit_name']
+
+    # create lookup for rating col, might need to refresh it later in google sheets, though
+    col_rated_e = 'rated E'
+    # need to make it boolean for checkbox thing to work
+    df_dynamic_raw[col_rated_e] = (
+            df_dynamic_raw['rating_short'] == 'E'
+    )
+
+    # Set expected col order
+    l_cols_clean_final_for_qa = [
+        'subreddit_id',
+        'subreddit_name',
+        col_new_cluster_val_int,
+        col_new_cluster_topic_mix,
+
+        # insert inputs for QA cols
+        'not country relevant',
+        col_rated_e,
+        'relevant to cluster/ other subreddits in cluster',
+        'safe to show in relation to cluster',
+        col_link_to_sub,
+
+        # cols for notes
+        'country relevance notes',
+        'rating or cluster notest',
+        #  # 'cluster relevance notes',
+
+        col_subs_in_cluster_count,
+        col_list_cluster_names,
+
+        'allow_discovery',
+
+        'total_users_in_subreddit_l28',
+        'rating_name',
+
+        'over_18',
+        'rating_short',
+        'primary_topic',
+        col_subreddit_topic_mix,
+
+        'posts_for_modeling_count',
+        'users_l7',
+        # why did a sub get marked as geo or culturally relevant?
+        #  can use them to sort
+        'geo_relevance_default',
+        'relevance_percent_by_subreddit',
+        'relevance_percent_by_country_standardized',
+        'b_users_percent_by_subreddit',
+        'e_users_percent_by_country_standardized',
+        'd_users_percent_by_country_rank',
+        col_model_sort_order,
+
+        'c_users_percent_by_country',
+        'users_in_subreddit_from_country_l28',
+        'total_users_in_country_l28',
+
+        col_new_cluster_val,
+        col_new_cluster_name,
+        col_new_cluster_prim_topic,
+    ]
+
+    # copy existing columns from raw +
+    l_cols_clean_existing = [c for c in l_cols_clean_final_for_qa if c in df_dynamic_raw.columns]
+    l_cols_clean_new = [c for c in l_cols_clean_final_for_qa if c not in df_dynamic_raw.columns]
+
+    # reorder cols in raw DF so it's easier to switch between the two tabs
+    df_dynamic_clean = df_dynamic_raw[
+        reorder_array(l_cols_clean_existing, df_dynamic_raw.columns)
+    ]
+
+    # only copy subs that aren't in excluded clusters!!
+    df_dynamic_clean = (
+        df_dynamic_raw
+        [df_dynamic_raw[col_exclude_from_qa] != val_exclude_from_qa]
+        [l_cols_clean_existing]
+        .copy()
+    )
+    # Add new columns and initialize them with empty strings
+    df_dynamic_clean[l_cols_clean_new] = ''
+
+    # re-order & rename the columns so their easier to see in google sheets
+    # Sorty by cluster label b/c sometimes a sub won't be clustered dynamically next to closest neighbors!
+    df_dynamic_clean = (
+        df_dynamic_clean[l_cols_clean_final_for_qa]
+        .sort_values(by=[col_new_cluster_val, col_model_sort_order], ascending=True)
+        # do final renaming only when saving, otherwise, it's a pain to adjust or look things up?
+        .rename(columns={c: c.replace('_', ' ') for c in l_cols_clean_final_for_qa[:]})
+    )
+    df_dynamic_raw = (
+        df_dynamic_raw
+        .sort_values(by=[col_new_cluster_val, col_model_sort_order], ascending=True)
+    )
+
+    return df_dynamic_raw, df_dynamic_clean
+
+
 def get_primary_topic_mix_cols(
         df_labels: pd.DataFrame,
         l_cols_primary_topics: list = None,
@@ -489,6 +606,7 @@ def reshape_df_to_get_1_cluster_per_row(
         col_list_cluster_names: str = 'list_cluster_subreddit_names',
         col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
         col_new_cluster_val: str = 'cluster_label',
+        col_new_cluster_val_int: str = 'cluster_label_int',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_topic: str = 'cluster_topic_mix',
         get_one_column_per_sub_id: bool = False,
@@ -498,9 +616,11 @@ def reshape_df_to_get_1_cluster_per_row(
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
     """
+    l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
+    l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
     df_cluster_per_row = (
         df_labels
-        .groupby([col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic])
+        .groupby(l_groupby_cols)
         .agg(
             **{
                 col_counterpart_count: ('subreddit_id', 'nunique'),
