@@ -8,7 +8,7 @@ The SQL queries below need to run in a colab cell (bigquery magic) because that'
 the fastest way to get the queries from BQ into a pandas dataframe
 """
 import gc
-from typing import Union
+from typing import Union, Tuple
 
 from tqdm import tqdm
 import pandas as pd
@@ -148,8 +148,9 @@ def get_table_for_optimal_dynamic_cluster_params(
         col_num_orph_subs: str = 'num_orphan_subreddits',
         col_num_subs_mean: str = 'num_subreddits_per_cluster_mean',
         col_num_subs_median: str = 'num_subreddits_per_cluster_median',
+        return_optimal_min_subs_in_cluster: bool = False,
         verbose: bool = False,
-) -> pd.DataFrame:
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, int]]:
     """We want to balance two things:
     - prevent orphan subreddits
     - prevent clusters that are too large to be meaningful
@@ -207,7 +208,15 @@ def get_table_for_optimal_dynamic_cluster_params(
     del df_clusters_dynamic_, d_run_clean
     gc.collect()
 
-    return pd.DataFrame(l_iteration_results)
+    if return_optimal_min_subs_in_cluster:
+        df_out = pd.DataFrame(l_iteration_results)
+        optimal_min = df_out.loc[
+            df_out['num_orphan_subreddits'] == df_out['num_orphan_subreddits'].min(),
+            'min_subreddits_in_cluster'
+        ].values[0]
+        return df_out, optimal_min
+    else:
+        return pd.DataFrame(l_iteration_results)
 
 
 def get_dynamic_cluster_summary(
@@ -228,8 +237,10 @@ def get_dynamic_cluster_summary(
     df_vc_clean = df_dynamic_labels[col_new_cluster_val].value_counts()
     dv_vc_below_threshold = df_vc_clean[df_vc_clean <= 1]
     d_run[col_num_orph_subs] = len(dv_vc_below_threshold)
+    d_run[col_num_subs_mean.replace('_mean', '_min')] = df_vc_clean.min()
     d_run[col_num_subs_mean] = df_vc_clean.mean()
     d_run[col_num_subs_median] = df_vc_clean.median()
+    d_run[col_num_subs_mean.replace('_mean', '_max')] = df_vc_clean.max()
 
     # get count of mature clusters
     df_unique_clusters = df_dynamic_labels.drop_duplicates(
