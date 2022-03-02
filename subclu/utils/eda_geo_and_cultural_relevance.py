@@ -109,12 +109,15 @@ def show_geo_score_for_sub_single_table_new_metrics(
         col_a: str = 'geo_relevance_default',
         col_b: str = 'b_users_percent_by_subreddit',
         col_e: str = 'e_users_percent_by_country_standardized',
+        col_new_score_combined: str = 'relevance_combined_score',
+        col_new_score_tier: str = 'relevance_glocal_tier',
         col_b_bool: str = 'relevance_percent_by_subreddit',
         col_e_bool: str = 'relevance_percent_by_country_standardized',
         b_threshold: float = 0.15,
         e_threshold: float = 2.0,
         print_section_titles: bool = True,
         rename_cols_for_mode: bool = False,
+        l_cols_to_front: iter = None,
 ) -> Union[None, pd.DataFrame]:
     """display geo-relevance scores for input sub
     include the standardized geo-relevance score
@@ -127,6 +130,18 @@ def show_geo_score_for_sub_single_table_new_metrics(
             # 'subreddit_id',
             'subreddit_name',
             'country_name',
+        ]
+    if l_cols_to_front is None:
+        l_cols_to_front = l_cols_base_merge + [
+            col_new_score_tier,
+            col_new_score_combined,
+            col_b,
+            col_e,
+            col_a,
+            col_b_bool,
+            col_e_bool,
+            'users_in_subreddit_from_country_l28',
+            'num_of_countries_with_visits_l28',
         ]
 
     if l_cols_new_pcts is None:
@@ -237,7 +252,8 @@ def show_geo_score_for_sub_single_table_new_metrics(
                 set(s_top_pct_country_standard)
             ))
             ]
-        [l_cols_new_pcts]
+        # Exclude geo_relevance default b/c it could create a duplicate column
+        [[c for c in l_cols_new_pcts if 'geo_relevance_default' not in c]]
     )
 
     # merge 2 dfs together
@@ -248,7 +264,8 @@ def show_geo_score_for_sub_single_table_new_metrics(
     ).fillna({'country_name': 'NULL', }).fillna(False)
 
     df_merged = df_merged[
-        reorder_array(l_cols_base_merge, df_merged.columns)
+        # Move some cols to front
+        reorder_array(l_cols_to_front, df_merged.columns)
     ]
 
     l_bar_simple = [
@@ -256,7 +273,9 @@ def show_geo_score_for_sub_single_table_new_metrics(
         'c_users_percent_by_country',
         'd_users_percent_by_country_rank',
         'e_users_percent_by_country_standardized',
+        col_new_score_combined,
     ]
+    l_bar_simple = [c for c in l_bar_simple if c in df_merged.columns]
     if rename_cols_for_mode:
         d_rename_cols_sub_examples = {
             col_a: col_a.replace('_', '<br>'),
