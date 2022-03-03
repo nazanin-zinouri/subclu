@@ -556,21 +556,28 @@ class MlflowLogger:
 
         if read_function == dd.read_parquet:
             try:
+                if verbose:
+                    print(f"Loading files in list:\n{l_parquet_files_downloaded[:n_sample_files]}")
                 return read_function(l_parquet_files_downloaded[:n_sample_files], columns=columns)
             except OSError:
-                return read_function(f"{path_to_load}/*.parquet", columns=columns)
+                path_glob_parquet_ = f"{path_to_load}/*.parquet"
+                if verbose:
+                    print(f"Loading file list failed, trying glob: \n{path_glob_parquet_}")
+                return read_function(path_glob_parquet_, columns=columns)
 
         if read_function == pd.read_csv:
             if verbose:
-                print('path to load\n', path_to_load)
-                print('path to TYPE\n', type(path_to_load))
-                print('list of CSV\n', l_csv_files_downloaded)
+                info('path to load\n', path_to_load)
+                info('path to TYPE\n', type(path_to_load))
+                info('list of CSV\n', l_csv_files_downloaded)
             return read_function(l_csv_files_downloaded[0], **read_csv_kwargs)
 
         elif pd.read_parquet == read_function:
             if n_sample_files is not None:
-                logging.warning(f"Loading ALL files to pandas df. File sampleing NOT implemented.")
+                logging.warning(f"Loading ALL files to pandas df. File sampling NOT implemented.")
             try:
+                if verbose:
+                    info(f"Loading path to pandas:\n  {path_to_load}")
                 return read_function(path_to_load,
                                      columns=columns)
             except TypeError:
@@ -578,9 +585,14 @@ class MlflowLogger:
 
             except OSError:
                 # This error might happen if there are non-parquet files in the folder
-                # so we'll append `*.parquet` to try to read parquet files
-                return read_function(f"{path_to_load}/*.parquet",
-                                     columns=columns)
+                # so we'll append `*.parquet` to try to read parquet files -- fall back to
+                #  dask to read them in parallel
+                if verbose:
+                    info(f"Falling back to reading parquet files with dask...")
+                return dd.read_parquet(
+                    f"{path_to_load}/*.parquet",
+                    columns=columns
+                ).compute()
 
         elif json.load == read_function:
             with open(l_json_files_downloaded[0], 'r') as f_:

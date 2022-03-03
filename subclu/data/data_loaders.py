@@ -298,7 +298,7 @@ class LoadSubreddits(LoadPosts):
                     'post_id',
                     'weighted_language',    # For language aggs
                     'post_type',            # For post aggs
-                    'combined_topic_and_rating',    # Needed for new manual label
+                    # 'combined_topic_and_rating',    # Needed for new manual label
                     'text_word_count',      # To get median post word count
                     'text_len',             # Get median text len
                 ]
