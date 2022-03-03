@@ -1,6 +1,8 @@
 """
 Utilities to compress embeddings and prep for visualizations
 """
+import logging
+
 import pandas as pd
 import numpy as np
 
@@ -36,6 +38,8 @@ def add_metadata_to_tsne(
         l_cols_labels = l_ix_sub + ['model_sort_order'] + [
             c for c in df_labels.columns if c.endswith('_label')
         ]
+        # drop duplicate columns from df_sub_meta
+        l_cols_labels = l_ix_sub + [c for c in l_cols_labels if c not in df_sub_meta.columns]
 
     df_emb_svd2 = pd.DataFrame(tsne_array)
     df_emb_svd2 = df_emb_svd2.rename(columns={c: f"tsne_{c}" for c in df_emb_svd2.columns})
@@ -57,11 +61,21 @@ def add_metadata_to_tsne(
         )
     )
     if df_labels is not None:
+        # Merge right to only keep subs that have a label
+        #   they made it to the final cut of the model
+        # There can be subs with an embedding but w/o a label if they had too
+        #  few posts and didn't make the final cut
         df_emb_svd2_meta = df_emb_svd2_meta.merge(
             df_labels[l_cols_labels],
-            how='left',
+            how='right',
             on=l_ix_sub,
         )
+        for c_ in [c for c in df_emb_svd2_meta.columns if c.endswith('_label')]:
+            try:
+                df_emb_svd2_meta[c_] = df_emb_svd2_meta[c_].astype(int)
+            except Exception as e:
+                logging.info(e)
+
     # null values create problems in plotly
     for c_ in l_cols_to_fill:
         df_emb_svd2_meta[c_] = df_emb_svd2_meta[c_].fillna('null')
