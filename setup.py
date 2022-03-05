@@ -17,16 +17,9 @@ INSTALL_REQUIRES = [
     # pandas, np, and sklearn versions are managed by Google notebooks and
     #  are not guaranteed to be the same, so don't pin them to prevent errors
     "mlflow == 1.16.0",
-    # "pandas == 1.2.4",
-    # "scikit-learn == 0.24.1",
-    # "joblib == 1.0.1",
-    # "numpy == 1.19.5",
 
     # Exclude dask & modin while I test out spark
     "dask[complete] == 2021.6.0",
-    # "modin == 0.10.0",
-    # "modin[dask]",
-    #  "ray",
 
     # Auth
     # "pydata-google-auth",
