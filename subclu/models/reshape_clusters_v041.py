@@ -101,6 +101,9 @@ _L_MATURE_CLUSTERS_TO_EXCLUDE_FROM_QA_ = [
     '0010-0017-0030-0040-0042-0053-0056-0078-0219-0437-0630-0705',
     '0010-0017-0030-0040-0042-0053-0056-0078-0219-0437-0630-0705-1017-1195-1439-1532-1828-2032-2196-2380-2482-2516',
 
+    # Also exclude covid-related clusters b/c it's not worth the risk of mis-information
+    '0010-0017-0031-0042-0045-0056-0060-0085-0238',
+    '0010-0017-0031-0042-0045-0056-0060-0085-0238-0476-0689-0769-1113-1309-1571-1674-2004-2221-2400-2607-2717-2756',
 ]
 
 
@@ -353,6 +356,80 @@ def get_dynamic_cluster_summary(
     else:
         return pd.DataFrame([d_run])
 
+
+# ==================
+# keywords & subreddits to exclude
+# ===
+# for now, exclude city/state/region clusters because they provide a bad experience (no hierarchy)
+_L_PLACE_RELATED_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
+    '0007-0011-0019-0026-0027-0036-0037-0047-0135-0273-0402-0452',
+    '0007-0011-0019-0026-0027-0036-0037-0047-0136-0274-0404-0454-0659-0777-0934-0994-1201-1336-1439-1566-1639-1664',
+
+]
+# Exclude these subs either as seeds or recommendations
+_L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
+    'covid',
+    'coronavirus',
+]
+
+_L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
+    # Conspiracy & covid
+    # only list subs that don't fit a regex like:
+    # .str.contains('covid')
+    'conspiracy',
+    'debatevaccines',
+    'banned4life',
+    'novavax_vaccine_talk',
+    'coronadownunder',
+    'lockdownskepticismau',
+    'modernavaccine',
+    'covidvaccinated',
+    'vaxxhappened',
+    'takethejab',
+    'covidatemyface',
+    'bidenisnotmypresident',
+    'fightingfakenews',
+
+    # diet-related subs
+    '1500isplenty',
+    '1200isplenty',
+    '1200australia',
+    'edanonymemes',
+    'diettea',
+    '1200isjerky',
+    '1200isfineiguessugh',
+    'fatpeoplestories',
+    'edanonymous',
+    'cico',
+    'loseit',
+    'supermorbidlyobese',
+    'safe_food',  # people who have anxiety about food/diets
+
+    # drug-related
+    'abv',
+    'avb',
+    'modareviewsnotbought',
+
+    # medical
+    'autism',
+    'autisminwomen',
+    'aspergirls',
+    'aspergers',
+    'twoxadhd',
+    'adhd_anxiety',
+    'adhd',
+    'adhdwomen',
+    'psychmelee',
+    'schematherapy',
+    'cptsd',
+
+    # other
+    'shincheonji',
+    'cults',
+    'unethicallifeprotips',
+    'ausguns',
+
+]
 
 # ==================
 # SQL queries
