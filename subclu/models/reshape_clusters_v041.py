@@ -8,7 +8,7 @@ The SQL queries below need to run in a colab cell (bigquery magic) because that'
 the fastest way to get the queries from BQ into a pandas dataframe
 """
 import gc
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 
 from tqdm import tqdm
 import numpy as np
@@ -31,6 +31,7 @@ _L_MATURE_CLUSTERS_TO_EXCLUDE_FROM_QA_ = [
     '0001-0001-0001-0001-0001-0001-0001-0001-0003-0005-0006',
     '0001-0001-0001-0001-0001-0002-0002-0002',
     '0001-0001-0001-0001-0001-0002-0002-0002-0004',
+    '0001-0001-0001-0001-0001-0002-0002-0002-0004-0008-0011',
     '0001-0001-0001-0001-0001-0002-0002-0002-0005',
     '0001-0001-0001-0001-0001-0002-0002-0002-0005-0010-0013-0015',
     '0001-0001-0002-0002-0002-0003-0003-0003',
@@ -104,6 +105,162 @@ _L_MATURE_CLUSTERS_TO_EXCLUDE_FROM_QA_ = [
     # Also exclude covid-related clusters b/c it's not worth the risk of mis-information
     '0010-0017-0031-0042-0045-0056-0060-0085-0238',
     '0010-0017-0031-0042-0045-0056-0060-0085-0238-0476-0689-0769-1113-1309-1571-1674-2004-2221-2400-2607-2717-2756',
+]
+
+
+# ==================
+# keywords & subreddits to exclude
+# ===
+# for now, exclude city/state/region clusters because they provide a bad experience (no hierarchy)
+_L_PLACE_RELATED_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
+    '0007-0011-0019-0026-0027-0036-0037-0047-0135-0273-0402-0452',
+    '0007-0011-0019-0026-0027-0036-0037-0047-0136-0274-0404-0454-0659-0777-0934-0994',
+
+]
+# Exclude these subs either as seeds or recommendations
+_L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
+    'covid',
+    'coronavirus',
+]
+
+_L_COVID_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
+    '0010-0017-0031-0042-0045-0056-0060-0085-0238',
+    '0010-0017-0031-0042-0045-0056-0060-0085-0238-0476',
+
+]
+
+_L_OTHER_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
+    # NSFW?
+    # '0001-0001-0001-0001-0001-0002-0002-0002-0004-0008-0011',
+    # '0001-0001-0001-0001-0001-0002-0002-0002-0005-0009-0012-0014',
+    # '0001-0001-0002-0002-0002-0003-0003-0003-0006-0011-0014-0016-0025-0030',
+    # '0001-0001-0002-0002-0002-0003-0003-0003-0006',
+    # '0001-0001-0003-0003-0003-0004-0004-0004-0010-0018-0025-0028-0046-0054-0061-0067-0089-0102-0113-0128',
+    # '0001-0001-0003-0003-0003-0004-0005-0005-0012-0021-0031-0034-0052-0063',
+    # '0001-0001-0003-0003-0003-0004-0005-0005-0013',
+    # '0001-0001-0003-0003-0003-0004-0005-0005-0014-0031-0043-0051',
+    # '0002-0002-0005-0005-0005-0006-0007-0007-0017',
+    '0002-0004-0009-0010-0010-0012-0013-0015',
+
+    '0004-0006-0011-0013-0013',  # teen-related cluster
+    # '0005-0007-0012-0014-0014-0017-0018-0021-0061-0116-0173-0197',  # lgbtq slightly nsfw?
+
+    # smoking & vaping
+    '0008-0014-0025-0034-0036-0047-0049-0067-0193',
+    '0008-0014-0025-0034-0036-0047-0049-0067-0192',
+
+    # medical conditions (depression & drugs)
+    '0008-0014-0025-0034-0036-0046-0048-0066-0189-0374-0541',
+
+    # conspiracy & misinformation
+    '0010-0017-0030-0040-0043-0054-0057-0082-0230-0456-0657-0735-1065-1254',
+
+]
+
+_L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
+    # Conspiracy & covid
+    # only list subs that don't fit a regex like:
+    # .str.contains('covid')
+    'conspiracy',
+    'debatevaccines',
+    'banned4life',
+    'novavax_vaccine_talk',
+    'coronadownunder',
+    'lockdownskepticismau',
+    'modernavaccine',
+    'covidvaccinated',
+    'vaxxhappened',
+    'takethejab',
+    'bidenisnotmypresident',
+    'fightingfakenews',
+    'wuhanvirus',
+    'china_flu',
+    'cvnews',
+    'trumpvirus',
+    'vaccinemandates',
+
+    'lockdownsceptics',
+    'ukantilockdown',
+    'lockdownskepticismcan',
+    'vaccinepassport',
+    'churchofcovid',
+    'quitefrankly',
+    'daverubin',
+    'breakingpoints',
+    'breakingpointsnews',
+    'banned4life',
+    'timpool',
+    'qult_headquarters',
+    'parlerwatch',
+    'askthe_donald',
+    'benshapiro',
+    'tucker_carlson',
+    'trueanon',
+    'beholdthemasterrace',
+
+    'globallockdown',
+    'nurembergtwo',
+    'covidiots',
+    'covidbc',
+
+    # diet-related subs
+    '1500isplenty',
+    '1200isplenty',
+    '1200australia',
+    'vegan1200isplenty',
+    'edanonymemes',
+    'diettea',
+    '1200isjerky',
+    '1200isfineiguessugh',
+    'fatpeoplestories',
+    'edanonymous',
+    'cico',
+    'loseit',
+    'supermorbidlyobese',
+    'safe_food',  # people who have anxiety about food/diets
+    'bingeeatingdisorder',
+    '1200isfineiguessugh',
+
+    # drug-related
+    'abv',
+    'avb',
+    'modareviewsnotbought',
+
+    # medical
+    'autism',
+    'autisminwomen',
+    'aspergirls',
+    'aspergers',
+    'twoxadhd',
+    'adhd_anxiety',
+    'adhd',
+    'adhdwomen',
+    'psychmelee',
+    'schematherapy',
+    'cptsd',
+
+    'breastcancer',
+    'cancer',
+
+    'babyloss',
+    'tfmr_support',
+    'endo',
+    'endometriosis',
+    'hysterectomy',
+    'secondaryinfertility',
+    'stilltrying',
+    'ttc30',
+
+    # other
+    'shincheonji',
+    'cults',
+    'unethicallifeprotips',
+    'ausguns',
+
+    # hunting is next to animal/nature subs...
+    #  probably not a great experience for animal-lovers to see hunting stuff
+    'huntingaustralia',
+
 ]
 
 
@@ -357,6 +514,9 @@ def get_dynamic_cluster_summary(
         return pd.DataFrame([d_run])
 
 
+# ==================
+# Functions to clean up subs after QA (and get FPR outputs)
+# ===
 def get_subs_to_filter_as_df(
         sh_filter,
         cols_to_keep: Union[str, iter] = 'core',
@@ -402,143 +562,138 @@ def get_subs_to_filter_as_df(
     return df_subs_to_filter
 
 
-# ==================
-# keywords & subreddits to exclude
-# ===
-# for now, exclude city/state/region clusters because they provide a bad experience (no hierarchy)
-_L_PLACE_RELATED_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
-    '0007-0011-0019-0026-0027-0036-0037-0047-0135-0273-0402-0452',
-    '0007-0011-0019-0026-0027-0036-0037-0047-0136-0274-0404-0454-0659-0777-0934-0994',
+def remove_sensitive_clusters_and_subs(
+        df_qa: pd.DataFrame,
+        col_new_cluster_val: str = 'cluster_label',
+        additional_subs_to_filter: iter = None,
+        print_qa_check: bool = True,
+        additional_qa_keywords: List[str] = None,
+) -> pd.DataFrame:
+    """Remove subreddits and clusters that have been flagged as sensitive
+    Main use case: apply to df-qa to clean up subreddits to prepare for FPR output.
 
-]
-# Exclude these subs either as seeds or recommendations
-_L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
-    'covid',
-    'coronavirus',
-]
+    It applies all the lists in this file and allows additional inputs as
+    a list/array/series of subreddit_names to remove.
+    """
+    print(f"{df_qa.shape} <- Initial shape")
+    df_qa_clean = df_qa.copy()
 
-_L_COVID_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
-    '0010-0017-0031-0042-0045-0056-0060-0085-0238',
-    '0010-0017-0031-0042-0045-0056-0060-0085-0238-0476',
+    # cluster-level
+    for cluster_ in _L_PLACE_RELATED_CLUSTERS_TO_EXCLUDE_FROM_FPRS_:
+        df_qa_clean = (
+            df_qa_clean[~df_qa_clean[col_new_cluster_val].str.startswith(cluster_, na=False)]
+        )
+    print(f"{df_qa_clean.shape} <- Shape AFTER dropping place-clusters")
 
-]
+    # covid-related clusters
+    for cluster_ in _L_COVID_CLUSTERS_TO_EXCLUDE_FROM_FPRS_:
+        df_qa_clean = (
+            df_qa_clean[~df_qa_clean[col_new_cluster_val].str.startswith(cluster_, na=False)]
+        )
+    print(f"{df_qa_clean.shape} <- Shape AFTER dropping covid-clusters")
 
-_L_OTHER_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
-    # smoking & vaping
-    '0008-0014-0025-0034-0036-0047-0049-0067-0193',
-    '0008-0014-0025-0034-0036-0047-0049-0067-0192',
+    # medical & other clusters
+    for cluster_ in _L_OTHER_CLUSTERS_TO_EXCLUDE_FROM_FPRS_:
+        df_qa_clean = (
+            df_qa_clean[~df_qa_clean[col_new_cluster_val].str.startswith(cluster_, na=False)]
+        )
+    print(f"{df_qa_clean.shape} <- Shape AFTER dropping sensitive clusters")
 
-    # medical conditions (depression & drugs)
-    '0008-0014-0025-0034-0036-0046-0048-0066-0189-0374-0541',
+    # subreddit-level
+    df_qa_clean = (
+        df_qa_clean[~df_qa_clean['subreddit_name'].isin(additional_subs_to_filter)]
+    )
+    print(f"{df_qa_clean.shape} <- Shape AFTER dropping flagged subs A")
 
-    # conspiracy & misinformation
-    '0010-0017-0030-0040-0043-0054-0057-0082-0230-0456-0657-0735-1065-1254',
+    df_qa_clean = (
+        df_qa_clean[~df_qa_clean['subreddit_name'].isin(_L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_)]
+    )
 
-]
+    # subreddit-title matches
+    print(f"{df_qa_clean.shape} <- Shape AFTER dropping flagged subs B")
+    for word_ in _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_:
+        df_qa_clean = (
+            df_qa_clean[~df_qa_clean['subreddit_name'].str.contains(word_, na=False)]
+        )
 
-_L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
-    # Conspiracy & covid
-    # only list subs that don't fit a regex like:
-    # .str.contains('covid')
-    'conspiracy',
-    'debatevaccines',
-    'banned4life',
-    'novavax_vaccine_talk',
-    'coronadownunder',
-    'lockdownskepticismau',
-    'modernavaccine',
-    'covidvaccinated',
-    'vaxxhappened',
-    'takethejab',
-    'bidenisnotmypresident',
-    'fightingfakenews',
-    'wuhanvirus',
-    'china_flu',
-    'cvnews',
-    'trumpvirus',
-    'vaccinemandates',
+    print(f"{df_qa_clean.shape} <- Shape AFTER dropping covid-related subs")
 
-    'lockdownskepticismcan',
-    'vaccinepassport',
-    'churchofcovid',
-    'quitefrankly',
-    'daverubin',
-    'breakingpoints',
-    'breakingpointsnews',
-    'banned4life',
-    'timpool',
-    'qult_headquarters',
-    'parlerwatch',
-    'askthe_donald',
-    'benshapiro',
-    'tucker_carlson',
-    'trueanon',
-    'beholdthemasterrace',
+    print(f"{len(df_qa) - len(df_qa_clean):,.0f} <- Total subreddits removed")
 
-    'globallockdown',
-    'nurembergtwo',
-    'covidiots',
-    'covidbc',
+    if print_qa_check:
+        print(f"\nQA keyword subreddit checks:")
+        print_subreddit_name_qa_checks(
+            df_qa=df_qa_clean,
+            additional_qa_keywords=additional_qa_keywords,
+        )
+    return df_qa_clean
 
-    # diet-related subs
-    '1500isplenty',
-    '1200isplenty',
-    '1200australia',
-    'vegan1200isplenty',
-    'edanonymemes',
-    'diettea',
-    '1200isjerky',
-    '1200isfineiguessugh',
-    'fatpeoplestories',
-    'edanonymous',
-    'cico',
-    'loseit',
-    'supermorbidlyobese',
-    'safe_food',  # people who have anxiety about food/diets
-    'bingeeatingdisorder',
-    '1200isfineiguessugh',
 
-    # drug-related
-    'abv',
-    'avb',
-    'modareviewsnotbought',
+def print_subreddit_name_qa_checks(
+        df_qa: pd.DataFrame,
+        additional_qa_keywords: List[str] = None,
+) -> None:
+    """Print subreddit_names that may contain sensitive keywords"""
+    l_keywords_for_qa_ = [
+        'coro', 'cov', 'vacc', 'vax',
+        'lockdown', 'skeptic', 'fakenews', 'anon',
+        '1200', '1500', 'diet', 'binge',
+        'nsfw', 'xxx', 'onlyfans', 'fap', 'teen', 'thots',
+        'anxi', 'depress', 'adhd', 'pill',
+    ]
+    if additional_qa_keywords is not None:
+        l_keywords_for_qa_ = l_keywords_for_qa_ + additional_qa_keywords
 
-    # medical
-    'autism',
-    'autisminwomen',
-    'aspergirls',
-    'aspergers',
-    'twoxadhd',
-    'adhd_anxiety',
-    'adhd',
-    'adhdwomen',
-    'psychmelee',
-    'schematherapy',
-    'cptsd',
+    for k_ in l_keywords_for_qa_:
+        list_ = df_qa[df_qa['subreddit_name'].str.contains(k_, na=False)]['subreddit_name'].to_list()
+        if len(list_) > 0:
+            print(f"  {list_}")
+    print('')
 
-    'breastcancer',
-    'cancer',
 
-    'babyloss',
-    'tfmr_support',
-    'endo',
-    'endometriosis',
-    'hysterectomy',
-    'secondaryinfertility',
-    'stilltrying',
-    'ttc30',
+def apply_qa_filters_for_fpr(
+        df: pd.DataFrame,
+        col_rated_e_latest: str = 'rated_e_latest',
+        col_over_18_latest: str = 'over_18_latest',
+        col_country_relevant: str = 'not_country_relevant',
+        col_releveant_to_cluster: str = 'relevant_to_cluster/_other_subreddits_in_cluster',
+        col_safe_to_show_in_cluster: str = 'safe_to_show_in_relation_to_cluster',
+        col_allow_discovery_latest: str = 'allow_discovery_latest',
+        print_qa_check: bool = True,
+        additional_qa_keywords: List[str] = None,
+) -> pd.DataFrame:
+    """Apply expected filters to df"""
+    mask_rated_e = df[col_rated_e_latest] == True
+    mask_not_over_18 = df[col_over_18_latest] != 't'
+    mask_relevant_to_country = df[col_country_relevant] != 'TRUE'  # do this in case there are nulls
+    mask_relevant_to_cluster = df[col_releveant_to_cluster] == 'TRUE'
+    mask_safe_in_cluster = df[col_safe_to_show_in_cluster] == 'TRUE'
+    mask_allows_discovery = df[col_allow_discovery_latest] != 'f'
 
-    # other
-    'shincheonji',
-    'cults',
-    'unethicallifeprotips',
-    'ausguns',
+    mask_clean_for_fpr = (
+            mask_rated_e &
+            mask_not_over_18 &
+            mask_relevant_to_country &
+            mask_relevant_to_cluster &
+            mask_safe_in_cluster &
+            mask_allows_discovery
+    )
 
-    # hunting is next to animal/nature subs...
-    #  probably not a great experience for animal-lovers to see hunting stuff
-    'huntingaustralia',
+    df_clean = df[mask_clean_for_fpr].copy()
 
-]
+    if print_qa_check:
+        print(f"\nQA keyword subreddit checks:")
+        print_subreddit_name_qa_checks(
+            df_qa=df_clean,
+            additional_qa_keywords=additional_qa_keywords,
+        )
+
+    print(f"{len(df):,.0f} <- Initial subreddit count")
+    print(f"{mask_clean_for_fpr.sum():,.0f} <- Clean subreddits to use")
+    print(f"{df_clean.shape} <- df subreddits to use for FPR")
+
+    return df_clean
+
 
 # ==================
 # SQL queries
