@@ -357,19 +357,83 @@ def get_dynamic_cluster_summary(
         return pd.DataFrame([d_run])
 
 
+def get_subs_to_filter_as_df(
+        sh_filter,
+        cols_to_keep: Union[str, iter] = 'core',
+) -> pd.DataFrame:
+    """Get all the subreddits from central google sheet with all subs that
+    are missing rating or were flagged to be re-rated.
+    Assume input is an open sheet to prevent having to deal with oauth in this fxn.
+
+    gsheet_key: str = '1JiDpiLa8RKRTC0ZxjLI0ISgtngAFWTEbsoYEoeeaVO8',
+    """
+    ws_filter_list = sh_filter.worksheets()
+
+    # loop through each ws to get the subreddits so we can filter them out:
+    l_all_sh_filters = list()
+
+    for ws_ in tqdm(ws_filter_list):
+        df_ = pd.DataFrame(
+            sh_filter
+            .get_worksheet(ws_._properties['index'])
+            .get_all_records()
+        )
+        if len(df_) > 1:
+            l_all_sh_filters.append(
+                df_
+                .rename(columns={k: k.strip().lower().replace(' ', '_') for k in df_.columns})
+                .dropna(subset=['subreddit_name'])
+            )
+    df_subs_to_filter = (
+        pd.concat(l_all_sh_filters)
+        # make sure subs are lower case
+        .assign(subreddit_name=lambda x: x['subreddit_name'].str.lower())
+        .drop_duplicates(subset=['subreddit_name'])
+    )
+
+    if cols_to_keep == 'core':
+        cols_to_keep = ['subreddit_name', 'category', 'request_type']
+    elif cols_to_keep is None:
+        cols_to_keep = df_subs_to_filter.columns
+
+    df_subs_to_filter = df_subs_to_filter[cols_to_keep]
+    print(f"\n{df_subs_to_filter.shape} <- df_subs to filter shape")
+
+    return df_subs_to_filter
+
+
 # ==================
 # keywords & subreddits to exclude
 # ===
 # for now, exclude city/state/region clusters because they provide a bad experience (no hierarchy)
-_L_PLACE_RELATED_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
+_L_PLACE_RELATED_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
     '0007-0011-0019-0026-0027-0036-0037-0047-0135-0273-0402-0452',
-    '0007-0011-0019-0026-0027-0036-0037-0047-0136-0274-0404-0454-0659-0777-0934-0994-1201-1336-1439-1566-1639-1664',
+    '0007-0011-0019-0026-0027-0036-0037-0047-0136-0274-0404-0454-0659-0777-0934-0994',
 
 ]
 # Exclude these subs either as seeds or recommendations
 _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
     'covid',
     'coronavirus',
+]
+
+_L_COVID_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
+    '0010-0017-0031-0042-0045-0056-0060-0085-0238',
+    '0010-0017-0031-0042-0045-0056-0060-0085-0238-0476',
+
+]
+
+_L_OTHER_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
+    # smoking & vaping
+    '0008-0014-0025-0034-0036-0047-0049-0067-0193',
+    '0008-0014-0025-0034-0036-0047-0049-0067-0192',
+
+    # medical conditions (depression & drugs)
+    '0008-0014-0025-0034-0036-0046-0048-0066-0189-0374-0541',
+
+    # conspiracy & misinformation
+    '0010-0017-0030-0040-0043-0054-0057-0082-0230-0456-0657-0735-1065-1254',
+
 ]
 
 _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
@@ -386,14 +450,41 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'covidvaccinated',
     'vaxxhappened',
     'takethejab',
-    'covidatemyface',
     'bidenisnotmypresident',
     'fightingfakenews',
+    'wuhanvirus',
+    'china_flu',
+    'cvnews',
+    'trumpvirus',
+    'vaccinemandates',
+
+    'lockdownskepticismcan',
+    'vaccinepassport',
+    'churchofcovid',
+    'quitefrankly',
+    'daverubin',
+    'breakingpoints',
+    'breakingpointsnews',
+    'banned4life',
+    'timpool',
+    'qult_headquarters',
+    'parlerwatch',
+    'askthe_donald',
+    'benshapiro',
+    'tucker_carlson',
+    'trueanon',
+    'beholdthemasterrace',
+
+    'globallockdown',
+    'nurembergtwo',
+    'covidiots',
+    'covidbc',
 
     # diet-related subs
     '1500isplenty',
     '1200isplenty',
     '1200australia',
+    'vegan1200isplenty',
     'edanonymemes',
     'diettea',
     '1200isjerky',
@@ -404,6 +495,8 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'loseit',
     'supermorbidlyobese',
     'safe_food',  # people who have anxiety about food/diets
+    'bingeeatingdisorder',
+    '1200isfineiguessugh',
 
     # drug-related
     'abv',
@@ -423,11 +516,27 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'schematherapy',
     'cptsd',
 
+    'breastcancer',
+    'cancer',
+
+    'babyloss',
+    'tfmr_support',
+    'endo',
+    'endometriosis',
+    'hysterectomy',
+    'secondaryinfertility',
+    'stilltrying',
+    'ttc30',
+
     # other
     'shincheonji',
     'cults',
     'unethicallifeprotips',
     'ausguns',
+
+    # hunting is next to animal/nature subs...
+    #  probably not a great experience for animal-lovers to see hunting stuff
+    'huntingaustralia',
 
 ]
 
