@@ -674,6 +674,7 @@ def convert_distance_or_ab_to_list_for_fpr(
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
         col_model_sort_order: str = 'model_sort_order',
         col_primary_topic: str = 'primary_topic',
+        col_sort_by: str = None,
         verbose: bool = False,
 ) -> pd.DataFrame:
     """Take a df_distances or df_ab and reshape it to get output needed for an FPR
@@ -692,6 +693,12 @@ def convert_distance_or_ab_to_list_for_fpr(
                 'subreddit_id', 'subreddit_name',
                 col_new_cluster_val
             ]
+        if col_sort_by is None:
+            col_sort_by = col_model_sort_order
+        else:
+            if col_sort_by not in l_cols_for_seeds:
+                l_cols_for_seeds.append(col_sort_by)
+
         if verbose:
             print(l_cols_for_seeds)
             print(l_cols_for_clusters)
@@ -720,10 +727,24 @@ def convert_distance_or_ab_to_list_for_fpr(
     else:
         raise NotImplementedError(f"reshape for df_distances not implemented")
 
+    # update default groupby cols with input seeds & col_sort_by
+    l_groupby_cols = [
+        col_model_sort_order, col_sub_id_a, col_sub_name_a,
+        col_new_cluster_val, col_new_cluster_name
+    ]
+    for c_ in l_cols_for_seeds:
+        if c_ in ['subreddit_name', 'subreddit_id'] + l_groupby_cols:
+            continue
+        else:
+            l_groupby_cols.append(c_)
+    if col_sort_by not in l_groupby_cols:
+        l_groupby_cols.append(col_sort_by)
+    if verbose:
+        print(f"  Groupby cols:\n    {l_groupby_cols}")
+
     df_a_to_b_list = (
         df_ab
-        .groupby([col_model_sort_order, col_sub_name_a, col_sub_id_a,
-                  col_new_cluster_val, col_new_cluster_name])
+        .groupby(l_groupby_cols)
         .agg(
             **{
                 col_counterpart_count: (col_sub_id_b, 'nunique'),
@@ -734,7 +755,7 @@ def convert_distance_or_ab_to_list_for_fpr(
         .reset_index()
         # .rename(columns={'subreddit_name_a': 'subreddit_name_de',
         #                  'subreddit_id_a': 'subreddit_id_de'})
-        .sort_values(by=[col_model_sort_order, ], ascending=True)
+        .sort_values(by=[col_sort_by, ], ascending=True)
         .drop([col_model_sort_order], axis=1)
     )
 
