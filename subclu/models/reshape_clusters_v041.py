@@ -116,6 +116,9 @@ _L_PLACE_RELATED_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
     '0007-0011-0019-0026-0027-0036-0037-0047-0135-0273-0402-0452',
     '0007-0011-0019-0026-0027-0036-0037-0047-0136-0274-0404-0454-0659-0777-0934-0994',
 
+    # German cities
+    '0007-0011-0019-0026-0026-0035-0036-0046-0132-0264-0391-0441-0640-0753-0907-0965-1167-1296-1396-1523-1590-1615',
+
 ]
 # Exclude these subs either as seeds or recommendations
 _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
@@ -143,7 +146,7 @@ _L_OTHER_CLUSTERS_TO_EXCLUDE_FROM_FPRS_ = [
     '0002-0004-0009-0010-0010-0012-0013-0015',
 
     '0004-0006-0011-0013-0013',  # teen-related cluster
-    # '0005-0007-0012-0014-0014-0017-0018-0021-0061-0116-0173-0197',  # lgbtq slightly nsfw?
+    # '0005-0007-0012-0014-0014-0017-0018-0021-0061-0116-0173-0197',  # lgbtq maybe nsfw?
 
     # smoking & vaping
     '0008-0014-0025-0034-0036-0047-0049-0067-0193',
@@ -202,6 +205,9 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'nurembergtwo',
     'covidiots',
     'covidbc',
+    'coronakritiker',
+    'berlinvaccination',
+    'covidmx',
 
     # diet-related subs
     '1500isplenty',
@@ -227,6 +233,8 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'modareviewsnotbought',
 
     # medical
+    'narcoticsanonymous',
+    'depression_de',
     'autism',
     'autisminwomen',
     'aspergirls',
@@ -252,10 +260,18 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'ttc30',
 
     # other
+    'fuck',
     'shincheonji',
     'cults',
     'unethicallifeprotips',
     'ausguns',
+    'backdoorgore2',
+    'exlldm',
+    'extj',
+    'rorochan_1999',
+
+    'eroticrelatos',
+    'vyralnews',
 
     # hunting is next to animal/nature subs...
     #  probably not a great experience for animal-lovers to see hunting stuff
@@ -638,8 +654,10 @@ def print_subreddit_name_qa_checks(
         'coro', 'cov', 'vacc', 'vax',
         'lockdown', 'skeptic', 'fakenews', 'anon',
         '1200', '1500', 'diet', 'binge',
+        'gore',
         'nsfw', 'xxx', 'onlyfans', 'fap', 'teen', 'thots',
         'anxi', 'depress', 'adhd', 'pill',
+        'adh',
     ]
     if additional_qa_keywords is not None:
         l_keywords_for_qa_ = l_keywords_for_qa_ + additional_qa_keywords
