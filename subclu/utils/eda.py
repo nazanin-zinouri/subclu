@@ -672,6 +672,10 @@ def style_df_numeric(
         d_format = {rename_col_fxn(k): v for k, v in d_format.items()}
         df = df.rename(columns={c: rename_col_fxn(c) for c in df.columns})
 
+        # rename index as well
+        ix_rename = {ix: rename_col_fxn(ix) for ix in df.index.names}
+        df = df.rename_axis(index=ix_rename)
+
     if verbose:
         info(f"Format dictionary:\n  {d_format}")
 
