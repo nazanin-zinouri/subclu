@@ -60,11 +60,18 @@ class AnnoyIndex():
             append_i: bool = True,
             col_distance: str = 'distance',
             col_distance_rank: str = 'distance_rank',
+            cosine_similarity: bool = False,
+            col_cosine_similarity: str = 'cosine_similarity',
     ) -> pd.DataFrame:
         """
         We'll use this method to get the top_n items for each item in index
         Query by top item because we don't want to have to remove the item from its own
         query when we're building the top N neighbors
+
+        Best to compute cosine similarity on all dfs rather than one at a time.
+        from [github](https://github.com/spotify/annoy/issues/112#issuecomment-686513356)
+
+        cosine_similarity = 1 - cosine_distance^2/2
         """
         indices = self.index.get_nns_by_item(
             item_i,
@@ -132,6 +139,12 @@ class AnnoyIndex():
         else:
             df_nn = df_results_
 
+        if cosine_similarity & (self.metric == 'angular'):
+            df_nn[col_cosine_similarity] = (
+                    1 -
+                    (df_nn[col_distance] ** 2) / 2
+            )
+
         return df_nn
 
     def get_top_n_by_item_all(
@@ -142,6 +155,8 @@ class AnnoyIndex():
             append_i: bool = True,
             col_distance: str = 'distance',
             col_distance_rank: str = 'distance_rank',
+            cosine_similarity: bool = True,
+            col_cosine_similarity: str = 'cosine_similarity',
     ):
         """Convenience method to get top_n items for ALL items
 
@@ -159,11 +174,19 @@ class AnnoyIndex():
                     append_i=append_i,
                     col_distance=col_distance,
                     col_distance_rank=col_distance_rank,
+                    cosine_similarity=False,
                 )
             )
 
         df_full = pd.concat(l_nn_dfs, axis=0, ignore_index=True)
         df_full = df_full[df_full[col_distance_rank] != 0]
+
+        if cosine_similarity & (self.metric == 'angular'):
+            df_full[col_cosine_similarity] = (
+                    1 -
+                    (df_full[col_distance] ** 2) / 2
+            )
+
         logging.info(f"{df_full.shape} <- df_top_items shape")
         return df_full
 
