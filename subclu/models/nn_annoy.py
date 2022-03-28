@@ -1,8 +1,11 @@
 """
 Get nearest neighbors with ANNOY
 """
+import logging
+
 import annoy
 import pandas as pd
+from tqdm import tqdm
 
 
 class AnnoyIndex():
@@ -57,7 +60,7 @@ class AnnoyIndex():
             append_i: bool = True,
             col_distance: str = 'distance',
             col_distance_rank: str = 'distance_rank',
-    ) -> list:
+    ) -> pd.DataFrame:
         """
         We'll use this method to get the top_n items for each item in index
         Query by top item because we don't want to have to remove the item from its own
@@ -132,11 +135,36 @@ class AnnoyIndex():
         return df_nn
 
     def get_top_n_by_item_all(
-            self
+            self,
+            k=100,
+            search_k: int = -1,
+            include_distances: bool = True,
+            append_i: bool = True,
+            col_distance: str = 'distance',
+            col_distance_rank: str = 'distance_rank',
     ):
         """Convenience method to get top_n items for ALL items
 
         We'll use the output of this table to create SQL table that can be shared & used by others.
         """
-        pass
+        l_nn_dfs = list()
+
+        for i in tqdm(range(self.n_rows)):
+            l_nn_dfs.append(
+                self.get_top_n_by_item(
+                    i,
+                    k=k,
+                    search_k=search_k,
+                    include_distances=include_distances,
+                    append_i=append_i,
+                    col_distance=col_distance,
+                    col_distance_rank=col_distance_rank,
+                )
+            )
+
+        df_full = pd.concat(l_nn_dfs, axis=0, ignore_index=True)
+        df_full = df_full[df_full[col_distance_rank] != 0]
+        logging.info(f"{df_full.shape} <- df_top_items shape")
+        return df_full
+
 
