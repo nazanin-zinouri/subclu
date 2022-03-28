@@ -323,15 +323,28 @@ It's not great because, for example, after 1 minute (60 seconds), if you want to
 # Debug connection
 Sometimes the connection via the web will stop working (e.g., 524 errors). If jupyter itself is still working, you can restart the docker service that's in charge of the reverse proxy:
 
-TODO(djb): add instructions to:
+The general checks are:
 - ssh into machine
-- check status of Jupyter server (first)
+  - is the machine even responsive?
+- check status of Jupyter server (first) 
+  - is jupyter server online?
 - check status of docker server (doesn't matter much... when in doubt restart)
+  - is docker service down? **THIS IS USUALLY THE LIKELIEST PROCESS TO GO DOWN**
 
 For more troubleshooting tips:
 https://cloud.google.com/notebooks/docs/troubleshooting#restart_the_docker_service
 
 ```shell
+# ssh into machine (from laptop/local)
+ssh djb-100-2021-04-28-djb-eda-german-subs.us-west1-b.data-prod-165221
+
+# check status of jupyter server (after ssh succeeds)
+sudo service jupyter status
+
+# check that jupyter API is active
+curl http://127.0.0.1:8080/api/kernelspecs
+
+# Restart docker service
 sudo service docker restart
 ```
 

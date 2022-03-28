@@ -140,6 +140,9 @@ EXTRAS_REQUIRE = {
         #  pip install hdbscan --no-build-isolation --no-binary :all:
         # "hdbscan",
 
+        # nearest neighbors
+        "annoy == 1.17.0",
+
         # Graphvis to visualize dask jobs
         "graphviz >= 0.17",
 

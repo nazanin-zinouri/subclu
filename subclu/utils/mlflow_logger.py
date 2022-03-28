@@ -122,6 +122,8 @@ class MlflowLogger:
             'v0.4.1_mUSE_clustering_test',
             'v0.4.1_mUSE_clustering',
             'v0.4.1_mUSE_clustering_new_metrics',
+            'v0.4.1_nearest_neighbors_test',
+            'v0.4.1_nearest_neighbors',
 
         ]
         for i, exp in enumerate(l_experiments):
