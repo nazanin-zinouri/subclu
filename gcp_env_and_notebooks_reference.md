@@ -15,7 +15,7 @@ GCP spark clusters on `data-science` project:
 
 
 #### Individual VMs:
-Inference for USE:
+Inference for USE (GPU):
 - project: data-prod
 - Use for getting embeddings (vectorizing text)
 - https://7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com/lab
