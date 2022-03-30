@@ -189,26 +189,26 @@ posts_hover_data = "<br>".join([
 
 l_custom_data_posts = ['subreddit_name', col_manual_labels, 'text_1', 'text_2']
 
-%%time
-
-fig = px.scatter(
-    df_v_posts_tsne_meta,
-    y='tsne_0', x='tsne_1',
-    color=col_manual_labels,
-    custom_data=l_custom_data_posts,
-    color_discrete_map=d_manual_label_colors,
-    opacity=0.7,
-)
-fig.update_traces(hovertemplate=posts_hover_data)
-fig.update_layout(
-    title_text=(
-        f"{n_posts:,.0f} Posts from {n_subs} German-relevant subreddits"
-        f"<br>Using posts from {first_date} to {last_date}"
-    ),
-    title_x=0.5,
-    width=900,
-    height=700,
-#     uniformtext_minsize=8, uniformtext_mode='hide'
-)
-fig.show()
+# %%time
+#
+# fig = px.scatter(
+#     df_v_posts_tsne_meta,
+#     y='tsne_0', x='tsne_1',
+#     color=col_manual_labels,
+#     custom_data=l_custom_data_posts,
+#     color_discrete_map=d_manual_label_colors,
+#     opacity=0.7,
+# )
+# fig.update_traces(hovertemplate=posts_hover_data)
+# fig.update_layout(
+#     title_text=(
+#         f"{n_posts:,.0f} Posts from {n_subs} German-relevant subreddits"
+#         f"<br>Using posts from {first_date} to {last_date}"
+#     ),
+#     title_x=0.5,
+#     width=900,
+#     height=700,
+# #     uniformtext_minsize=8, uniformtext_mode='hide'
+# )
+# fig.show()
 

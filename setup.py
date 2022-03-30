@@ -17,16 +17,9 @@ INSTALL_REQUIRES = [
     # pandas, np, and sklearn versions are managed by Google notebooks and
     #  are not guaranteed to be the same, so don't pin them to prevent errors
     "mlflow == 1.16.0",
-    # "pandas == 1.2.4",
-    # "scikit-learn == 0.24.1",
-    # "joblib == 1.0.1",
-    # "numpy == 1.19.5",
 
     # Exclude dask & modin while I test out spark
     "dask[complete] == 2021.6.0",
-    # "modin == 0.10.0",
-    # "modin[dask]",
-    #  "ray",
 
     # Auth
     # "pydata-google-auth",
@@ -41,6 +34,9 @@ INSTALL_REQUIRES = [
     "plotly == 4.14.3",
     "kaleido == 0.2.1",
 
+    # Read & write to GCS & google sheets
+    "gspread >= 4.0.1, <5.0",
+
 ]
 
 # These libraries will be installed only if called with "extras" syntax:
@@ -52,12 +48,20 @@ EXTRAS_REQUIRE = {
         "Sphinx", "coverage", "awscli", "flake8"
     ],
 
+    "colab": [
+        # Extra installs needed in colab notebooks
+        "gcsfs >= 2021.11.1",
+    ],
+
     "latop_dev": [
         "click == 8.0.1",
         "ipython <= 7.28.0",
         "joblib == 1.0.1",
         "jupyterlab <= 3.1.18",
         "markupsafe <= 1.1.1",
+
+        # Extentions to make jupyter notebook closer to jupyter lab
+        "jupyter_contrib_nbextensions == 0.5.1",
 
         "numpy == 1.19.5",
         "pyarrow == 5.0.0",
@@ -72,7 +76,15 @@ EXTRAS_REQUIRE = {
         "google-api-python-client == 2.22.0",
         "google-apitools == 0.5.31",
         "google-auth == 1.35.0",
+        "google-cloud-bigquery < 2.32.0",
+        "google-cloud-bigquery-storage < 2.11.0",
 
+        # load data from GCS & BigQuery
+        "gcsfs >= 2021.11.1",
+        "pandas-gbq == 0.17.0",
+
+        # visualize sets
+        "matplotlib-venn == 0.11.6",
     ],
 
     "cpu_eda": [
@@ -128,8 +140,14 @@ EXTRAS_REQUIRE = {
         #  pip install hdbscan --no-build-isolation --no-binary :all:
         # "hdbscan",
 
+        # nearest neighbors
+        "annoy == 1.17.0",
+
         # Graphvis to visualize dask jobs
         "graphviz >= 0.17",
+
+        # visualize sets
+        "matplotlib-venn == 0.11.6",
     ],
 
     "pytorch": [
@@ -171,6 +189,7 @@ EXTRAS_REQUIRE = {
     ],
 
     "tensorflow_233": [
+        # This is the default for main inference box
         # Core libraries need to be pinned... otherwise `pip` tries to upgrade them
         "click == 8.0.1",
         "joblib == 1.0.1",
@@ -312,7 +331,7 @@ EXTRAS_REQUIRE = {
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.4.0',
+    version='0.4.1',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',

@@ -91,6 +91,14 @@ endif
 test_environment:
 	$(PYTHON_INTERPRETER) test_environment.py
 
+## Install javascript & CSS files for jupyter_contrib_nbextenstions (optional)
+install_jcn_user:
+	# See: https://jupyter-contrib-nbextensions.readthedocs.io/en/latest/install.html
+	@echo ">>> Installing Javascript & CSS files needed for jupyter_contrib_nbextenstions"
+	source .venv/bin/activate && jupyter contrib nbextension install --user
+	@echo ">>> Enabling nbextension configurator (so you can edit from jupyter notebook GUI)"
+	source .venv/bin/activate && jupyter nbextensions_configurator enable --user
+
 #################################################################################
 # PROJECT RULES                                                                 #
 #################################################################################

@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from logging import info
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 
 import mlflow
 import pandas as pd
@@ -29,18 +29,23 @@ from ..utils.mlflow_logger import (
     MlflowLogger, save_pd_df_to_parquet_in_chunks,
     save_and_log_config,
 )
+from ..utils.tqdm_logger import FileLogger, LogTQDM
+
+
+log = logging.getLogger(__name__)
 
 
 def vectorize_text_to_embeddings(
+        subreddits_path: str,
+        posts_path: str,
+        comments_path: str,
         mlflow_experiment: str,
+        subreddits_path_exclude: str = None,
         model_name: str = 'use_multilingual',
         run_name: str = None,
         tokenize_lowercase: bool = False,
 
         bucket_name: str = 'i18n-subreddit-clustering',
-        subreddits_path: str = 'subreddits/de/2021-06-16',
-        posts_path: str = 'posts/de/2021-06-16',
-        comments_path: str = 'comments/de/2021-06-16',
         preprocess_text_folder: str = None,
 
         col_text_post: str = 'text',
@@ -73,6 +78,7 @@ def vectorize_text_to_embeddings(
         n_sample_posts: int = None,
         n_sample_comments: int = None,
         get_embeddings_verbose: bool = False,
+        log_each_batch_df_to_mlflow_invididually: bool = False,
 ) -> None:
     """
     Take files in GCS as input and run them through selected model to extract embeddings.
@@ -91,6 +97,7 @@ def vectorize_text_to_embeddings(
         'posts_path': posts_path,
         'comments_path': comments_path,
         'preprocess_text_folder': preprocess_text_folder,
+        'subreddits_path_exclude': subreddits_path_exclude,
 
         'col_text_post': col_text_post,
         'col_text_post_word_count': col_text_post_word_count,
@@ -133,10 +140,12 @@ def vectorize_text_to_embeddings(
         col_text_post_word_count,
         col_text_post_url,
     ]
-    l_cols_comments = [
+    l_cols_ix_comments = [
         'subreddit_name',
         'subreddit_id',
         col_comment_id,
+    ]
+    l_cols_comments = l_cols_ix_comments + [
         col_text_comment,
         col_text_comment_word_count,
     ]
@@ -164,6 +173,11 @@ def vectorize_text_to_embeddings(
         f"data/models/{model_name}/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
     )
     Path(path_this_model).mkdir(exist_ok=True, parents=True)
+    f_log = FileLogger(
+        logs_path=path_this_model,
+        log_name='log'
+    )
+    f_log.init_file_log()
     info(f"  Local model saving directory: {path_this_model}")
 
     mlf = MlflowLogger()
@@ -187,6 +201,23 @@ def vectorize_text_to_embeddings(
     model = hub.load(D_MODELS_TF_HUB[model_name])
     elapsed_time(t_start_hub_load, log_label='Load TF HUB model', verbose=True)
     logging.warning(f"For TF-HUB models, the only preprocessing applied is lowercase()")
+
+    # check whether to filter out subs -- this filter only applies to comments or posts
+    #  not to subreddit inference (this is so small and cheap it's not worth filtering)
+    df_subs_exclude = None
+    if subreddits_path_exclude is not None:
+        # Even if we have to process thousands of subs, these should be ok
+        #  as a single file. Sometimes BigQuery can output dozens of files even
+        #  if we're only processing a few thousand subs
+        info(f"Load subreddits df...")
+        t_start_subs_filter_load = datetime.utcnow()
+        df_subs_exclude = pd.read_parquet(
+            path=f"gs://{bucket_name}/{subreddits_path_exclude}",
+            columns=l_cols_subreddits
+        )
+        elapsed_time(t_start_subs_filter_load, log_label='df_subs_exclude loading', verbose=True)
+        info(f"  {df_subs_exclude.shape} <- df_subs_exclude shape")
+        assert len(df_subs_exclude) == df_subs_exclude[col_subreddit_id].nunique()
 
     if subreddits_path is not None:
         # Even if we have to process thousands of subs, these should be ok
@@ -238,6 +269,11 @@ def vectorize_text_to_embeddings(
         elapsed_time(t_start_posts, log_label='df_post loading', verbose=True)
         info(f"  {df_posts.shape} <- df_posts.shape")
         assert len(df_posts) == df_posts[col_post_id].nunique()
+
+        if df_subs_exclude is not None:
+            info(f"  Excluding posts for subs to exclude...")
+            df_posts = df_posts[~df_posts['subreddit_id'].isin(df_subs_exclude['subreddit_id'])]
+            info(f"  {df_posts.shape} <- df_posts.shape AFTER excluding subreddits")
 
         if n_sample_posts is not None:
             info(f"  Sampling posts down to: {n_sample_posts:,.0f}")
@@ -307,29 +343,30 @@ def vectorize_text_to_embeddings(
             # print(f"List of files to process: \n  {l_comment_files_to_process}")
 
             l_comment_files_to_process = list(bucket.list_blobs(prefix=comments_path))[:n_sample_comment_files]
+            if n_comment_files_slice_end is not None:
+                if n_comment_files_slice_start is None:
+                    n_comment_files_slice_start = 0
+                # make new copy of files to process so that when slicing the time estimates from tqdm
+                #  are useful/accurate
+                l_comment_files_to_process = (
+                    l_comment_files_to_process[n_comment_files_slice_start:n_comment_files_slice_end]
+                )
             total_comms_file_count = len(l_comment_files_to_process)
 
             info(f"-- Loading & vectorizing COMMENTS in files: {total_comms_file_count} --"
                  f"\nExpected batch size: {tf_batch_inference_rows}"
-
                  )
             try:
                 df_posts.shape
             except (TypeError, UnboundLocalError) as e:
                 logging.warning(f"df_posts missing, so we can't filter comments without a post...\n{e}")
 
-            if n_comment_files_slice_end is not None:
-                if n_comment_files_slice_start is None:
-                    n_comment_files_slice_start = 0
-
             # TODO(djb): instead of reading each file from GCS, cache them locally first!
             count_comms_files_processed = 1  # count from 1 because slices start at zero
-            for i, blob in enumerate(tqdm(l_comment_files_to_process, ascii=True)):
-                if n_comment_files_slice_end is not None:
-                    if not (n_comment_files_slice_start <= i < n_comment_files_slice_end):
-                        info(f"    -- Skipping file: {blob.name} --")
-                        continue
-
+            for i, blob in enumerate(LogTQDM(
+                    l_comment_files_to_process, mininterval=20, ascii=True,
+                    logger=log
+            )):
                 gc.collect()
                 # Use this name to map old files to new files
                 f_comment_name_root = blob.name.split('/')[-1].split('.')[0]
@@ -341,7 +378,12 @@ def vectorize_text_to_embeddings(
                     columns=l_cols_comments
                 )
                 # info(f"  {df_comments.shape} <- df_comments shape")
-                assert len(df_comments) == df_comments[col_comment_id].nunique()
+                if len(df_comments) > df_comments[col_comment_id].nunique():
+                    logging.warning(f"Found duplicate IDs in col: {col_comment_id}")
+                    info(f"Keeping only one row_per ID")
+                    df_comments = df_comments.drop_duplicates(subset=l_cols_ix_comments, keep='first')
+                    info(f"  {df_comments.shape} <- df_comments.shape AFTER removing duplicates")
+
                 gc.collect()
 
                 try:
@@ -349,9 +391,14 @@ def vectorize_text_to_embeddings(
                     # info(f"Keep only comments that match posts IDs in df_posts...")
                     if df_posts is not None:
                         df_comments = df_comments[df_comments[col_post_id].isin(df_posts[col_post_id])]
-                        info(f"  {df_comments.shape} <- updated df_comments shape AFTER removing orphan comments (w/o post)")
+                        info(f"  {df_comments.shape} <- df_comments.shape AFTER removing orphan comments (w/o post)")
                 except (TypeError, UnboundLocalError) as e:
                     pass
+
+                if df_subs_exclude is not None:
+                    info(f"  Excluding posts for subs to exclude...")
+                    df_comments = df_comments[~df_comments['subreddit_id'].isin(df_subs_exclude['subreddit_id'])]
+                    info(f"  {df_comments.shape} <- df_comments.shape AFTER excluding subreddits")
 
                 if n_sample_comments is not None:
                     n_sample_comments_per_file = 1 + int(n_sample_comments / total_comms_file_count)
@@ -360,6 +407,10 @@ def vectorize_text_to_embeddings(
                     df_comments = df_comments.sample(n=n_sample_comments_per_file)
                     info(f"  {df_comments.shape} <- df_comments.shape AFTER sampling")
 
+                if len(df_comments) == 0:
+                    info(f"  No comments left to vectorize after filtering, moving to next file...")
+                    continue
+
                 # only add the comment len AFTER sampling, otherwise we can get the wrong values
                 total_comments_count += len(df_comments)
 
@@ -367,7 +418,10 @@ def vectorize_text_to_embeddings(
                     info(f"Create merged text column")
                     df_comments[col_comment_text_to_concat] = ''
 
-                    for col_ in tqdm(cols_comment_text_to_concat, ascii=True, position=0, leave=True):
+                    for col_ in LogTQDM(
+                            cols_comment_text_to_concat, ascii=True,
+                            logger=log
+                            ):
                         mask_c_not_null = ~df_comments[col_].isnull()
                         df_comments.loc[
                             mask_c_not_null,
@@ -382,27 +436,70 @@ def vectorize_text_to_embeddings(
 
                 t_start_comms_vect = datetime.utcnow()
                 # Reset index right away so we don't forget to do it later
-                df_vect_comments = get_embeddings_as_df(
-                    model=model,
-                    df=df_comments,
-                    col_text=col_text_comment if cols_comment_text_to_concat is None else col_comment_text_to_concat,
-                    cols_index='comment_default_' if cols_index_comment is None else cols_index_comment,
-                    lowercase_text=tokenize_lowercase,
-                    batch_size=tf_batch_inference_rows,
-                    limit_first_n_chars=tf_limit_first_n_chars,
-                    verbose_init=get_embeddings_verbose,
-                ).reset_index()
+                col_text_ = col_text_comment if cols_comment_text_to_concat is None else col_comment_text_to_concat
+                cols_index_ = 'comment_default_' if cols_index_comment is None else cols_index_comment
+                # In general, we want a high batch_size because that'll complete faster, but we need to reduce
+                #  it when we deal with long text b/c it can overflow the GPU's memory and result in OOM errors.
+                # If a batch (n-rows in a file) fails, get_embeddings_as_df() will retry with
+                #  a lower `limit_first_n_chars` value. However, that may not be enough if too many comments
+                #  in a batch are really long. In that case, I have 2 try/excepts to reduce the `batch_size`
+                #  which should make it more likely for a job to complete even if the input batch_size was too hight.
+                try:
+                    df_vect_comments = get_embeddings_as_df(
+                        model=model,
+                        df=df_comments,
+                        col_text=col_text_,
+                        cols_index=cols_index_,
+                        lowercase_text=tokenize_lowercase,
+                        batch_size=tf_batch_inference_rows,
+                        limit_first_n_chars=tf_limit_first_n_chars,
+                        verbose_init=get_embeddings_verbose,
+                    ).reset_index()
+                except Exception as e:
+                    try:
+                        logging.error(f"Failed to vectorize comments")
+                        logging.error(e)
+                        new_batch_size = int(tf_batch_inference_rows * 0.8)
+                        info(f"*** Retrying with smaller batch size {new_batch_size}***")
+                        df_vect_comments = get_embeddings_as_df(
+                            model=model,
+                            df=df_comments,
+                            col_text=col_text_,
+                            cols_index=cols_index_,
+                            lowercase_text=tokenize_lowercase,
+                            batch_size=new_batch_size,
+                            limit_first_n_chars=tf_limit_first_n_chars,
+                            verbose_init=get_embeddings_verbose,
+                        ).reset_index()
+                    except Exception as er:
+                        logging.error(f"Failed to vectorize comments")
+                        logging.error(er)
+                        new_batch_size = int(tf_batch_inference_rows * 0.6)
+                        info(f"*** Retrying with smaller batch size {new_batch_size}***")
+                        df_vect_comments = get_embeddings_as_df(
+                            model=model,
+                            df=df_comments,
+                            col_text=col_text_,
+                            cols_index=cols_index_,
+                            lowercase_text=tokenize_lowercase,
+                            batch_size=new_batch_size,
+                            limit_first_n_chars=tf_limit_first_n_chars,
+                            verbose_init=get_embeddings_verbose,
+                        ).reset_index()
+
                 total_time_comms_vect += (
                     elapsed_time(t_start_comms_vect, log_label='df_comms-batch vectorizing', verbose=False) /
                     timedelta(minutes=1)
                 )
 
-                # Save single file locally, but wait until all files are done to log to mlflow
+                # Save single file locally & log to mlflow right away
+                #  this might take longer to upload than uploading as a batch but makes the code easier to follow
+                #  than having a giant try/except
                 save_df_and_log_to_mlflow(
                     df=df_vect_comments,
                     local_path=path_this_model,
                     name_for_metric_and_artifact_folder=local_comms_subfolder_relative,
-                    log_to_mlflow=False,
+                    log_to_mlflow=log_each_batch_df_to_mlflow_invididually,
                     save_in_chunks=False,
                     df_single_file_name=f_comment_name_root,
                 )
@@ -424,18 +521,27 @@ def vectorize_text_to_embeddings(
                  'total_comment_files_processed': count_comms_files_processed
                  }
             )
-            # add manual meta file for comms
-            _, c = df_vect_comments.shape
-            f_meta = f"_manual_meta-{total_comments_count}_by_{c}.txt"
-            with open(Path(local_comms_subfolder_full) / f_meta, 'w') as f_:
-                f_.write(f"Original dataframe info\n==="
-                         f"\n{total_comments_count:9,.0f}\t | rows (comments)\n{c:9,.0f} | columns of LAST FILE\n")
-                f_.write(f"\nColumn list:\n{list(df_vect_comments.columns)}")
 
-            info(f"Logging COMMENT files as mlflow artifact (to GCS)...")
-            mlflow.log_artifacts(str(local_comms_subfolder_full), local_comms_subfolder_relative)
+            if total_comments_count == 0:
+                logging.warning(f"No comments to process, can't log artifacts to mlflow")
+            else:
+                try:
+                    # add manual meta file for comms
+                    _, c = df_vect_comments.shape
+                    f_meta = f"_manual_meta-{total_comments_count}_by_{c}.txt"
+                    with open(Path(local_comms_subfolder_full) / f_meta, 'w') as f_:
+                        f_.write(f"Original dataframe info\n==="
+                                 f"\n{total_comments_count:9,.0f}\t | rows (comments)\n{c:9,.0f} | columns of LAST FILE\n")
+                        f_.write(f"\nColumn list:\n{list(df_vect_comments.columns)}")
+                except UnboundLocalError:
+                    pass
 
-            del df_vect_comments
+                # No longer need to log all artifacts at the end b/c we're logging each file individually
+                if not log_each_batch_df_to_mlflow_invididually:
+                    info(f"Logging COMMENT files as mlflow artifact (to GCS)...")
+                    mlflow.log_artifacts(str(local_comms_subfolder_full), local_comms_subfolder_relative)
+
+                del df_vect_comments
             gc.collect()
 
         else:
@@ -492,8 +598,11 @@ def vectorize_text_to_embeddings(
     mlflow.log_metric('vectorizing_time_minutes_full_function',
                       total_fxn_time / timedelta(minutes=1)
                       )
+    # load log file into mlflow
+    mlflow.log_artifact(f_log.f_log_file)
+    f_log.remove_file_logger()
     mlflow.end_run()
-    # return model, df_vect, df_vect_comments, df_vect_subs
+    # Don't return anything b/c it's hard to predict output, instead check mlflow for artifacts
 
 
 def get_embeddings_as_df(
@@ -592,7 +701,10 @@ def get_embeddings_as_df(
         if verbose:
             info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
-        for i in tqdm(iteration_chunks, ascii=True, ncols=80, position=0, leave=True):
+        for i in LogTQDM(
+                iteration_chunks, mininterval=11, ascii=True,  ncols=80,  # position=0, leave=True,
+                logger=log
+                ):
             try:
                 l_df_embeddings.append(
                     get_embeddings_as_df(

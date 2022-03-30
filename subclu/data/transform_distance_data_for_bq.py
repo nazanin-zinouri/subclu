@@ -235,7 +235,7 @@ def reshape_distances_to_pairwise_bq(
     # Rename index & column names, BEFORE .unstack() to prevent name collisions
     #  i.e., if they both have the same name, we'll get a ValueError
 
-    # Reshape distances to pair-wise & rename columns
+    info(f"Reshape distance matrix to pair-wise & rename columns")
     df_dist_pair = (
         df_distance_matrix
         .rename_axis(f'{index_name}_a', axis='columns')
@@ -264,6 +264,8 @@ def reshape_distances_to_pairwise_bq(
             'German_posts_percent',
             'post_median_word_count',
         ]
+        l_meta_basic = [c for c in l_meta_basic if c in df_sub_metadata.columns]
+
         df_dist_pair = (
             df_dist_pair
             .merge(

@@ -29,8 +29,10 @@ Array = Union[np.array, pd.Series, pd.DataFrame, List]
 # ===============
 # Logging & Misc
 # ===
-def reorder_array(items_to_front: list,
-                  array):
+def reorder_array(
+        items_to_front: list,
+        array
+):
     """
     if the array is a dataframe, re-order the columns
     if array is list-like, re-order it
@@ -78,6 +80,55 @@ def get_venn_sets2(
     d_[f"{b_name}_only"] = set(iter_b) - set(iter_a)
 
     return d_
+
+
+def get_venn_sets3(
+        iter_a: iter,
+        iter_b: iter,
+        iter_c: iter,
+        a_name: str = 'a',
+        b_name: str = 'b',
+        c_name: str = 'c',
+        print_counts: bool = True,
+        return_dict: bool = True,
+) -> Dict[str, set]:
+    """Input 3 iterables and return a dictionary with
+    the items in one
+    """
+    if not isinstance(iter_a, set):
+        set_a = set(iter_a)
+    else:
+        set_a = iter_a
+    if not isinstance(iter_b, set):
+        set_b = set(iter_b)
+    else:
+        set_b = iter_b
+    if not isinstance(iter_c, set):
+        set_c = set(iter_c)
+    else:
+        set_c = iter_c
+
+    if print_counts:
+        print(f"{len(set_a):6,.0f} <- {a_name}")
+        print(f"{len(set_b):6,.0f} <- {b_name}")
+        print(f"{len(set_c):6,.0f} <- {c_name}")
+        print(f"---")
+        print(f"{len(set_a | set_b | set_c):6,.0f} <- {a_name} OR {b_name} OR {c_name}")
+        print(f"")
+        print(f"{len(set_a | set_b):6,.0f} <- {a_name} OR {b_name}")
+        print(f"{len(set_a | set_c):6,.0f} <- {a_name} OR {c_name}")
+        print(f"{len(set_b | set_c):6,.0f} <- {b_name} OR {c_name}")
+
+    if return_dict:
+        d_ = dict()
+        d_[f"{a_name}_only"] = set_a - set_b - set_c
+        d_[f"{b_name}_only"] = set_b - set_a - set_c
+        d_[f"{c_name}_only"] = set_c - set_b - set_a
+
+        # TODO(djb): calculate all set intersections?
+        d_[f"{a_name}_and_{b_name}_and_{c_name}"] = set_a & set_b & set_c
+
+        return d_
 
 
 def setup_logging(
@@ -493,7 +544,8 @@ def style_df_numeric(
         currency_cols: List[str] = None,
         currency_format: str = "${:,.2f}",
         d_custom_style: dict = None,
-        fillna: Any = None,
+        fillna_numeric: Any = None,
+        fillna_obj: Any = None,
         na_rep: str = '-',
         rename_cols_for_display: bool = False,
         rename_cols_pairs: List[Tuple] = None,
@@ -534,7 +586,8 @@ def style_df_numeric(
         currency_cols:
         currency_format:
         d_custom_style:
-        fillna:
+        fillna_numeric:
+        fillna_obj:
         na_rep:
         rename_cols_for_display:
             replace underscores so it's easier to view/display column names
@@ -552,6 +605,8 @@ def style_df_numeric(
 
     native_int_cols = {c for c in df.select_dtypes(include=['int']).columns}
     all_num_cols = {c for c in df.select_dtypes('number').columns} - native_int_cols
+    # TODO(djb): calculate set of int & pct cols by label upfront & then exclude int_cols & pct_cols
+    #  from them so that int_cols & pct_cols always override int_labels & pct_labels
 
     if int_cols is True:
         int_cols = set(all_num_cols)
@@ -594,8 +649,13 @@ def style_df_numeric(
     if d_custom_style is not None:
         d_format.update(d_custom_style)
 
-    if fillna is not None:
-        df[all_num_cols] = df[all_num_cols].fillna(fillna)
+    if fillna_numeric is not None:
+        df[all_num_cols] = df[all_num_cols].fillna(fillna_numeric)
+
+    if fillna_obj is not None:
+        df[df.drop(all_num_cols, axis=1).columns] = (
+            df[df.drop(all_num_cols, axis=1).columns].fillna(fillna_obj)
+        )
 
     if rename_cols_for_display:
         if rename_cols_pairs is None:
@@ -611,6 +671,10 @@ def style_df_numeric(
 
         d_format = {rename_col_fxn(k): v for k, v in d_format.items()}
         df = df.rename(columns={c: rename_col_fxn(c) for c in df.columns})
+
+        # rename index as well
+        ix_rename = {ix: rename_col_fxn(ix) for ix in df.index.names}
+        df = df.rename_axis(index=ix_rename)
 
     if verbose:
         info(f"Format dictionary:\n  {d_format}")

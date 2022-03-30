@@ -31,7 +31,7 @@ Example for v0.4.0 queries:<br>
     - Create new table with lower geo-relevance threshold & definition (this way Cricket is relevant to India & the UK) 
   - [`_01_select_subreddits.sql`](https://github.snooguts.net/david-bermejo/subreddit_clustering_i18n/blob/master/subclu/data/sql_dataset_selection_and_creation/v0.4.0_add_more_geo_and_active_subs/_01_select_subreddits.sql)
     - Based on new geo-relevance definition, select highly active subs + subs that are i18n targets (e.g., Germany, France, India, Australia) 
-  - [`_02_selects_posts_for_modeling.sql`](https://github.snooguts.net/david-bermejo/subreddit_clustering_i18n/blob/master/subclu/data/sql_dataset_selection_and_creation/v0.4.0_add_more_geo_and_active_subs/_02_selects_posts_for_modeling.sql)
+  - [`_02_select_posts_for_modeling.sql`](https://github.snooguts.net/david-bermejo/subreddit_clustering_i18n/blob/master/subclu/data/sql_dataset_selection_and_creation/v0.4.0_add_more_geo_and_active_subs/_02_select_posts_for_modeling.sql)
     - Selects posts for the selected subreddits
     - Currently we limit to the top 1,200 comments from selected subreddits
     - Adds text from OCR (if it exists) and does some basic text clean up

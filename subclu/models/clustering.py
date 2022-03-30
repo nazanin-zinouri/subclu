@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 from pathlib import Path
+from typing import Union
 
 import joblib
 import mlflow
@@ -35,13 +36,16 @@ from sklearn.pipeline import Pipeline
 from ..utils.tqdm_logger import LogTQDM
 from ..utils import mlflow_logger
 from ..utils.mlflow_logger import (
-    MlflowLogger,  # save_pd_df_to_parquet_in_chunks,
-    save_df_and_log_to_mlflow
+    MlflowLogger,
+    save_df_and_log_to_mlflow,
 )
 from ..utils import get_project_subfolder
 from ..utils.eda import elapsed_time
 from ..data.data_loaders import LoadSubreddits  # , LoadPosts
-
+from ..utils.ml_metrics import (
+    log_precision_recall_fscore_support,
+    log_classification_report_and_confusion_matrix,
+)
 from .clustering_utils import (
     create_linkage_for_dendrogram, fancy_dendrogram,
     plot_elbow_and_get_k
@@ -55,33 +59,73 @@ from .clustering_registry import (
 log = logging.getLogger(__name__)
 
 
-@hydra.main(config_path='../config', config_name="clustering_v0.4.0_base")
-def culster_embeddings(cfg: DictConfig) -> object:
+@hydra.main(config_path='../config', config_name="clustering_v0.4.1_subreddit_base")
+def cluster_embeddings(
+        cfg: DictConfig,
+        return_object: bool = False
+) -> Union[None, object]:
     """
     The hydra runner will call the clustering class and apply all the needed
     hyperparameters
+    Note: by default we DO NOT return the cluster object because at some point around
+       December something changed and we started getting a joblib/hydra error
+
+    Args:
+        cfg: hydra/omegaconf dictionary configuration
+
+        return_object:
+            whether to return the clustering object. By default, set to False
+            because setting to True can result in errors when doing multi-run
+
+    Returns:
+        By default, set to False
+            because setting to True can result in errors when doing multi-run
     """
     print(f"CFG keys: {cfg.keys()}")
 
     log.info(f"Define cluster class...")
     cluster = ClusterEmbeddings(
-        dict_data_embeddings_to_cluster=cfg['data_embeddings_to_cluster'],
-        dict_clustering_algo=cfg['clustering_algo'],
-        dict_data_text_and_metadata=cfg['data_text_and_metadata'],
+        data_embeddings_to_cluster=cfg['data_embeddings_to_cluster'],
+        clustering_algo=cfg['clustering_algo'],
+        data_text_and_metadata=cfg['data_text_and_metadata'],
         embeddings_to_cluster=cfg['embeddings_to_cluster'],
+        mlflow_experiment_name=cfg['mlflow_experiment_name'],
         mlflow_tracking_uri=cfg.get('mlflow_tracking_uri', 'sqlite'),
+        n_max_clusters_to_check_for_optimal_k=cfg.get('n_max_clusters_to_check_for_optimal_k', 2200),
         n_sample_embedding_rows=cfg.get('n_sample_embedding_rows', None),
-        mlflow_experiment_name=cfg.get('mlflow_experiment_name', 'v0.4.0_use_multi_clustering_test'),
         mlflow_run_name=(
             f"{cfg.get('mlflow_run_name', 'embedding_clustering')}-{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
         ),
-        dict_filter_embeddings=cfg.get('filter_embeddings', None),
-        pipeline_config=cfg.get('pipeline', None),
-        logs_path=cfg.get('logs_path', 'logs/ClusterEmbeddings'),
+        filter_embeddings=cfg.get('filter_embeddings', None),
+        pipeline_config=cfg.get('pipeline', cfg.get('pipeline_config', None)),
+        logs_path=cfg.get('logs_path', 'logs'),
     )
 
     cluster.run_clustering()
-    return cluster
+
+    if return_object:
+        return cluster
+
+    """
+    Error from hydra/joblib in multi-run details.
+    Fix for now by returning None (nothing)
+    ```
+    Traceback (most recent call last):
+      File "/opt/conda/lib/python3.7/site-packages/hydra/_internal/utils.py", line 211, in run_and_report
+        return func()
+      File "/opt/conda/lib/python3.7/site-packages/hydra/_internal/hydra.py", line 139, in multirun
+        ret = sweeper.sweep(arguments=task_overrides)
+      File "/opt/conda/lib/python3.7/site-packages/hydra/_internal/core_plugins/basic_sweeper.py", line 157, in sweep
+        results = self.launcher.launch(batch, initial_job_idx=initial_job_idx)
+      File "/opt/<same_as_above>/site-packages/hydra_plugins/hydra_joblib_launcher/joblib_launcher.py", line 46, in launch
+      ...
+      File "/opt/conda/lib/python3.7/concurrent/futures/_base.py", line 435, in result
+        return self.__get_result()
+      File "/opt/conda/lib/python3.7/concurrent/futures/_base.py", line 384, in __get_result
+        raise self._exception
+      TypeError: can't pickle _thread.RLock objects
+    ```
+    """
 
 
 class ClusterEmbeddings:
@@ -92,27 +136,29 @@ class ClusterEmbeddings:
     """
     def __init__(
             self,
-            dict_data_embeddings_to_cluster: dict,
-            dict_clustering_algo: dict,
-            dict_data_text_and_metadata: dict,
+            data_embeddings_to_cluster: dict,
+            clustering_algo: dict,
+            data_text_and_metadata: dict,
+            mlflow_experiment_name: str,
             embeddings_to_cluster: str = 'df_sub_level_agg_c_post_comments_and_sub_desc',
             n_sample_embedding_rows: int = None,
+            n_max_clusters_to_check_for_optimal_k: int = 2200,
             mlflow_tracking_uri: str = 'sqlite',
-            mlflow_experiment_name: str = 'v0.4.0_use_multi_clustering_test',
             mlflow_run_name: str = 'embedding_clustering',
             pipeline_config: dict = None,
-            dict_filter_embeddings: dict = None,
-            logs_path: str = 'logs/ClusterEmbeddings',
-            col_model_leaves_order: str = 'model_leaves_list_order_left_to_right',
+            filter_embeddings: dict = None,
+            logs_path: str = 'logs',
+            col_model_leaves_order: str = 'model_sort_order',
             # **kwargs
     ):
         """"""
-        self.dict_data_embeddings_to_cluster = dict_data_embeddings_to_cluster
-        self.dict_clustering_algo = dict_clustering_algo
-        self.dict_data_text_and_metadata = dict_data_text_and_metadata
+        self.data_embeddings_to_cluster = data_embeddings_to_cluster
+        self.clustering_algo = clustering_algo
+        self.data_text_and_metadata = data_text_and_metadata
 
         self.embeddings_to_cluster = embeddings_to_cluster
         self.n_sample_embedding_rows = n_sample_embedding_rows
+        self.n_max_clusters_to_check_for_optimal_k = n_max_clusters_to_check_for_optimal_k
 
         self.mlflow_experiment_name = mlflow_experiment_name
         self.mlflow_run_name = mlflow_run_name
@@ -126,7 +172,7 @@ class ClusterEmbeddings:
         # pipeline to store model
         self.pipeline_config = pipeline_config
         self.pipeline = None
-        self.dict_filter_embeddings = dict_filter_embeddings
+        self.filter_embeddings = filter_embeddings
 
         # attributes to save outputs
         self.df_accel = None
@@ -154,12 +200,6 @@ class ClusterEmbeddings:
             self.mlf.log_ram_stats(param=True, only_memory_used=False)
 
             self._set_path_local_model()
-
-            # TODO(djb): fix -- log configs for nested dictionaries
-            #  examples:
-            #   - pipeline input configs
-            #   - clustering algo inputs
-            #   - filter embeddings config
             self._create_and_log_config()
 
             log.info(f"Creating pipeline...")
@@ -168,8 +208,8 @@ class ClusterEmbeddings:
             log.info(f"Loading embeddings...")
             df_embeddings = self._load_embeddings()
 
-            if self.dict_filter_embeddings is not None:
-                if self.dict_filter_embeddings.get('filter_subreddits', False):
+            if self.filter_embeddings is not None:
+                if self.filter_embeddings.get('filter_subreddits', False):
                     log.info(f"-- Loading data to filter SUBREDDITS")
                     df_subs = self._load_metadata_for_filtering()
 
@@ -199,18 +239,15 @@ class ClusterEmbeddings:
 
             self._log_pipeline_to_mlflow()
 
-            # TODO(djb): Get metrics: elbow & "optimal" k's
-            #  Only applies to agg-clutering models
-            # TODO(djb): Create, save & log dendrograms
+            # Linkage and optimal Ks only applies to hierarchical clustering
+            # TODO(djb): need a different method when using a different cluster type
             self._get_linkage_and_optimal_ks()
             self.mlf.log_ram_stats(param=False, only_memory_used=True)
 
-            # TODO(djb): Get predictions for each row (subreddit or post)
-            # TODO(djb): Get metrics to compare clusters:
-            #  - classification report
+            # Use the majority label for a cluster to compute supervised metrics
+            #  We can use these to compare and find the "best" clusters:
             #  - adjusted metrics (rand index, mutual info)
-            #  - homegeneity
-            self._get_cluster_ids_and_labels(
+            self._get_cluster_ids_and_labels_and_supervised_metrics(
                 df_embeddings=df_embeddings,
                 df_subs=df_subs,
             )
@@ -228,20 +265,26 @@ class ClusterEmbeddings:
             mlflow.log_metric('vectorizing_time_minutes',
                               total_fxn_time / timedelta(minutes=1)
                               )
-            log.info(f"=== END clustering ===")
-            self.mlf.log_ram_stats(param=False, only_memory_used=True)
-            log.info(f"  Uploading logs to mlflow...")
-            l_logs = list(Path(os.getcwd()).glob('*.log'))
-            for f_ in l_logs:
-                try:
-                    mlflow.log_artifact(str(f_))
-                except Exception as e:
-                    log.error(f"Couldn't log file: {f_}\n  {e}")
-            mlflow.end_run()
+            log.info(f"--- END clustering metrics---")
 
-        if os.getcwd() == get_original_cwd():
-            log.info(f"    Removing fileHandler...")
-            self._remove_file_logger()
+            log.info(f"  Uploading logs to mlflow...")
+            try:
+                self.mlf.log_ram_stats(param=False, only_memory_used=True)
+                l_logs = list(Path(os.getcwd()).glob('*.log'))
+                for f_ in l_logs:
+                    try:
+                        mlflow.log_artifact(str(f_))
+                    except Exception as e:
+                        log.error(f"Couldn't log file: {f_}\n  {e}")
+            except Exception as er:
+                logging.error(f" Could not upload logs to mlflow {er}")
+
+            # no need for mlflow.end_run() because we're running in a `with ...` block context
+
+        # Remove fileHandler to prevent edge case: one file captures logs from multiple runs
+        self._remove_file_logger()
+
+        logging.info(f"=== END clustering full job ===")
 
     def _create_pipeline(self):
         """Create pipeline with steps from pipeline config
@@ -255,8 +298,8 @@ class ClusterEmbeddings:
             ('cluster', AgglomerativeClustering(n_clusters=30, affinity='euclidean', connectivity=False)),
         ])
         """
-        cls = D_CLUSTER_MODELS[self.dict_clustering_algo['model_name']](
-            **self.dict_clustering_algo['model_kwargs']
+        cls = D_CLUSTER_MODELS[self.clustering_algo['model_name']](
+            **self.clustering_algo['model_kwargs']
         )
         # start with only the clustering algo
         self.pipeline = Pipeline([
@@ -292,8 +335,8 @@ class ClusterEmbeddings:
     def _load_embeddings(self):
         """Load embeddings for clustering"""
         df_embeddings = self.mlf.read_run_artifact(
-            run_id=self.dict_data_embeddings_to_cluster['run_uuid'],
-            artifact_folder=self.dict_data_embeddings_to_cluster[self.embeddings_to_cluster],
+            run_id=self.data_embeddings_to_cluster['run_uuid'],
+            artifact_folder=self.data_embeddings_to_cluster[self.embeddings_to_cluster],
             read_function='pd_parquet',
             cache_locally=True,
         )
@@ -316,12 +359,11 @@ class ClusterEmbeddings:
 
     def _load_metadata_for_filtering(self) -> pd.DataFrame:
         """Load metadata to filter embeddings"""
-        pass
         log.warning(f"** Loading metadata **")
         return LoadSubreddits(
-            bucket_name=self.dict_data_text_and_metadata['bucket_name'],
-            folder_path=self.dict_data_text_and_metadata['folder_subreddits_text_and_meta'],
-            folder_posts=self.dict_data_text_and_metadata['folder_posts_text_and_meta'],
+            bucket_name=self.data_text_and_metadata['bucket_name'],
+            folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
+            folder_posts=self.data_text_and_metadata['folder_posts_text_and_meta'],
             columns=None,
             # col_new_manual_topic=col_manual_labels,
         ).read_apply_transformations_and_merge_post_aggs(
@@ -341,8 +383,8 @@ class ClusterEmbeddings:
         those embeddings very much.
         """
         log.info(f"** Applying filters... **")
-        col_filter_ = self.dict_filter_embeddings['filter_subreddits']['filter_column']
-        min_value = self.dict_filter_embeddings['filter_subreddits']['minimum_column_value']
+        col_filter_ = self.filter_embeddings['filter_subreddits']['filter_column']
+        min_value = self.filter_embeddings['filter_subreddits']['minimum_column_value']
         log.info(f"  {col_filter_} >= {min_value}")
 
         df_embeddings = (
@@ -403,7 +445,7 @@ class ClusterEmbeddings:
             fig = plt.figure(figsize=(14, 8))
             self.df_accel, self.optimal_ks = plot_elbow_and_get_k(
                 self.X_linkage,
-                n_clusters_to_check=500,
+                n_clusters_to_check=self.n_max_clusters_to_check_for_optimal_k,
                 return_optimal_ks=True,
             )
             plt.savefig(
@@ -412,7 +454,7 @@ class ClusterEmbeddings:
                 ),
                 dpi=200, bbox_inches='tight', pad_inches=0.2
             )
-            plt.show()  # show AFTER saving, otherwise we'll save an empty plot
+            # plt.show()  # show AFTER saving, otherwise we'll save an empty plot
             plt.close(fig)
             del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
@@ -446,10 +488,10 @@ class ClusterEmbeddings:
             p_vals = {40}
             try:
                 p_vals.add(
-                    int(self.optimal_ks['050_to_100']['k'] + 1)
+                    int(self.optimal_ks['0060_to_0080']['k'] + 1)
                 )
                 p_vals.add(
-                    int(self.optimal_ks['100_to_200']['k'] + 1)
+                    int(self.optimal_ks['0100_to_0200']['k'] + 1)
                 )
             except Exception as e:
                 log.error(f"  {e}")
@@ -477,7 +519,7 @@ class ClusterEmbeddings:
                     ),
                     dpi=200, bbox_inches='tight', pad_inches=0.2
                 )
-                plt.show()
+                # plt.show()
                 plt.close(fig)
                 del fig
             mlflow.log_artifacts(self.path_local_model_figures, 'figures')
@@ -485,7 +527,7 @@ class ClusterEmbeddings:
         except Exception as e:
             log.error(f"Dendrogram failed:\n  {e}")
 
-    def _get_cluster_ids_and_labels(
+    def _get_cluster_ids_and_labels_and_supervised_metrics(
             self,
             df_embeddings: pd.DataFrame,
             df_subs: pd.DataFrame = None,
@@ -493,7 +535,7 @@ class ClusterEmbeddings:
         """For a number of K-values, we need to get the labels"""
         # try to add other columns from the df_subs meta
         l_cols_ground_truth = [
-            # 'rating_name',  # ignore rating, it's useles/noisy for clustering
+            # 'rating_name',  # ignore rating, it's noisy for clustering
             'primary_topic',
         ]
         l_cols_to_add = l_cols_ground_truth + [
@@ -536,14 +578,43 @@ class ClusterEmbeddings:
         except Exception as e:
             log.error(f"Failed to append model leaves order\n  {e}")
 
-        s_k_to_evaluate = set(np.arange(10, 260, 10))
+        # for plots we'd like a smoother or more constant interval between k's,
+        #  but for the final df_labels table (which will be uploaded to bigquery)
+        #  we want fewer k's because each k will be a column and we want to make it easier
+        #  for people to pick one k -- they could get overwhelmed if we give them a ton
+        #  of columns and they wouldn't pick any of them
+        s_k_to_evaluate = (
+            set(np.arange(10, 100, 10)) |
+            set(np.arange(100, 200, 25))
+        )
+        # increase interval between k's as we go bigger
+        if 200 <= self.n_max_clusters_to_check_for_optimal_k:
+            s_k_to_evaluate = (
+                s_k_to_evaluate |
+                set(np.arange(200, 1 + min(1000, self.n_max_clusters_to_check_for_optimal_k), 100))
+            )
+        if 1000 <= self.n_max_clusters_to_check_for_optimal_k:
+            s_k_to_evaluate = (
+                s_k_to_evaluate |
+                set(np.arange(1000, 1 + min(3000, self.n_max_clusters_to_check_for_optimal_k), 250))
+            )
+        if 3000 <= self.n_max_clusters_to_check_for_optimal_k:
+            s_k_to_evaluate = (
+                s_k_to_evaluate |
+                set(np.arange(3000, 1 + self.n_max_clusters_to_check_for_optimal_k, 200))
+            )
+        # explicitly add n_max clusters in case intervals missed it
+        s_k_to_evaluate = s_k_to_evaluate | {self.n_max_clusters_to_check_for_optimal_k}
+
         # add the 'optimal' k_ values:
         for interval_, d_ in self.optimal_ks.items():
             s_k_to_evaluate.add(int(d_['k']))
 
         log.info(f"Get cluster IDs for each designated k...")
+        label_col_prefix = 'k_'
+        label_col_suffix = '_label'
         for k_ in LogTQDM(sorted(s_k_to_evaluate)):
-            self.df_labels_[f"{k_:03d}_k_labels"] = fcluster(self.X_linkage, k_, criterion='maxclust')
+            self.df_labels_[f"{label_col_prefix}{k_:04d}{label_col_suffix}"] = fcluster(self.X_linkage, k_, criterion='maxclust')
 
         log.info(self.df_labels_.shape)
 
@@ -553,7 +624,6 @@ class ClusterEmbeddings:
             d_metrics = dict()
             l_cols_predicted = list()
             l_metrics_for_df = list()
-            # val_fill_pred_nulls = 'Meta/Reddit'
 
             log.info(f"-- Get true labels & metrics --")
             # use list of optimal k's to log
@@ -561,10 +631,20 @@ class ClusterEmbeddings:
             for interval_, d_ in self.optimal_ks.items():
                 d_optimal_ks_lookup[d_['k']] = interval_
 
-            for col_cls_labels in LogTQDM([c for c in self.df_labels_.columns if '_k_labels' in c], mininterval=.8, ):
-                k_int = int(col_cls_labels.split('_k_')[0])
-                k_col_prefix = col_cls_labels.replace('_labels', '')
-                log.info(f"  k: {k_col_prefix}")
+            # create folder to save supervised artifacts
+            folder_ = 'df_supervised_metrics'
+            folder_full_ = self.path_local_model / folder_
+            folder_classifxn_ = 'df_classification_reports'
+            folder_classifxn_full_ = self.path_local_model / folder_classifxn_
+
+            for col_cls_labels in LogTQDM(
+                    [c for c in self.df_labels_.columns if c.endswith(label_col_suffix)],
+                    mininterval=.8,
+                    desc='select k-values',
+            ):
+                k_int = int(col_cls_labels.replace(label_col_suffix, '').replace(label_col_prefix, ''))
+                k_col_prefix = col_cls_labels.replace(label_col_suffix, '')
+                # log.info(f"  k: {k_col_prefix}")
 
                 d_df_crosstab_labels[col_cls_labels] = dict()
                 d_metrics[col_cls_labels] = dict()
@@ -581,7 +661,7 @@ class ClusterEmbeddings:
                     )
 
                     # Create new predicted column
-                    col_pred_ = f"{k_col_prefix}-predicted-{c_tl}"
+                    col_pred_ = f"{k_col_prefix}_majority_{c_tl}"
                     l_cols_predicted.append(col_pred_)
                     self.df_labels_ = self.df_labels_.merge(
                         (
@@ -598,22 +678,63 @@ class ClusterEmbeddings:
                     # Should be rare, but fill just in case?
                     # self.df_labels_[col_pred_] = self.df_labels_[col_pred_].fillna(val_fill_pred_nulls)
 
-                    # =====================
-                    # Classification report
-                    # ===
-                    #         print(
-                    #             classification_report(
-                    #                 y_true=self.df_labels_[mask_not_null_gt][c_tl],
-                    #                 y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
-                    #                 zero_division=0,
-                    #             )
-                    #         )
-
+                    # store metrics for this k in this dict & combine all of them in a df later
                     d_metrics_this_split = {
                         'predicted_col': col_cls_labels,
                         'truth_col': c_tl,
                         'k': k_int,
                     }
+                    # =====================
+                    # Classification report
+                    # ===
+                    # Save confusion matrices & per-class metrics only for optimal K's
+                    if k_int in d_optimal_ks_lookup.keys():
+                        data_fold_name_ = f"{c_tl}-{d_optimal_ks_lookup[k_int]}"
+                        log_clf_metrics_to_mlflow_ = True
+                        log_classification_report_and_confusion_matrix(
+                            y_true=self.df_labels_[mask_not_null_gt][c_tl],
+                            y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            data_fold_name=f"{c_tl}-{d_optimal_ks_lookup[k_int]}-{k_int}",
+                            beta=1,
+                            class_labels=None,
+                            sort_labels_by_support=True,
+                            save_path=folder_classifxn_full_,
+                            log_metrics_to_console=False,
+                            log_df_to_console=False,
+                            log_metrics_to_mlflow=False,
+                            log_artifacts_to_mlflow=False,
+                            log_support_avg=True,
+                            log_support_per_class=True,
+                        )
+                    else:
+                        data_fold_name_ = f"{c_tl}-{k_int}"
+                        log_clf_metrics_to_mlflow_ = False
+
+                    # Save aggregate classification scores for all K's so we can compare & plot them
+                    #  Only log to mlflow optimal k's (see check above)
+                    d_metrics_this_split.update(
+                        log_precision_recall_fscore_support(
+                            y_true=self.df_labels_[mask_not_null_gt][c_tl],
+                            y_pred=self.df_labels_[mask_not_null_gt][col_pred_],
+                            data_fold_name=data_fold_name_,
+                            append_fold_name_as_metric_prefix=True,
+                            beta=1,
+                            average='macro_and_weighted',
+                            class_labels=None,
+                            save_path=None,
+                            log_metrics_to_console=False,
+                            log_metrics_to_mlflow=log_clf_metrics_to_mlflow_,
+                            log_artifacts_to_mlflow=False,
+                            log_df_to_console=False,
+                            log_support=False,
+                            output_dict=True,
+                            append_fold_name_to_output_dict=False,
+                        )
+                    )
+
+                    # ===============
+                    # Other metrics
+                    # ===
                     for m_name, metric_ in D_CLUSTER_METRICS_WITH_KNOWN_LABELS.items():
                         try:
                             d_metrics_this_split[m_name] = metric_(
@@ -626,6 +747,7 @@ class ClusterEmbeddings:
                                 labels_pred=self.df_labels_[mask_not_null_gt][col_pred_],
                             )
 
+                        # Only log to MLflow metrics for optimal Ks
                         if k_int in d_optimal_ks_lookup.keys():
                             mlflow.log_metric(
                                 f"{c_tl}-{d_optimal_ks_lookup[k_int]}-{m_name}",
@@ -637,8 +759,6 @@ class ClusterEmbeddings:
             log.info(f"{self.df_supervised_metrics_.shape} <- df_supervised metrics shape")
 
             log.info(f"  Saving df_supervised_metrics...")
-            folder_ = 'df_supervised_metrics'
-            folder_full_ = self.path_local_model / folder_
             save_df_and_log_to_mlflow(
                 df=self.df_supervised_metrics_,
                 path=self.path_local_model,
@@ -653,24 +773,19 @@ class ClusterEmbeddings:
                 df_plot = self.df_supervised_metrics_[
                     self.df_supervised_metrics_['truth_col'] == tc_val
                 ]
-                fig = plt.figure(figsize=(14, 8))
-                for c_ in [c for c in self.df_supervised_metrics_.columns if c.endswith('_score')]:
+                for metrics_group in ['_score', '_avg']:
+                    self._plot_metric_scores(
+                        df_plot=df_plot,
+                        true_col=tc_val,
+                        metric_cols_suffix=metrics_group,
+                        save_path=folder_full_,
+                    )
 
-                    sns.lineplot(data=df_plot, x='k', y=c_,
-                                 label=c_)
-
-                plt.title(f"Scores for: {tc_val}")
-                plt.ylabel(f"score")
-                plt.xlabel(f"k (number of clusters)")
-                plt.savefig(
-                    folder_full_ / (
-                        f"metrics_for_known_labels-{tc_val}.png"
-                    ),
-                    dpi=200, bbox_inches='tight', pad_inches=0.2
-                )
-                plt.close(fig)
-                del fig
+            # Log general supervised metrics
             mlflow.log_artifacts(folder_full_, artifact_path=folder_)
+
+            # Log classification report dataframes
+            mlflow.log_artifacts(folder_classifxn_full_, folder_classifxn_)
 
         save_df_and_log_to_mlflow(
             df=self.df_labels_,
@@ -679,13 +794,65 @@ class ClusterEmbeddings:
             index=True,
         )
 
+    def _plot_metric_scores(
+            self,
+            df_plot: pd.DataFrame,
+            true_col: str,
+            metric_cols_suffix: str,
+            save_path: Path,
+    ):
+        """Plot metric scores at different k-values
+        Since we'll be plotting a lot of different metrics, better to use it to split into
+        two plots:
+        - one for clustering metrics (homogeneity, adjusted mutual info, adjusted rand score)
+        - another one for classification metrics (precision, recall, f1)
+        """
+        fig = plt.figure(figsize=(14, 8))
+
+        if metric_cols_suffix == '_score':
+            save_suffix = 'clustering'
+        elif metric_cols_suffix == '_avg':
+            save_suffix = 'classification'
+        else:
+            raise NotImplementedError
+
+        # only plot cols known to end in a metric suffix
+        metric_cols = [
+            c for c in self.df_supervised_metrics_.columns if
+            c.endswith(metric_cols_suffix)
+        ]
+        # legend order will be based on order that column was aded to plot
+        #  We can make it easier to read by adding metrics in ascending order
+        metric_cols = df_plot[metric_cols].max().sort_values(ascending=False).index.to_list()
+        for c_ in metric_cols:
+            sns.lineplot(data=df_plot, x='k', y=c_,
+                         label=c_)
+
+        plt.title(f"Scores for: {true_col}")
+        plt.ylabel(f"score")
+        plt.xlabel(f"k (number of clusters)")
+        plt.savefig(
+            save_path / (
+                f"metrics_for_known_labels-{true_col}-{save_suffix}.png"
+            ),
+            dpi=200, bbox_inches='tight', pad_inches=0.2
+        )
+        plt.show()
+        plt.close(fig)
+        del fig
+
     def _set_path_local_model(self):
         """Set where to save artifacts locally for this model"""
-        if os.getcwd() != get_original_cwd():
-            # hydra takes care of creating a custom working directory
+        try:
+            get_original_cwd()
+            hydra_initialized = True
+        except ValueError:
+            hydra_initialized = False
+
+        if hydra_initialized:
             log.info(f"Using hydra's path")
-            print(f"  Current working directory : {os.getcwd()}")
-            print(f"  Orig working directory    : {get_original_cwd()}")
+            # log.info(f"  Current working directory : {os.getcwd()}")
+            # log.info(f"  Orig working directory    : {get_original_cwd()}")
             self.path_local_model = Path(os.getcwd())
         else:
             # create local path to store artifacts before logging to mlflow
@@ -694,8 +861,8 @@ class ClusterEmbeddings:
             )
             Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
             log.info(f"  Local model saving directory: {self.path_local_model}")
-            self._init_file_log()
 
+        self._init_file_log()
         self.path_local_model_figures = self.path_local_model / 'figures'
         Path(self.path_local_model_figures).mkdir(exist_ok=True, parents=True)
 
@@ -713,11 +880,13 @@ class ClusterEmbeddings:
         self.config_to_log_and_store = dict()
         for k_, v_ in vars(self).items():
             try:
-                if any([k_.startswith('df_'), k_ == 'mlf', k_ == 'pipeline']):
+                if any([k_.startswith('df_')] +
+                       [k_ == c for c in ['mlf', 'pipeline', 'f_log_file', 'optimal_ks']],
+                       ):
                     # skip dataframes & some objects that aren't params
                     continue
                 elif k_ == 'config_to_log_and_store':
-                    # skip this config file b/c it can lead to weird nested recursion
+                    # skip itself config file b/c it can lead to weird nested recursion
                     continue
                 elif any([isinstance(v_, pd.DataFrame),
                           isinstance(v_, logging.FileHandler),
@@ -751,11 +920,11 @@ class ClusterEmbeddings:
 
     def _init_file_log(self) -> None:
         """Create a file & FileHandler to log data"""
-        # TODO(djb): make sure to remove fileHandler after job is run_aggregation()
+        # TODO(djb): make sure to remove fileHandler after job completes run_aggregation()
         if self.logs_path is not None:
             logger = logging.getLogger()
 
-            path_logs = Path(self.logs_path)
+            path_logs = Path(self.path_local_model) / self.logs_path
             Path.mkdir(path_logs, parents=False, exist_ok=True)
             self.f_log_file = str(
                 path_logs /
@@ -776,16 +945,22 @@ class ClusterEmbeddings:
         """After completing job, remove logging handler to prevent
         info from other jobs getting logged to the same log file
         """
-        if self.fileHandler is not None:
-            logger = logging.getLogger()
-            try:
-                logger.removeHandler(self.fileHandler)
-            except Exception as e:
-                logging.warning(f"Can't remove logger\n{e}")
+        try:
+            log.info(f"    Removing fileHandler...")
+            if self.fileHandler is not None:
+                logger = logging.getLogger()
+                try:
+                    logger.removeHandler(self.fileHandler)
+                except Exception as e:
+                    logging.error(f"Can't remove logger\n{e}")
+            else:
+                logging.info(f"There is NO fileHandler to remove")
+        except Exception as er:
+            logging.error(f"Can't remove file logger\n {er}")
 
 
 if __name__ == "__main__":
-    culster_embeddings()
+    cluster_embeddings()
 
 
 #

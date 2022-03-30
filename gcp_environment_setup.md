@@ -1,3 +1,35 @@
+This README/doc is focused on **first time set up** of: 
+- a GCP notebook (Vertex AI notebooks)
+- setting up gcloud's SDK on your laptop
+- how to synchronize with github (creating ssh keys)
+- how to use PyCharm to synchronize your code 
+  
+After you've gone through the instructios in this doc, see the [gcp_env_and_notebooks_reference.md](gcp_env_and_notebooks_reference.md) file for more reference & deubgging info. 
+
+
+# Useful GCP consoles
+### AI notebooks
+https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-science-prod-218515
+> Create and use Jupyter Notebooks with a notebook instance. Notebook instances have JupyterLab pre-installed and are configured with GPU-enabled machine learning frameworks.
+
+### VM Instances
+https://console.cloud.google.com/compute/instances?project=data-prod-165221
+> VM instances are highly configurable virtual machines for running workloads on Google infrastructure.
+
+### **Machine Images**
+https://console.cloud.google.com/compute/machineImages?project=data-prod-165221
+> A machine image contains a VM’s properties, metadata, permissions, and data from all its attached disks. You can use a machine image to create, backup, or restore a VM
+
+### **Data Proc clusters**
+- https://console.cloud.google.com/dataproc/clusters?region=us-central1&project=data-science-prod-218515
+- https://cloud.google.com/dataproc
+> Dataproc is a fully managed and highly scalable service for running Apache Spark, Apache Flink, Presto, and 30+ open source tools and frameworks. Use Dataproc for data lake modernization, ETL, and secure data science, at planet scale, fully integrated with Google Cloud, at a fraction of the cost.
+
+By default, these clusters will create a bucket where they'll store data and notebooks.
+- Bucket created by a Data Proc cluster (`dataproc-staging-us-central1-212906482731-fh9nrzce`)
+- [Example GCS data with cluster notebooks](https://console.cloud.google.com/storage/browser/dataproc-staging-us-central1-212906482731-fh9nrzce/notebooks/jupyter/cluster_notebooks;tab=objects?pageState=(%22StorageObjectListTable%22:(%22f%22:%22%255B%255D%22))&project=data-science-prod-218515&prefix=&forceOnObjectsSortingFiltering=false)
+
+
 # GCP AI Notebooks + ssh setup
 
 ## View existing notebooks / Consoles & URL Proxy
@@ -12,20 +44,6 @@ GCP AI notebooks in `data-science` project:
 
 GCP spark clusters on `data-science` project:
 - https://console.cloud.google.com/dataproc/clusters?region=us-central1&project=data-science-prod-218515
-
-
-#### Individual VMs:
-Inference for USE:
-- project: data-prod
-- Use for getting embeddings (vectorizing text)
-- https://7958aa9a2f5e63c6-dot-us-west1.notebooks.googleusercontent.com/lab
-
-CPU / EDA:
-- project: data-prod
-- Use for Dask cluster, bump to 64 CPUs & 400+ GB RAM)
-- Use for regular EDA: (32 CPUs & ~64 GB RAM)
-- https://1185e8680f9b40ca-dot-us-west1.notebooks.googleusercontent.com/lab?
-
 
 
 ## Create a GCP Notebook
@@ -182,13 +200,13 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 
 ## Add SSH key to ssh-agent
 After creating the key you'll need to 1) start the ssh-agent, 2) add your key to ssh-agent:
-```
+```bash
 eval "$(ssh-agent -s)"
 
 ssh-add ~/.ssh/id_ed25519
 ```
 
-Note: you'll be prompted for your git passphrase.
+Note: you'll be prompted for your git-ssh passphrase.
 
 ## Add key to github
 github's guide:
@@ -315,23 +333,16 @@ If resolving packages is taking too long, might need to use a flag (in the short
 ```bash
 sudo su - david.bermejo
 
-# Install my additional libraries
-pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/
-
-# if resolving takes too long
-pip install -e /home/david.bermejo/repos/subreddit_clustering_i18n/ --use-deprecated=legacy-resolver
-
 # Each VM might have slightly different uses & requirements, so it's best
 #  to install the specific VM's requirements using [extras]
+
+# EDA / clustering / aggregation VM
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]"
 
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]" --use-deprecated=legacy-resolver
 
-# install TF or Torch libraries
-pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_232]" --use-deprecated=legacy-resolver
-
+# Default VM inference on data-prod
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_233]" --use-deprecated=legacy-resolver
-
 
 
 # VM in data-science project
@@ -455,195 +466,4 @@ conda activate subclu_tf
 # Install base libraries that maybe weren't part of conda
 pip install -r base_requirements.txt --use-deprecated=legacy-resolver
 
-```
-
-
-# Running mlflow-server on GCP
-
-## Step 1: Run this command in the **GCP Notebok/VM**.
-The new pattern is to call the mlflow DB for the current host name:
-### Tensorflow Inference VM
-```
-mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-subclu-inference-tf-2-3-20210630/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns 
-```
-
-### CPU-based VM with lots of RAM & CPUs:
-```
-mlflow server --backend-store-uri sqlite:///subreddit_clustering_i18n/mlflow_sync/djb-100-2021-04-28-djb-eda-german-subs/mlruns.db --default-artifact-root gs://i18n-subreddit-clustering/mlflow/mlruns
-```
-
-
-## Step 2: SSH into VM from your local
-I created a custom function to tunnel into your VM:
-```bash
-dj_ssh_mlflow cpu
-```
-
-Function definition
-```bash
-# ssh into gcloud boxes to see mlflow server locally
-function dj_ssh_mlflow(){
-	if [ $1 = "cpu" ];
-	then
-		remote_ip="XXXYYY.us-west1-b.data-prod-165221"
-		local_port=5000
-
-	elif [ $1 = "tf_inference" ];
-	then
-		remote_ip="XXXYYY.us-west1-b.data-prod-165221"
-		local_port=5002
-
-	remote_port=5000
-	ssh -N -L $local_port\:localhost:$remote_port $remote_ip
-}
-```
-
-### Step 3: Open GUI in a browser
-Now you should be able to go to the browser and connect to your mlflow server. Replace the port as needed (e.g., `5000`, `50002` )
-
-https://127.0.0.1:5002/
-
-
-# Useful GCP consoles
-### AI notebooks
-https://console.cloud.google.com/ai-platform/notebooks/list/instances?project=data-science-prod-218515
-> Create and use Jupyter Notebooks with a notebook instance. Notebook instances have JupyterLab pre-installed and are configured with GPU-enabled machine learning frameworks.
-
-### VM Instances
-https://console.cloud.google.com/compute/instances?project=data-prod-165221
-> VM instances are highly configurable virtual machines for running workloads on Google infrastructure.
-
-### **Machine Images**
-https://console.cloud.google.com/compute/machineImages?project=data-prod-165221
-> A machine image contains a VM’s properties, metadata, permissions, and data from all its attached disks. You can use a machine image to create, backup, or restore a VM
-
-### **Data Proc clusters**
-- https://console.cloud.google.com/dataproc/clusters?region=us-central1&project=data-science-prod-218515
-- https://cloud.google.com/dataproc
-> Dataproc is a fully managed and highly scalable service for running Apache Spark, Apache Flink, Presto, and 30+ open source tools and frameworks. Use Dataproc for data lake modernization, ETL, and secure data science, at planet scale, fully integrated with Google Cloud, at a fraction of the cost.
-
-By default, these clusters will create a bucket where they'll store data and notebooks.
-- Bucket created by a Data Proc cluster (`dataproc-staging-us-central1-212906482731-fh9nrzce`)
-- [Example GCS data with cluster notebooks](https://console.cloud.google.com/storage/browser/dataproc-staging-us-central1-212906482731-fh9nrzce/notebooks/jupyter/cluster_notebooks;tab=objects?pageState=(%22StorageObjectListTable%22:(%22f%22:%22%255B%255D%22))&project=data-science-prod-218515&prefix=&forceOnObjectsSortingFiltering=false)
-
-
-# Monitoring GPU usage
-`htop` doesn't seem to have a way to monitor GPU stats, but here are some alternatives.
-
-## JupterLab `Status Bar`
-On the jupyter-lab UI, you can click on If you click on:
-<br>`View` > `Show Status Bar`
-
-At the bottom of your window you will see some icons on the bottom left-hand side. If you click on them, you can cycle through different stats, one of them will be `GPU` Stats. For example:
-`GPU: Tesla T4 - 33.0%`
-
-## Nvidia CLI tool - `nvidia-smi`
-Nvidia's `nvidia-smi` is a CLI tool for GPU monitoring similar to `htop`. It's not dynamic like `htop` (which auto refreshes), but you can use some commands to refresh the data every N seconds.
-
-```bash
-nvidia-smi
-
-Thu Jul 29 23:26:53 2021       
-+-----------------------------------------------------------------------------+
-| NVIDIA-SMI 460.73.01    Driver Version: 460.73.01    CUDA Version: 11.2     |
-|-------------------------------+----------------------+----------------------+
-| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
-|                               |                      |               MIG M. |
-|===============================+======================+======================|
-|   0  Tesla T4            Off  | 00000000:00:04.0 Off |                    0 |
-| N/A   64C    P0    39W /  70W |  14378MiB / 15109MiB |     79%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-```
-
-`watch` is my favorite command here because it auto-refreshes in a pseudo-dynamic way. After you're done (`Ctrl+C` or `:q`), you go back to your terminal without `stdout` clutter. The `-n` flag is followed by how often (in seconds) you want the call to `nvidia-smi` to happen.
-
-For example, one of these:
-```
-watch -n 5 nvidia-smi
-watch -n 4 nvidia-smi
-watch -n 3 nvidia-smi
-```
-
-
-The NVIDIA CLI also has a flag to refresh, but it will print/stdout a brand new set of stats ever 10 seconds:
-
-`nvidia-smi -l 10`
-
-It's not great because, for example, after 1 minute (60 seconds), if you want to scroll back, you'll go through 6 stdout statements. 
-
-
-# Debug connection
-Sometimes the connection via the web will stop working (e.g., 524 errors). If jupyter itself is still working, you can restart the docker service that's in charge of the reverse proxy:
-
-TODO(djb): add instructions to:
-- ssh into machine
-- check status of Jupyter server (first)
-- check status of docker server (doesn't matter much... when in doubt restart)
-
-For more troubleshooting tips:
-https://cloud.google.com/notebooks/docs/troubleshooting#restart_the_docker_service
-
-```shell
-sudo service docker restart
-```
-
-# Debugging GPU Usage
-TODO(djb)
-
-**Warning** installing tensorflow-text without pinning existing dependencies can make GPUs unusable. So before installing anything, here's what a blank/raw GPU environment looks like:
-      
-```
-
-```
-
-# Setting up versioning for a bucket
-
-Enabling Object Versioning can keep copies of a file if/when it is over-written.
-This could be nice in case we over-write something by accident. More details:
-- https://cloud.google.com/storage/docs/using-object-versioning#gsutil
-
-## Turning on Object Versioning
-However, it's good to limit how many copies we keep to prevent high costs if we store multiple versions of large files.
-
-We can't check the status in the GUI/console, so we have to use `gsutil`. First, we can check the versioning status:
-
-```bash
-gsutil versioning get gs://i18n-subreddit-clustering
-# gs://i18n-subreddit-clustering: Suspended
-```
-
-Then, we can enable it with `set on` or disable with `set off`:
-```bash
-gsutil versioning set on gs://i18n-subreddit-clustering
-# Enabling versioning for gs://i18n-subreddit-clustering/...
-```
-
-If we check again, we see that it's now enabled:
-```bash
-gsutil versioning get gs://i18n-subreddit-clustering
-# gs://i18n-subreddit-clustering: Enabled
-```
-
-## Setting up Object Lifecycle Policy
-- https://cloud.google.com/storage/docs/lifecycle
-- https://console.cloud.google.com/storage/browser/i18n-subreddit-clustering;tab=lifecycle?project=data-science-prod-218515
-
-
-## Viewing/ working with older file versions
-- https://cloud.google.com/storage/docs/using-versioned-objects#list-gsutil
-
-You can view the retention in the console:
-- Click on bucket to see bucket details
-- Then click on the "LIFECCLE" tab at the top
-
-You can also view it in gsutil:
-```bash
-gsutil lifecycle get gs://i18n-subreddit-clustering
-# {"rule": 
-#  [
-#     {"action": {"type": "Delete"}, "condition": {"numNewerVersions": 3}}
-#  ]
-# }
 ```
