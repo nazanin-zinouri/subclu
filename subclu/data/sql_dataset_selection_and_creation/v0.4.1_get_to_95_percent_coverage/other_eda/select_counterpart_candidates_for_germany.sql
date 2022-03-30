@@ -36,8 +36,13 @@ WITH
             -- Get primary language
             LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_language_rank` AS lan
                 ON ga.subreddit_id = lan.subreddit_id
+            LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddits_no_recommendation` AS nr
+                ON ga.subreddit_name = nr.subreddit_name
 
         WHERE 1=1
+            -- remove subreddits flagged as sensitive
+            AND nr.subreddit_name IS NULL
+
             -- filters for geo-relevant country
             AND (
                 ga.geo_country_code = GEO_TARGET_COUNTRY_CODE_TARGET
@@ -79,19 +84,32 @@ WITH
                 ON d.subreddit_id_a = ga.subreddit_id
             LEFT JOIN subs_relevant_baseline AS gb
                 ON d.subreddit_id_b = gb.subreddit_id
-            LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup` AS slo
+            LEFT JOIN (
+                SELECT * FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+                WHERE dt = (CURRENT_DATE() - 2)
+            ) AS slo
                 ON d.subreddit_id_a = slo.subreddit_id
             LEFT JOIN (
                 SELECT * FROM `data-prod-165221.cnc.shredded_crowdsource_topic_and_rating`
                 WHERE pt = (CURRENT_DATE() - 2)
             ) AS nt
                 ON ga.subreddit_id = nt.subreddit_id
+            LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddits_no_recommendation` AS nr
+                ON d.subreddit_name_b = nr.subreddit_name
 
-        -- Exclude subreddits that are geo-relevant to the country
         WHERE 1=1
-            AND slo.dt = (CURRENT_DATE() - 2)
+            -- Exclude subreddits that are geo-relevant to the country
             AND gb.subreddit_id IS NULL
+            -- remove subreddits flagged as sensitive
+            AND nr.subreddit_name IS NULL
 
+            -- exclude subs with covid or corona in title
+            AND subreddit_name_a NOT LIKE "%covid%"
+            AND subreddit_name_a NOT LIKE "%coronavirus%"
+            AND subreddit_name_b NOT LIKE "%covid%"
+            AND subreddit_name_b NOT LIKE "%coronavirus%"
+
+            -- exclude other subs
             AND COALESCE(verdict, 'f') <> 'admin_removed'
             AND COALESCE(is_spam, false) = false
             AND COALESCE(is_deleted, false) = false
@@ -107,11 +125,11 @@ WITH
 
             , slo.subscribers AS subscribers_us
 
+            , allow_discovery_geo
             , rating_short_geo
             , nt.rating_short AS rating_short_us
             , primary_topic_geo
             , primary_topic AS primary_topic_us
-            , allow_discovery_geo
 
             , language_name_geo, language_percent_geo, language_rank_geo
             , lan.language_name AS primary_language_name_us
@@ -137,8 +155,6 @@ WITH
 
         WHERE 1=1
             AND slo.dt = (CURRENT_DATE() - 2)
-            -- Exclude geo-subreddits that don't want to be discovered
-            AND COALESCE(allow_discovery_geo, '') != 'f'
 
             -- filters for US counterparts
             AND slo.subscribers >= 9000
@@ -170,7 +186,8 @@ WITH
 
             AND COALESCE(primary_topic_geo, '') NOT IN (
                 'Place',
-                'Celebrity', 'Mature Themes and Adult Content',
+                'Celebrity',
+                -- 'Mature Themes and Adult Content',
                 'Sexual Orientation', 'Gender',
                 'Medical and Mental Health', 'Medical and Mental Health', 'Addiction Support',
                 'Politics', 'Military'
@@ -194,6 +211,9 @@ FROM distance_lang_and_relevance_a_and_b AS d
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS sc
         ON d.subreddit_id_geo = sc.subreddit_id
 WHERE 1=1
+    -- Exclude geo-subreddits that don't want to be discovered
+    -- AND COALESCE(allow_discovery_geo, '') != 'f'
+
     AND (
         rank_geo_to_us <= MIN_COUNTERPARTS_TO_SHOW
         OR cosine_similarity >= 0.79
