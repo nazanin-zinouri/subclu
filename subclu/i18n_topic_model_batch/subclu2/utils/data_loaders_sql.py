@@ -25,10 +25,12 @@ class LoadSubredditsSQL:
             col_unique_check: str = 'subreddit_id',
             concat_text_cols: str = "CONCAT(name, '. ', COALESCE(title, ''), '. ', COALESCE(description, ''))",
             col_concat_text: str = 'concat_text',
+            limit_clause: str = '',
             unique_check: bool = True,
             verbose: bool = False,
             log_query: bool = False,
             sql_template: str = 'subreddit_lookup',
+            cache: bool = False,
     ):
         self.project_name = project_name
         self.dataset = dataset
@@ -36,9 +38,12 @@ class LoadSubredditsSQL:
         self.col_unique_check = col_unique_check
         self.concat_text_cols = concat_text_cols
         self.col_concat_text = col_concat_text
+        self.limit_clause = limit_clause
+
         self.unique_check = unique_check
         self.verbose = verbose
         self.log_query = log_query
+        self.cache = cache
         self.df = None
         self.str_sql = None
 
@@ -47,7 +52,7 @@ class LoadSubredditsSQL:
         if columns == 'default':
             self.columns = """
                 subreddit_id
-                , name
+                # , name
                 # , title
                 # , description
             """
@@ -69,7 +74,8 @@ class LoadSubredditsSQL:
             columns=self.columns,
             project_name=self.project_name,
             dataset=self.dataset,
-            table=self.table
+            table=self.table,
+            limit=self.limit_clause,
         )
 
         if self.df is None:
@@ -81,18 +87,24 @@ class LoadSubredditsSQL:
                 logger.info(self.str_sql)
             query_start_time = datetime.utcnow()
             logger.info(f"  {query_start_time} | query START time")
-            self.df = bigquery_client.query(self.str_sql).to_dataframe()
+            df = bigquery_client.query(self.str_sql).to_dataframe()
             query_end_time = datetime.utcnow()
             logger.info(f"  {query_end_time} | query END time")
             logger.info(f"  {query_end_time - query_start_time} | query ELAPSED time")
             if self.unique_check:
                 assert(
-                    len(self.df == self.df[self.col_unique_check].nunique())
+                    len(df == df[self.col_unique_check].nunique())
                 ), f"ERROR: Col {self.col_unique_check} NOT UNIQUE"
                 logger.info(f"Col {self.col_unique_check} is unique")
 
-            logger.info(f"  {self.df.shape} <- df.shape")
-            return self.df
+            logger.info(f"  {df.shape} <- df.shape")
+
+            # only cache if explicitly told to
+            #  otherwise we could end up with a copy of a huge df
+            if self.cache:
+                self.df = df
+
+            return df
         else:
             logger.info(f"  Query already cached")
             logger.info(f"  {self.df.shape} <- df.shape")
@@ -118,7 +130,7 @@ def get_sql_template(
             AND deleted IS NULL
             AND type IN ('public', 'private', 'restricted')
             AND NOT REGEXP_CONTAINS(LOWER(name), r'^u_.*')
-        LIMIT 10000
+        {limit}
         """,
 
         'all_reddit_subreddits': """
@@ -128,7 +140,7 @@ def get_sql_template(
         WHERE 1=1
             AND DATE(pt) = (CURRENT_DATE() - 2)  -- all_reddit_subreddits
             
-        LIMIT 10000
+        {limit}
         """
     }
 
