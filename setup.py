@@ -186,6 +186,9 @@ EXTRAS_REQUIRE = {
         "tensorflow-text == 2.3.0",
 
         "Werkzeug == 2.0.1",
+
+        # test alternative API to read & write to bigQuery
+        "pandas-gbq < 0.17.4",
     ],
 
     "tensorflow_233": [
