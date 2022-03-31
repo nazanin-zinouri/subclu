@@ -85,12 +85,15 @@ class VectorizeText:
             data_loader_name: str,
             col_text_for_embeddings: str,
             cols_index: Union[str, iter],
+            output_bucket: str,
+            output_folder: str,
             data_loader_kwargs: dict = None,
             run_id: str = None,
             tokenize_lowercase: bool = False,
             batch_inference_rows: int = 2000,
             limit_first_n_chars: int = 1000,
             get_embeddings_verbose: bool = False,
+            verbose: bool = False,
             **kwargs
     ) -> None:
         """"""
@@ -100,11 +103,15 @@ class VectorizeText:
         self.model_name = model_name
         self.col_text_for_embeddings = col_text_for_embeddings
         self.data_loader_name = data_loader_name
+        self.output_bucket = output_bucket
+        self.output_folder = output_folder
+
         self.tokenize_lowercase = tokenize_lowercase
         self.batch_inference_rows = batch_inference_rows
         self.limit_first_n_chars = limit_first_n_chars
         self.get_embeddings_verbose = get_embeddings_verbose
         self.cols_index = cols_index
+        self.verbose = verbose
 
         self.data_loader = DATA_LOADERS[data_loader_name](
             **data_loader_kwargs
@@ -150,20 +157,15 @@ class VectorizeText:
         # mlflow.log_metric('vectorizing_time_minutes_subreddit_meta',
         #                   total_time_subs_vect / timedelta(minutes=1)
         #                   )
-        log.info(f"{df_vect}")
+        if self.verbose:
+            log.info(f"{df_vect.shape} <- df_vect.shape")
         print(df_vect.head())
         # TODO(djb): save embeddings
-        #  for now, save straight to GCS, in the future shift to mlflow
-        #  so we'd have to save to local first
-
-        # save_df_and_log_to_mlflow(
-        #     df=df_vect_subs.reset_index(),
-        #     local_path=path_this_model,
-        #     name_for_metric_and_artifact_folder='df_vect_subreddits_description',
-        # )
+        self._save_embeddings(df_vect)
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
+
         # mlflow.log_metric('vectorizing_time_minutes_full_function',
         #                   total_fxn_time / timedelta(minutes=1)
         #                   )
@@ -185,6 +187,28 @@ class VectorizeText:
             'use_multilingual_3': "https://tfhub.dev/google/universal-sentence-encoder-multilingual/3",
         }
         return hub.load(D_MODELS_TF_HUB[self.model_name])
+
+    def _save_embeddings(
+            self,
+            df_vect: pd.DataFrame,
+            df_single_file_name: str = 'df',
+            add_shape_to_name: bool = True,
+    ):
+        """save df embeddings"""
+        #  for now, save straight to GCS, in the future shift to mlflow
+        #  so we'd have to save to local first
+        f_gcs_path = f"gcs://{self.output_bucket}/{self.output_folder}/{self.run_id}"
+        if add_shape_to_name:
+            r, c = df_vect.shape
+            f_gcs_name = f"{f_gcs_path}/{df_single_file_name}-{r}_by_{c}.parquet"
+        else:
+            f_gcs_name = f"{f_gcs_path}/{df_single_file_name}.parquet"
+        log.info(f"Saving df_embeddings to: {f_gcs_name}")
+        df_vect.to_parquet(
+            f_gcs_name
+        )
+
+
 
 
 def get_embeddings_as_df(

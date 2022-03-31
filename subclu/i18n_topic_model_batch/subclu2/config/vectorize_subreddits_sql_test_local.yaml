@@ -4,7 +4,7 @@ defaults:
 
 model_name: use_multilingual_3
 
-# Keys for items to vectorize should match keys in data_text
+# Keys for items to vectorize should match keys in data_text & output_folder
 thing_to_vectorize: subreddit_meta
 col_text_for_embeddings: concat_text
 
@@ -14,10 +14,10 @@ get_embeddings_verbose: true
 cols_index: subreddit_default_
 
 output_bucket: 'gazette-models-temp'
-output_folders:
-  subreddit_meta: 'i18n_topic_model/subreddits/test'
-  posts: 'i18n_topic_model/posts/test'
-  comments: 'i18n_topic_model/comments/test'
+output_folder: 'i18n_topic_model/subreddits/test'
+#  subreddit_meta: 'i18n_topic_model/subreddits/test'
+#  posts: 'i18n_topic_model/posts/test'
+#  comments: 'i18n_topic_model/comments/test'
 
 
 
