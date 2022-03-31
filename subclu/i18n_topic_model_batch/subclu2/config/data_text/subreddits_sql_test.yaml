@@ -5,7 +5,7 @@ subreddit_meta:
     table: subreddit_lookup
     dataset: ds_v2_postgres_tables
     project_name: 'data-prod-165221'
-    columns: 'subreddit_id, name'
+    columns: 'subreddit_id, LOWER(name) AS subreddit_name'
     col_unique_check: 'subreddit_id'
     concat_text_cols: "CONCAT(name, '. ', COALESCE(title, ''), '. ', COALESCE(description, ''))"
     col_concat_text: 'concat_text'

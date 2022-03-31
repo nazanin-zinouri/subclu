@@ -8,6 +8,11 @@ model_name: use_multilingual_3
 thing_to_vectorize: subreddit_meta
 col_text_for_embeddings: concat_text
 
+batch_inference_rows: 2000
+limit_first_n_chars: 1100
+get_embeddings_verbose: true
+cols_index: subreddit_default_
+
 output_bucket: 'gazette-models-temp'
 output_folders:
   subreddit_meta: 'i18n_topic_model/subreddits/test'
