@@ -78,3 +78,15 @@ SELECT
     , COUNT(DISTINCT subreddit_id) AS subreddit_unique_count
 FROM `reddit-relevance.tmp.subclu_subreddit_geo_selected_20220323`
 ;
+
+
+-- =====================
+--  final table of selected subs for modeling
+-- ===
+SELECT
+    COUNT(*) AS row_count
+    , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+    , COUNT(DISTINCT subreddit_name) AS subreddit_name_unique_count
+FROM `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220406`
+;
+
