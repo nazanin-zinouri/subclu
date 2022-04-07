@@ -92,8 +92,7 @@ _L_MATURE_CLUSTERS_TO_EXCLUDE_FROM_QA_ = [
 
     # '0008-0013',  # thegirlsurvivalguide could be good to show, but prob not for ppl looking at r/onlinedating...?
     # 0008-0013-0023-0032-0034-0044-0046-0064 is a can of worms... but it includes askreaddit, feminism
-    #  and other LGBTQ subs that could be good for some people...
-    '0008-0013',
+    #  and other LGBTQ subs that could be good for some people. Rely on QA process sort it out.
     '0008-0014-0025-0034-0036-0046-0048-0066',
     '0008-0014-0025-0034-0036-0046-0048-0066-0190-0378',
     '0008-0014-0025-0034-0036-0047-0049-0067',

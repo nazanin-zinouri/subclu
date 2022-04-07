@@ -662,12 +662,19 @@ def style_df_numeric(
             # add a space after a dash so google sheets can display columns better
             rename_cols_pairs = [('_', ' '), ('-', '- ')]
 
-        def rename_col_fxn(col: str, rename_cols_pairs: list = rename_cols_pairs):
+        def rename_col_fxn(
+                col: str,
+                rename_cols_pairs: list = rename_cols_pairs
+        ):
             """Given a list of tuples, apply them to replace string patterns in col name"""
-            col_new = col
-            for tpl in rename_cols_pairs:
-                col_new = col_new.replace(*tpl)
-            return col_new
+            if col is None:
+                # In case we get an un-named index
+                return ''
+            else:
+                col_new = col
+                for tpl in rename_cols_pairs:
+                    col_new = col_new.replace(*tpl)
+                return col_new
 
         d_format = {rename_col_fxn(k): v for k, v in d_format.items()}
         df = df.rename(columns={c: rename_col_fxn(c) for c in df.columns})
