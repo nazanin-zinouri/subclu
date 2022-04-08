@@ -13,7 +13,7 @@ WITH words_by_cluster AS (
             , ' ', COALESCE(text, '')
             , ' ', COALESCE(ocr_inferred_text_agg_clean, '')
         )), '&amp;', '&'), r'&[a-z]{2,4};', '*')
-        , r'[a-z]{2,20}\'?[a-z]+') AS words
+        , r"[a-z]{2,20}\'?[a-z]+") AS words
     , COUNT(*) OVER() docs_n
   FROM `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214` AS p
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS sc
