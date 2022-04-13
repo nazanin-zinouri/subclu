@@ -1,0 +1,58 @@
+config_description: "Test data loaders & vectorizing classes on subreddit descriptions"
+defaults:
+  - data_text: v0.5.0_test.yaml
+
+# Paths to cache & upload
+local_cache_path: "/home/jupyter/subreddit_clustering_i18n/data/local_cache/"
+output_bucket: 'gazette-models-temp'
+output_folder: 'i18n_topic_model_batch/runs/20220413/subreddits/embeddings'
+
+
+# Values for data loader
+gcs_path: folder_subreddits_text_and_meta
+data_loader_name: 'LoadSubredditsGCS'
+data_loader_kwargs:
+  columns:
+    - subreddit_id
+    - subreddit_name
+    - subreddit_name_title_related_subs_and_clean_descriptions
+  df_format: 'pandas'
+  n_sample_files: null
+  n_files_slice_start: null
+  n_files_slice_end: null
+  unique_check: true
+  verbose: true
+
+
+# Values for vectorizing methods/functions
+# TODO(djb): how to handle LIST of columns to concat
+col_text_for_embeddings: subreddit_name_title_related_subs_and_clean_descriptions
+
+model_name: use_multilingual_3
+batch_inference_rows: 2000
+limit_first_n_chars: 2500
+get_embeddings_verbose: true
+cols_index:
+  - subreddit_id
+  - subreddit_name
+
+
+
+# Change n_jobs(parallel jobs) & logging for hydra itself
+hydra:
+  # launcher:
+    # override the number of jobs for joblib
+    # n_jobs: 11
+  job_logging:
+    formatters:
+      simple:
+        # format: '`%(asctime)s` | `%(name)s` | `%(levelname)s` | `%(message)s`'
+        format: '`%(asctime)s` | `%(levelname)s` | `%(message)s`'
+  # Change location of logging - by default it might try to create logs in
+  #  home/david.bermejo instead of home/jupyter
+  #  https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: /home/jupyter/subreddit_clustering_i18n/hydra_runs/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: /home/jupyter/subreddit_clustering_i18n/hydra_runs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
