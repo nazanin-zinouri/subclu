@@ -25,7 +25,7 @@ from hydra.utils import get_original_cwd
 from omegaconf import DictConfig
 
 from ..utils.eda import elapsed_time
-from ..utils.data_loaders_sql import LoadSubredditsSQL
+from ..utils.data_loaders_gcs import LoadSubredditsGCS
 from ..utils.tqdm_logger import FileLogger, LogTQDM
 
 log = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class VectorizeText:
     ) -> None:
         """"""
         DATA_LOADERS = {
-            'LoadSubredditsSQL': LoadSubredditsSQL,
+            'LoadSubredditsGCS': LoadSubredditsGCS,
         }
         self.model_name = model_name
         self.col_text_for_embeddings = col_text_for_embeddings
@@ -159,8 +159,7 @@ class VectorizeText:
         #                   )
         if self.verbose:
             log.info(f"{df_vect.shape} <- df_vect.shape")
-        print(df_vect.head())
-        # TODO(djb): save embeddings
+        print(df_vect.iloc[:5, :10])
         self._save_embeddings(df_vect)
 
         # finish logging total time + end mlflow run
@@ -207,8 +206,6 @@ class VectorizeText:
         df_vect.to_parquet(
             f_gcs_name
         )
-
-
 
 
 def get_embeddings_as_df(
