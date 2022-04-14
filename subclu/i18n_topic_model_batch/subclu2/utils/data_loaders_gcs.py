@@ -6,6 +6,7 @@ from concurrent import futures
 import logging
 from logging import info
 from pathlib import Path
+from typing import Union, Iterator
 
 from google.cloud import storage
 # from google.cloud.storage.bucket import Bucket
@@ -64,13 +65,12 @@ class LoadSubredditsGCS:
         self.n_files_slice_start = n_files_slice_start
         self.n_files_slice_end = n_files_slice_end
 
-    def read_as_one_df(self):
+    def read_as_one_df(self) -> Union[dd.DataFrame, pd.DataFrame]:
         self._local_cache()
 
         if self.verbose:
             info(f"  df format: {self.df_format}")
 
-        # TODO(djb):
         if (1 == self.n_local_parquet_files_) & ('pandas' == self.df_format):
             df = pd.read_parquet(
                 self.local_parquet_files_[0],
@@ -91,17 +91,22 @@ class LoadSubredditsGCS:
             #  Uniqueness check optional b/c it can take
             #   +10 seconds on 8 million posts
             unique_check_ = (len(df) == df[self.col_unique_check].nunique())
-            assert (unique_check_), f"Unique column check failed: {self.col_unique_check}"
+            assert unique_check_, f"Unique column check failed: {self.col_unique_check}"
 
         return df
 
-    def yield_each_file_as_df(self):
-        """For tqdm to be useful you'd need to use `total` argument:
-
-        tqdm(generator, total=len(self.local_parquet_files_))...
+    def yield_each_file_as_df(self) -> Iterator[pd.DataFrame]:
         """
-        # TODO(djb):
-        pass
+        For tqdm to be useful you'd need to use `total` argument:
+          tqdm(generator, total=self.n_local_parquet_files_):
+        """
+        self._local_cache()
+
+        for f_ in self.local_parquet_files_:
+            yield pd.read_parquet(
+                f_,
+                columns=self.columns
+            )
 
     def _local_cache(self) -> None:
         """Cache files to read from GCS in local"""
