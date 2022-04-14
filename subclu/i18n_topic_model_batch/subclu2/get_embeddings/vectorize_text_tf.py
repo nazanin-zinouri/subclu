@@ -111,6 +111,7 @@ class VectorizeText:
             tokenize_lowercase: bool = False,
             batch_inference_rows: int = 2000,
             limit_first_n_chars: int = 1800,
+            limit_first_n_chars_retry: int = 700,
             n_sample_files: int = None,
             n_files_slice_start: int = None,
             n_files_slice_end: int = None,
@@ -132,6 +133,7 @@ class VectorizeText:
         self.tokenize_lowercase = tokenize_lowercase
         self.batch_inference_rows = batch_inference_rows
         self.limit_first_n_chars = limit_first_n_chars
+        self.limit_first_n_chars_retry = limit_first_n_chars_retry
         self.get_embeddings_verbose = get_embeddings_verbose
         self.cols_index = cols_index
         self.verbose = verbose
@@ -176,7 +178,6 @@ class VectorizeText:
             log.info(f"Loading text...")
             df_text = self.data_loader.read_as_one_df()
 
-            print(df_text[self.col_text_for_embeddings].head())
             df_vect = self._vectorize_single_df(
                 df_text=df_text,
                 model=model,
@@ -221,7 +222,17 @@ class VectorizeText:
     ) -> pd.DataFrame:
         """Call to vectorize a single df.
         Call this method to make sure vectorization is standardized when
-        we're calling vectorization on a series of dfs
+        we're calling vectorization on a series of dfs.
+
+        In general, we want a high batch_size because that'll complete faster,
+        but we need to reduce it when we deal with long text b/c it can overflow
+        the GPU's memory and result in OOM errors.
+
+        If a batch (n-rows in a file) fails, get_embeddings_as_df() will retry with
+         a lower `limit_first_n_chars` value. However, that may not be enough if
+         too many comments in a batch are really long. In that case, I have 2 try/excepts
+         to reduce the `batch_size` which should make it more likely for a job
+         to complete even if the input batch_size was too high.
         """
         # TODO(djb): concat multiple fields together
 
@@ -304,7 +315,8 @@ def get_embeddings_as_df(
     elif cols_index == 'subreddit_default_':
         cols_index = ['subreddit_name', 'subreddit_id']
     else:
-        pass
+        # Need to tweak this in case we get a weird iter input, like from OmegaConf.List
+        cols_index = [str(_) for _ in cols_index]
 
     if cols_index is not None:
         index_output = df[cols_index]

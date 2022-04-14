@@ -4,6 +4,7 @@
 --   ~       Average:  772
 --   ~ 75 percentile:  914
 --   ~ 85 percentile: 1560
+--   ~ 90 percentile: 2135
 --   ~ 95 percentile: 3156
 
 SELECT
@@ -21,6 +22,7 @@ SELECT
     , AVG(subreddit_name_title_related_subs_and_clean_descriptions_len) AS sub_desc_len_avg
     , APPROX_QUANTILES(subreddit_name_title_related_subs_and_clean_descriptions_len, 100)[OFFSET(75)] AS sub_desc_len_p75
     , APPROX_QUANTILES(subreddit_name_title_related_subs_and_clean_descriptions_len, 100)[OFFSET(85)] AS sub_desc_len_p85
+    , APPROX_QUANTILES(subreddit_name_title_related_subs_and_clean_descriptions_len, 100)[OFFSET(90)] AS sub_desc_len_p90
     , APPROX_QUANTILES(subreddit_name_title_related_subs_and_clean_descriptions_len, 100)[OFFSET(95)] AS sub_desc_len_p95
 
 FROM `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220413`
