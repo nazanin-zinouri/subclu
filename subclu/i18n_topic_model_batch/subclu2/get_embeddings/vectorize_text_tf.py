@@ -55,16 +55,27 @@ def vectorize_text(
             because the object needs to be pickle-able, otherwise
             we'll get errors if you try to do a multi-run job with hydra+joblib
     """
-    print(f"CFG keys: {cfg.keys()}")
+    print(f"CFG keys:\n  {cfg.keys()}")
 
-    thing_to_vectorize = cfg['thing_to_vectorize']
-    log.info(f"Creating vectorizing class for {thing_to_vectorize}...")
     # We expect only one type of thing to be vectorized per function
     #  e.g., either subreddit meta, posts, or comments, but not a combination of them
+
+    # Share some top-level variables with the data loader
     vect = VectorizeText(
-        data_loader_name=cfg['data_text'][thing_to_vectorize]['data_loader_name'],
-        data_loader_kwargs=cfg['data_text'][thing_to_vectorize]['data_loader_kwargs'],
-        **{k: v for k, v in cfg.items() if k not in ['data_test']}
+        data_loader_kwargs={
+            **cfg['data_loader_kwargs'],
+            **{
+                'bucket_name': cfg['data_text']['bucket_name'],
+                'gcs_path': cfg['gcs_path'],
+                'local_cache_path': cfg['local_cache_path'],
+
+                'n_sample_files': cfg.get('n_sample_files'),
+                'n_files_slice_start': cfg.get('n_files_slice_start'),
+                'n_files_slice_end': cfg.get('n_sample_files'),
+                'process_individual_files': cfg.get('process_individual_files', True),
+            }
+        },
+        **{k: v for k, v in cfg.items() if k not in ['data_test', 'data_loader_kwargs']}
     )
 
     vect.get_embeddings()
@@ -91,7 +102,10 @@ class VectorizeText:
             run_id: str = None,
             tokenize_lowercase: bool = False,
             batch_inference_rows: int = 2000,
-            limit_first_n_chars: int = 1000,
+            limit_first_n_chars: int = 1800,
+            n_sample_files: int = None,
+            n_files_slice_start: int = None,
+            n_files_slice_end: int = None,
             get_embeddings_verbose: bool = False,
             verbose: bool = False,
             **kwargs
@@ -112,6 +126,10 @@ class VectorizeText:
         self.get_embeddings_verbose = get_embeddings_verbose
         self.cols_index = cols_index
         self.verbose = verbose
+
+        self.n_sample_files = n_sample_files
+        self.n_files_slice_start = n_files_slice_start
+        self.n_files_slice_end = n_files_slice_end
 
         self.data_loader = DATA_LOADERS[data_loader_name](
             **data_loader_kwargs

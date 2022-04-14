@@ -221,6 +221,9 @@ You can use the gcloud CLI to get credentials -- similar to what you do in Colab
 ```bash
 # login
 gcloud auth application-default login
+
+# Check authentication accounts available
+gcloud auth list
 ```
 
 This is the same process as colab.

@@ -17,12 +17,14 @@ data_loader_kwargs:
     - subreddit_name
     - subreddit_name_title_related_subs_and_clean_descriptions
   df_format: 'pandas'
-  n_sample_files: null
-  n_files_slice_start: null
-  n_files_slice_end: null
   unique_check: true
   verbose: true
 
+# These sampling values should also get passed to the data loader
+n_sample_files: null
+n_files_slice_start: null
+n_files_slice_end: null
+process_individual_files: true
 
 # Values for vectorizing methods/functions
 # TODO(djb): how to handle LIST of columns to concat
