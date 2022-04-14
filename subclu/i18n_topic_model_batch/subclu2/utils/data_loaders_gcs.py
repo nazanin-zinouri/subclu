@@ -34,7 +34,6 @@ class LoadSubredditsGCS:
             columns: iter = None,
             col_unique_check: str = 'subreddit_id',
             df_format: str = 'pandas',
-            read_fxn: str = 'dask',
             n_sample_files: int = None,
             n_files_slice_start: int = None,
             n_files_slice_end: int = None,
@@ -46,12 +45,15 @@ class LoadSubredditsGCS:
         self.gcs_path = gcs_path
         self.columns = columns
         self.col_unique_check = col_unique_check
+        self.df_format = df_format
 
         if local_cache_path == 'local_vm':
             self.local_path_root = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/"
         else:
             self.local_path_root = local_cache_path
-        self.df_format = df_format
+
+        # Here we'll cache files locally
+        self.path_local_folder = None
 
         # NOTE: unique check only gets computed if the df_format is `pandas`
         #  otherwise it's super expensive on 10+ million rows in `dask`
@@ -62,31 +64,67 @@ class LoadSubredditsGCS:
         self.n_files_slice_start = n_files_slice_start
         self.n_files_slice_end = n_files_slice_end
 
-        if read_fxn == 'dask':
-            self.read_fxn = dd.read_parquet
-        elif read_fxn == 'pandas':
-            self.read_fxn = pd.read_parquet
+    def read_as_one_df(self):
+        self._local_cache()
+
+        if self.verbose:
+            info(f"  df format: {self.df_format}")
+
+        # TODO(djb):
+        if (1 == self.n_local_parquet_files_) & ('pandas' == self.df_format):
+            df = pd.read_parquet(
+                self.local_parquet_files_[0],
+                columns=self.columns,
+            )
         else:
-            self.read_fxn = read_fxn
+            df = dd.read_parquet(
+                self.local_parquet_files_,
+                columns=self.columns,
+            )
+
+            if 'pandas' == self.df_format:
+                df = df.compute()
+
+        if all([self.df_format == 'pandas', self.unique_check]):
+            if self.verbose:
+                info(f"  Checking ID uniqueness...")
+            #  Uniqueness check optional b/c it can take
+            #   +10 seconds on 8 million posts
+            unique_check_ = (len(df) == df[self.col_unique_check].nunique())
+            assert (unique_check_), f"Unique column check failed: {self.col_unique_check}"
+
+        return df
+
+    def yield_each_file_as_df(self):
+        """For tqdm to be useful you'd need to use `total` argument:
+
+        tqdm(generator, total=len(self.local_parquet_files_))...
+        """
+        # TODO(djb):
+        pass
 
     def _local_cache(self) -> None:
         """Cache files to read from GCS in local"""
-        # load files
-        d_local_cache = download_files_in_parallel(
-            bucket_name=self.bucket_name,
-            gcs_folder_path=self.gcs_path,
-            local_path_root=self.local_path_root,
-            n_sample_files=self.n_sample_files,
-            n_files_slice_start=self.n_files_slice_start,
-            n_files_slice_end=self.n_files_slice_end,
-            verbose=self.verbose,
-        )
+        # Only run downloads if  values are null
+        if self.path_local_folder is not None:
+            if self.verbose:
+                info(f"  Files already downloaded.")
+        else:
+            d_local_cache = download_files_in_parallel(
+                bucket_name=self.bucket_name,
+                gcs_folder_path=self.gcs_path,
+                local_path_root=self.local_path_root,
+                n_sample_files=self.n_sample_files,
+                n_files_slice_start=self.n_files_slice_start,
+                n_files_slice_end=self.n_files_slice_end,
+                verbose=self.verbose,
+            )
 
-        # get names for the individual parquet files to read
-        self.path_local_folder = d_local_cache['path_local_folder']
-        self.local_files_ = d_local_cache['files_downloaded']
-        self.local_parquet_files_ = d_local_cache['parquet_files_downloaded']
-
+            # get names for the individual parquet files to read
+            self.path_local_folder = d_local_cache['path_local_folder']
+            self.local_files_ = d_local_cache['files_downloaded']
+            self.local_parquet_files_ = d_local_cache['parquet_files_downloaded']
+            self.n_local_parquet_files_ = len(self.local_parquet_files_)
 
 
 def download_blob(
@@ -164,6 +202,6 @@ def download_files_in_parallel(
 
     t_total_ = datetime.utcnow() - t_start_
     info(f"  Files already cached: {n_cached_files}")
-    logger.info(f"Downloading files took {t_total_}")
+    logger.info(f"{t_total_}  <- Downloading files elapsed time")
 
     return d_output
