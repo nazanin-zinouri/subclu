@@ -77,6 +77,8 @@ class LoadSubredditsGCS:
             gcs_folder_path=self.gcs_path,
             local_path_root=self.local_path_root,
             n_sample_files=self.n_sample_files,
+            n_files_slice_start=self.n_files_slice_start,
+            n_files_slice_end=self.n_files_slice_end,
             verbose=self.verbose,
         )
 
@@ -121,17 +123,15 @@ def download_files_in_parallel(
     l_parquet_files_downloaded = []
 
     l_files_to_check = list(bucket.list_blobs(prefix=gcs_folder_path))[:n_sample_files]
-    # if n_comment_files_slice_end is not None:
-    #     if n_comment_files_slice_start is None:
-    #         n_comment_files_slice_start = 0
-    #     # make new copy of files to process so that when slicing the time estimates from tqdm
-    #     #  are useful/accurate
-    #     l_comment_files_to_process = (
-    #         l_comment_files_to_process[n_comment_files_slice_start:n_comment_files_slice_end]
-    #     )
-    # total_comms_file_count = len(l_comment_files_to_process)
+    info(f"  {len(l_files_to_check)} <- Files matching prefix")
+    if any([(_ is not None) for _ in [n_files_slice_start, n_files_slice_end]]):
+        # make new copy of blobs to process so that when slicing the time estimates from tqdm
+        #  are useful/accurate + we only download exactly what's needed
+        l_files_to_check = (
+            l_files_to_check[n_files_slice_start:n_files_slice_end]
+        )
 
-    info(f"  Files to check: {len(l_files_to_check)}")
+    info(f"  {len(l_files_to_check)} <- Files to check")
     n_cached_files = 0
 
     downloads = []
