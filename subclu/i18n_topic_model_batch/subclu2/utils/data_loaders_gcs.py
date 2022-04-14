@@ -6,7 +6,7 @@ from concurrent import futures
 import logging
 from logging import info
 from pathlib import Path
-from typing import Union, Iterator
+from typing import Union, Iterator, Tuple
 
 from google.cloud import storage
 # from google.cloud.storage.bucket import Bucket
@@ -44,7 +44,7 @@ class LoadSubredditsGCS:
         """"""
         self.bucket_name = bucket_name
         self.gcs_path = gcs_path
-        self.columns = columns
+        self.columns = [str(_) for _ in columns]
         self.col_unique_check = col_unique_check
         self.df_format = df_format
 
@@ -55,6 +55,9 @@ class LoadSubredditsGCS:
 
         # Here we'll cache files locally
         self.path_local_folder = None
+        self.local_files_ = None
+        self.local_parquet_files_ = None
+        self.n_local_parquet_files_ = None
 
         # NOTE: unique check only gets computed if the df_format is `pandas`
         #  otherwise it's super expensive on 10+ million rows in `dask`
@@ -66,7 +69,7 @@ class LoadSubredditsGCS:
         self.n_files_slice_end = n_files_slice_end
 
     def read_as_one_df(self) -> Union[dd.DataFrame, pd.DataFrame]:
-        self._local_cache()
+        self.local_cache()
 
         if self.verbose:
             info(f"  df format: {self.df_format}")
@@ -95,22 +98,21 @@ class LoadSubredditsGCS:
 
         return df
 
-    def yield_each_file_as_df(self) -> Iterator[pd.DataFrame]:
+    def yield_files_and_dfs(self) -> Iterator[Tuple[Path, pd.DataFrame]]:
         """
         For tqdm to be useful you'd need to use `total` argument:
           tqdm(generator, total=self.n_local_parquet_files_):
         """
-        self._local_cache()
+        self.local_cache()
 
         for f_ in self.local_parquet_files_:
-            yield pd.read_parquet(
+            yield f_, pd.read_parquet(
                 f_,
                 columns=self.columns
             )
 
-    def _local_cache(self) -> None:
-        """Cache files to read from GCS in local"""
-        # Only run downloads if  values are null
+    def local_cache(self) -> None:
+        """Cache files to read from GCS to local"""
         if self.path_local_folder is not None:
             if self.verbose:
                 info(f"  Files already downloaded.")

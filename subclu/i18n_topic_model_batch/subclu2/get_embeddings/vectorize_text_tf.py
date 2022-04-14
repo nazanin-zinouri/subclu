@@ -83,7 +83,8 @@ def vectorize_text(
                 'n_files_slice_end': cfg.get('n_sample_files'),
             }
         },
-        **{k: v for k, v in cfg.items() if k not in ['data_test', 'data_loader_kwargs']}
+        **{k: v for k, v in cfg.items() if k not in ['data_test', 'data_loader_kwargs']},
+        **{'gcs_output_path': cfg['data_text'][key_for_gcs_path]}
     )
 
     vect.get_embeddings()
@@ -105,7 +106,7 @@ class VectorizeText:
             col_text_for_embeddings: str,
             cols_index: Union[str, iter],
             output_bucket: str,
-            output_folder: str,
+            gcs_output_path: str,
             data_loader_kwargs: dict = None,
             run_id: str = None,
             tokenize_lowercase: bool = False,
@@ -128,7 +129,7 @@ class VectorizeText:
         self.col_text_for_embeddings = col_text_for_embeddings
         self.data_loader_name = data_loader_name
         self.output_bucket = output_bucket
-        self.output_folder = output_folder
+        self.gcs_output_path = gcs_output_path
 
         self.tokenize_lowercase = tokenize_lowercase
         self.batch_inference_rows = batch_inference_rows
@@ -146,11 +147,18 @@ class VectorizeText:
         self.data_loader = DATA_LOADERS[data_loader_name](
             **data_loader_kwargs
         )
+        self.data_loader_kwargs = data_loader_kwargs
         # set start time so we can use timestamp when saving outputs
         if run_id is None:
             self.run_id = f"{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
         else:
             self.run_id = run_id
+
+        # For now, save straight to GCS, in the future shift to mlflow
+        #  so we'd have to save to local first
+        self.gcs_output_path_subfolder = (
+            f"gcs://{self.output_bucket}/{self.gcs_output_path}/embedding/{self.run_id}"
+        )
 
     def get_embeddings(self) -> None:
         """Run process to get embeddings
@@ -171,7 +179,27 @@ class VectorizeText:
             # TODO(djb): iterate over N files to get the text & get embeddings
             #  will move away from SQL and back to GCS b/c files make it easier to run
             #  in parallel
-            raise NotImplementedError(f"Not implemented yet")
+            self.data_loader.local_cache()
+
+            for f_, df_ in LogTQDM(
+                self.data_loader.yield_files_and_dfs(),
+                total=self.data_loader.n_local_parquet_files_,
+                desc='Files in batch: ',
+                mininterval=20, ascii=True,
+                logger=log
+            ):
+                gc.collect()
+                f_name = f_.name
+                f_name_root = f_name.split('.')[0]
+                info(f"  Processing: {f_name}")
+                df_vect = self._vectorize_single_df(
+                    df_text=df_,
+                    model=model,
+                )
+                self._save_embeddings(
+                    df_vect,
+                    df_single_file_name=f_name_root,
+                )
 
         else:
             # branch B: process input as one df
@@ -235,25 +263,77 @@ class VectorizeText:
          to complete even if the input batch_size was too high.
         """
         # TODO(djb): concat multiple fields together
+        #   if cols_comment_text_to_concat is not None:
+        #     info(f"Create merged text column")
+        #     df_comments[col_comment_text_to_concat] = ''
+        #
+        #     for col_ in LogTQDM(
+        #             cols_comment_text_to_concat, ascii=True,
+        #             logger=log
+        #     ):
+        #         mask_c_not_null = ~df_comments[col_].isnull()
+        #         df_comments.loc[
+        #             mask_c_not_null,
+        #             col_comment_text_to_concat
+        #         ] = (
+        #                 df_comments[mask_c_not_null][col_comment_text_to_concat] + '. ' +
+        #                 df_comments[mask_c_not_null][col_]
+        #         )
+        #     # remove the first 3 characters because they'll always be '. '
+        #     df_comments[col_comment_text_to_concat] = df_comments[col_comment_text_to_concat].str[2:]
+        # col_text_ = col_text_comment if cols_comment_text_to_concat is None else col_comment_text_to_concat
 
         info(f"Vectorizing column: {self.col_text_for_embeddings}")
 
-        df_vect = get_embeddings_as_df(
-            model=model,
-            df=df_text,
-            col_text=self.col_text_for_embeddings,
-            cols_index=self.cols_index,
-            lowercase_text=self.tokenize_lowercase,
-            batch_size=self.batch_inference_rows,
-            limit_first_n_chars=self.limit_first_n_chars,
-            verbose_init=self.get_embeddings_verbose,
-        )
-
-        # TODO(djb): add a couple try/excepts in case of OOM (out of memory) errors
+        # reset_index() because multi-index is not well supported in parquet by many tools
+        try:
+            df_vect = get_embeddings_as_df(
+                model=model,
+                df=df_text,
+                col_text=self.col_text_for_embeddings,
+                cols_index=self.cols_index,
+                lowercase_text=self.tokenize_lowercase,
+                limit_first_n_chars=self.limit_first_n_chars,
+                limit_first_n_chars_retry=self.limit_first_n_chars_retry,
+                verbose_init=self.get_embeddings_verbose,
+                batch_size=self.batch_inference_rows,
+            ).reset_index()
+        except Exception as e:
+            try:
+                logging.error(f"Failed to vectorize comments")
+                logging.error(e)
+                new_batch_size = int(self.batch_inference_rows * 0.75)
+                info(f"*** Retrying with smaller batch size {new_batch_size}***")
+                df_vect = get_embeddings_as_df(
+                    model=model,
+                    df=df_text,
+                    col_text=self.col_text_for_embeddings,
+                    cols_index=self.cols_index,
+                    lowercase_text=self.tokenize_lowercase,
+                    limit_first_n_chars=self.limit_first_n_chars,
+                    limit_first_n_chars_retry=self.limit_first_n_chars_retry,
+                    verbose_init=self.get_embeddings_verbose,
+                    batch_size=new_batch_size,
+                ).reset_index()
+            except Exception as er:
+                logging.error(f"Failed to vectorize comments")
+                logging.error(er)
+                new_batch_size = int(self.batch_inference_rows * 0.5)
+                info(f"*** Retrying with smaller batch size {new_batch_size}***")
+                df_vect = get_embeddings_as_df(
+                    model=model,
+                    df=df_text,
+                    col_text=self.col_text_for_embeddings,
+                    cols_index=self.cols_index,
+                    lowercase_text=self.tokenize_lowercase,
+                    limit_first_n_chars=self.limit_first_n_chars,
+                    limit_first_n_chars_retry=self.limit_first_n_chars_retry,
+                    verbose_init=self.get_embeddings_verbose,
+                    batch_size=new_batch_size,
+                ).reset_index()
 
         if self.verbose:
             log.info(f"{df_vect.shape} <- df_vect.shape")
-        print(df_vect.iloc[:5, :10])
 
         return df_vect
 
@@ -264,14 +344,11 @@ class VectorizeText:
             add_shape_to_name: bool = True,
     ):
         """save df embeddings"""
-        #  for now, save straight to GCS, in the future shift to mlflow
-        #  so we'd have to save to local first
-        f_gcs_path = f"gcs://{self.output_bucket}/{self.output_folder}/{self.run_id}"
         if add_shape_to_name:
             r, c = df_vect.shape
-            f_gcs_name = f"{f_gcs_path}/{df_single_file_name}-{r}_by_{c}.parquet"
+            f_gcs_name = f"{self.gcs_output_path_subfolder}/{df_single_file_name}-{r}_by_{c}.parquet"
         else:
-            f_gcs_name = f"{f_gcs_path}/{df_single_file_name}.parquet"
+            f_gcs_name = f"{self.gcs_output_path_subfolder}/{df_single_file_name}.parquet"
         log.info(f"Saving df_embeddings to: {f_gcs_name}")
         df_vect.to_parquet(
             f_gcs_name
@@ -285,9 +362,9 @@ def get_embeddings_as_df(
         cols_index: Union[str, List[str]] = None,
         col_embeddings_prefix: Optional[str] = 'embeddings',
         lowercase_text: bool = False,
-        batch_size: Optional[int] = 2000,
-        limit_first_n_chars: int = 1000,
-        limit_first_n_chars_retry: int = 600,
+        batch_size: Optional[int] = 1600,
+        limit_first_n_chars: int = 2100,
+        limit_first_n_chars_retry: int = 700,
         verbose: bool = True,
         verbose_init: bool = False,
 ) -> pd.DataFrame:
@@ -355,12 +432,15 @@ def get_embeddings_as_df(
             model(series_text.to_list()).numpy()
         )
         if index_output is not None:
-            # Remember to reset the index of the output!
+            # Remember to reset the index before concat!
             #   Because pandas will do an inner join based on index
             df_vect = pd.concat(
                 [df_vect, index_output.reset_index(drop=True)],
                 axis=1,
             ).set_index(cols_index)
+            # Main use of set_index() is to move the index cols to front of df
+            #  so it's easier to inspect. We might need to reset_index() later
+            #  because multi-index is not well supported in parquet by many tools
 
         if col_embeddings_prefix is not None:
             # renaming can be expensive when we're calling the function recursively
@@ -380,9 +460,10 @@ def get_embeddings_as_df(
             info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
         for i in LogTQDM(
-                iteration_chunks, mininterval=11, ascii=True,  ncols=80,  # position=0, leave=True,
-                logger=log
-                ):
+            iteration_chunks, mininterval=11, ascii=True,  ncols=80,
+            desc='  Vectorizing: ',
+            logger=log,  # position=0, leave=True,
+        ):
             try:
                 l_df_embeddings.append(
                     get_embeddings_as_df(

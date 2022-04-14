@@ -5,12 +5,14 @@ defaults:
 # Paths to cache & upload
 local_cache_path: "/home/jupyter/subreddit_clustering_i18n/data/local_cache/"
 output_bucket: 'gazette-models-temp'
-output_folder: 'i18n_topic_model_batch/runs/20220413/subreddits/embeddings'
+#gcs_output_path: 'i18n_topic_model_batch/runs/20220412/subreddits/embeddings'
 
 
 # Values for data loader
 # GCS_path is the key we'll use from the data_text config
-#  get full value hydra call instead of having to write it twice
+#  get full value hydra call instead of having to write it twice.
+# We'll also use this key to write embeddings in a subfolder of text file
+#  to make data lineage easier (until we use mlflow).
 gcs_path_text_key: folder_subreddits_text_and_meta
 
 data_loader_name: 'LoadSubredditsGCS'
@@ -34,10 +36,11 @@ process_individual_files: true
 col_text_for_embeddings: subreddit_name_title_related_subs_and_clean_descriptions
 
 model_name: use_multilingual_3
-batch_inference_rows: 2000
-limit_first_n_chars: 2500
+batch_inference_rows: 1600
+limit_first_n_chars: 1900
+limit_first_n_chars_retry: 700
 get_embeddings_verbose: true
-cols_index:
+cols_index:  # subreddit_default_
   - subreddit_id
   - subreddit_name
 
