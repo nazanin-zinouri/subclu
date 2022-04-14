@@ -9,7 +9,10 @@ output_folder: 'i18n_topic_model_batch/runs/20220413/subreddits/embeddings'
 
 
 # Values for data loader
-gcs_path: folder_subreddits_text_and_meta
+# GCS_path is the key we'll use from the data_text config
+#  get full value hydra call instead of having to write it twice
+gcs_path_text_key: folder_subreddits_text_and_meta
+
 data_loader_name: 'LoadSubredditsGCS'
 data_loader_kwargs:
   columns:
@@ -17,7 +20,7 @@ data_loader_kwargs:
     - subreddit_name
     - subreddit_name_title_related_subs_and_clean_descriptions
   df_format: 'pandas'
-  unique_check: true
+  unique_check: false
   verbose: true
 
 # These sampling values should also get passed to the data loader

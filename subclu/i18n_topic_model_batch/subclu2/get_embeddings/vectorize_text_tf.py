@@ -8,7 +8,8 @@ import gc
 import logging
 from datetime import datetime, timedelta
 from logging import info
-from pathlib import Path
+import os
+# from pathlib import Path
 from typing import Union, List, Optional
 
 # import mlflow
@@ -17,8 +18,6 @@ from typing import Union, List, Optional
 # from sklearn.pipeline import Pipeline
 # from tqdm import tqdm
 import pandas as pd
-import tensorflow_hub as hub
-from tensorflow import errors
 
 import hydra
 from hydra.utils import get_original_cwd
@@ -27,6 +26,11 @@ from omegaconf import DictConfig
 from ..utils.eda import elapsed_time
 from ..utils.data_loaders_gcs import LoadSubredditsGCS
 from ..utils.tqdm_logger import FileLogger, LogTQDM
+
+
+# hide TF debugging logs. Env Var BEFORE import tf works
+#  1= keep warning & error, 2= keep error, 3= hide all
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 log = logging.getLogger(__name__)
 
@@ -61,18 +65,22 @@ def vectorize_text(
     #  e.g., either subreddit meta, posts, or comments, but not a combination of them
 
     # Share some top-level variables with the data loader
+
+    # GCS_path is the key we'll use from the data_text config
+    #  get full value hydra call instead of having to write it twice
+    key_for_gcs_path = cfg['gcs_path_text_key']
+
     vect = VectorizeText(
         data_loader_kwargs={
             **cfg['data_loader_kwargs'],
             **{
                 'bucket_name': cfg['data_text']['bucket_name'],
-                'gcs_path': cfg['gcs_path'],
+                'gcs_path': cfg['data_text'][key_for_gcs_path],
                 'local_cache_path': cfg['local_cache_path'],
 
                 'n_sample_files': cfg.get('n_sample_files'),
                 'n_files_slice_start': cfg.get('n_files_slice_start'),
                 'n_files_slice_end': cfg.get('n_sample_files'),
-                'process_individual_files': cfg.get('process_individual_files', True),
             }
         },
         **{k: v for k, v in cfg.items() if k not in ['data_test', 'data_loader_kwargs']}
@@ -106,6 +114,7 @@ class VectorizeText:
             n_sample_files: int = None,
             n_files_slice_start: int = None,
             n_files_slice_end: int = None,
+            process_individual_files: bool = True,
             get_embeddings_verbose: bool = False,
             verbose: bool = False,
             **kwargs
@@ -130,6 +139,7 @@ class VectorizeText:
         self.n_sample_files = n_sample_files
         self.n_files_slice_start = n_files_slice_start
         self.n_files_slice_end = n_files_slice_end
+        self.process_individual_files = process_individual_files
 
         self.data_loader = DATA_LOADERS[data_loader_name](
             **data_loader_kwargs
@@ -140,45 +150,44 @@ class VectorizeText:
         else:
             self.run_id = run_id
 
-    def get_embeddings(self) -> pd.DataFrame:
-        """Run process to get embeddings"""
+    def get_embeddings(self) -> None:
+        """Run process to get embeddings
+        TODO(djb): need to define what to return in case downstream steps need input from here.
+         Maybe output path (GCS path) is the way to go?
+        """
         t_start_vectorize = datetime.utcnow()
         info(f"Start vectorize function")
 
         # TODO(djb): load model
-        log.info(f"Lodaing model: {self.model_name}")
+        log.info(f"Loading model: {self.model_name}")
         model = self._load_model()
         log.info(f"Model loaded")
 
-        # TODO(djb): iterate over N files to get the text & get embeddings
-        #  will move away from SQL and back to GCS b/c files make it easier to run
-        #  in parallel
-
-        # get text
-        df_text = self.data_loader.get_as_dataframe()
-
-        print(df_text[self.col_text_for_embeddings].head())
-
-        info(f"Vectorizing subreddit descriptions...")
         t_start_subs_vect = datetime.utcnow()
-        df_vect = get_embeddings_as_df(
-            model=model,
-            df=df_text,
-            col_text=self.col_text_for_embeddings,
-            cols_index=self.cols_index,
-            lowercase_text=self.tokenize_lowercase,
-            batch_size=self.batch_inference_rows,
-            limit_first_n_chars=self.limit_first_n_chars,
-            verbose_init=self.get_embeddings_verbose,
-        )
+        if self.process_individual_files:
+            # branch A: process each file individually
+            # TODO(djb): iterate over N files to get the text & get embeddings
+            #  will move away from SQL and back to GCS b/c files make it easier to run
+            #  in parallel
+            raise NotImplementedError(f"Not implemented yet")
+
+        else:
+            # branch B: process input as one df
+            log.info(f"Loading text...")
+            df_text = self.data_loader.read_as_one_df()
+
+            print(df_text[self.col_text_for_embeddings].head())
+            df_vect = self._vectorize_single_df(
+                df_text=df_text,
+                model=model,
+            )
+            self._save_embeddings(df_vect)
+
         total_time_subs_vect = elapsed_time(t_start_subs_vect, log_label='df_subs vectorizing', verbose=True)
         # mlflow.log_metric('vectorizing_time_minutes_subreddit_meta',
         #                   total_time_subs_vect / timedelta(minutes=1)
         #                   )
-        if self.verbose:
-            log.info(f"{df_vect.shape} <- df_vect.shape")
-        print(df_vect.iloc[:5, :10])
-        self._save_embeddings(df_vect)
+        # TODO(djb): log the configuration used to create these embeddings
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
@@ -186,8 +195,6 @@ class VectorizeText:
         # mlflow.log_metric('vectorizing_time_minutes_full_function',
         #                   total_fxn_time / timedelta(minutes=1)
         #                   )
-
-        return df_vect
 
     def _load_model(self):
         """Load model based on input
@@ -198,12 +205,46 @@ class VectorizeText:
         https://github.com/tensorflow/tensorflow/issues/38597
         https://github.com/tensorflow/hub/issues/463
         """
+        import tensorflow_hub as hub
         import tensorflow_text
+
         D_MODELS_TF_HUB = {
             'use_multilingual_large_3': "https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3",
             'use_multilingual_3': "https://tfhub.dev/google/universal-sentence-encoder-multilingual/3",
         }
         return hub.load(D_MODELS_TF_HUB[self.model_name])
+
+    def _vectorize_single_df(
+            self,
+            df_text: pd.DataFrame,
+            model: callable,
+    ) -> pd.DataFrame:
+        """Call to vectorize a single df.
+        Call this method to make sure vectorization is standardized when
+        we're calling vectorization on a series of dfs
+        """
+        # TODO(djb): concat multiple fields together
+
+        info(f"Vectorizing column: {self.col_text_for_embeddings}")
+
+        df_vect = get_embeddings_as_df(
+            model=model,
+            df=df_text,
+            col_text=self.col_text_for_embeddings,
+            cols_index=self.cols_index,
+            lowercase_text=self.tokenize_lowercase,
+            batch_size=self.batch_inference_rows,
+            limit_first_n_chars=self.limit_first_n_chars,
+            verbose_init=self.get_embeddings_verbose,
+        )
+
+        # TODO(djb): add a couple try/excepts in case of OOM (out of memory) errors
+
+        if self.verbose:
+            log.info(f"{df_vect.shape} <- df_vect.shape")
+        print(df_vect.iloc[:5, :10])
+
+        return df_vect
 
     def _save_embeddings(
             self,
@@ -233,7 +274,7 @@ def get_embeddings_as_df(
         cols_index: Union[str, List[str]] = None,
         col_embeddings_prefix: Optional[str] = 'embeddings',
         lowercase_text: bool = False,
-        batch_size: int = 2000,
+        batch_size: Optional[int] = 2000,
         limit_first_n_chars: int = 1000,
         limit_first_n_chars_retry: int = 600,
         verbose: bool = True,
@@ -252,6 +293,10 @@ def get_embeddings_as_df(
     TODO(djb):  For each recursive call, use try/except!!
       That way if one batch fails, the rest of the batches can proceed!
     """
+    # Import errors here so that we can set the environment variable to suppress
+    #  debugging logs before importing TF
+    from tensorflow import errors
+
     if cols_index == 'comment_default_':
         cols_index = ['subreddit_name', 'subreddit_id', 'post_id', 'comment_id']
     elif cols_index == 'post_default_':
