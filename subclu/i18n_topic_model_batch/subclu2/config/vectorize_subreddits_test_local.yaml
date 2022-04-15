@@ -4,8 +4,10 @@ defaults:
 
 # Paths to cache & upload
 local_cache_path: "/home/jupyter/subreddit_clustering_i18n/data/local_cache/"
+# Note: this model path is used ONLY if we run model OUTSIDE of hydra
+local_model_path: "/home/jupyter/subreddit_clustering_i18n/data/models/embeddings"
+
 output_bucket: 'gazette-models-temp'
-#gcs_output_path: 'i18n_topic_model_batch/runs/20220412/subreddits/embeddings'
 
 
 # Values for data loader

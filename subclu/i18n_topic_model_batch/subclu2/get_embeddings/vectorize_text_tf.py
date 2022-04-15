@@ -6,17 +6,15 @@ Meant to be used in kubeflow but should be flexible enough to be used outside of
 """
 import gc
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from logging import info
 import os
-# from pathlib import Path
+from pathlib import Path
+import posixpath
 from typing import Union, List, Optional
 
 # import mlflow
-# import pandas as pd
-# import numpy as np
-# from sklearn.pipeline import Pipeline
-# from tqdm import tqdm
+from google.cloud import storage
 import pandas as pd
 
 import hydra
@@ -107,6 +105,7 @@ class VectorizeText:
             cols_index: Union[str, iter],
             output_bucket: str,
             gcs_output_path: str,
+            local_model_path: str,
             data_loader_kwargs: dict = None,
             run_id: str = None,
             tokenize_lowercase: bool = False,
@@ -130,6 +129,8 @@ class VectorizeText:
         self.data_loader_name = data_loader_name
         self.output_bucket = output_bucket
         self.gcs_output_path = gcs_output_path
+        self.local_model_path = local_model_path
+        self.f_log_file = None
 
         self.tokenize_lowercase = tokenize_lowercase
         self.batch_inference_rows = batch_inference_rows
@@ -156,8 +157,9 @@ class VectorizeText:
 
         # For now, save straight to GCS, in the future shift to mlflow
         #  so we'd have to save to local first
-        self.gcs_output_path_subfolder = (
-            f"gcs://{self.output_bucket}/{self.gcs_output_path}/embedding/{self.run_id}"
+        # For full path we'd need to append `gcs://{self.output_bucket}/`
+        self.gcs_output_path_this_run = (
+            f"{self.gcs_output_path}/embedding/{self.run_id}"
         )
 
     def get_embeddings(self) -> None:
@@ -166,6 +168,8 @@ class VectorizeText:
          Maybe output path (GCS path) is the way to go?
         """
         t_start_vectorize = datetime.utcnow()
+        self._set_path_local_model()
+
         info(f"Start vectorize function")
 
         # TODO(djb): load model
@@ -217,6 +221,8 @@ class VectorizeText:
         #                   total_time_subs_vect / timedelta(minutes=1)
         #                   )
         # TODO(djb): log the configuration used to create these embeddings
+        # log hydra config
+        self._log_hydra_config_and_log_file()
 
         # finish logging total time + end mlflow run
         total_fxn_time = elapsed_time(start_time=t_start_vectorize, log_label='Total vectorize fxn', verbose=True)
@@ -346,13 +352,134 @@ class VectorizeText:
         """save df embeddings"""
         if add_shape_to_name:
             r, c = df_vect.shape
-            f_gcs_name = f"{self.gcs_output_path_subfolder}/{df_single_file_name}-{r}_by_{c}.parquet"
+            f_gcs_name = f"gcs://{self.output_bucket}/{self.gcs_output_path_this_run}/{df_single_file_name}-{r}_by_{c}.parquet"
         else:
-            f_gcs_name = f"{self.gcs_output_path_subfolder}/{df_single_file_name}.parquet"
+            f_gcs_name = f"gcs://{self.output_bucket}/{self.gcs_output_path_this_run}/{df_single_file_name}.parquet"
         log.info(f"Saving df_embeddings to: {f_gcs_name}")
         df_vect.to_parquet(
             f_gcs_name
         )
+
+    def _set_path_local_model(self):
+        """Set where to save artifacts locally for this run"""
+        try:
+            get_original_cwd()
+            hydra_initialized = True
+        except ValueError:
+            hydra_initialized = False
+
+        if hydra_initialized:
+            log.info(f"Using hydra's path")
+            # log.info(f"  Current working directory : {os.getcwd()}")
+            # log.info(f"  Orig working directory    : {get_original_cwd()}")
+            self.path_local_model = Path(os.getcwd())
+        else:
+            # create local path to store artifacts before logging to mlflow
+            self.path_local_model = Path(
+                f"{self.local_model_path}/{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
+            )
+            Path(self.path_local_model).mkdir(exist_ok=True, parents=True)
+            log.info(f"  Local model saving directory: {self.path_local_model}")
+
+        self._init_file_log()
+        # self.path_local_model_figures = self.path_local_model / 'figures'
+        # Path(self.path_local_model_figures).mkdir(exist_ok=True, parents=True)
+
+    def _init_file_log(self) -> None:
+        """Create a file & FileHandler to log data"""
+        # TODO(djb): make sure to remove fileHandler after job completes run_aggregation()
+        if self.f_log_file is None:
+            logger = logging.getLogger()
+
+            path_logs = Path(self.path_local_model) / 'logs'
+            Path.mkdir(path_logs, parents=False, exist_ok=True)
+            self.f_log_file = str(
+                path_logs /
+                f"{datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')}_vectorize_text.log"
+            )
+            info(f"  Log file created at: {self.f_log_file}")
+
+            self.fileHandler = logging.FileHandler(self.f_log_file)
+            self.fileHandler.setLevel(logging.INFO)
+
+            formatter = logging.Formatter(
+                '%(asctime)s | %(levelname)s | "%(message)s"',
+                '%Y-%m-%d %H:%M:%S'
+            )
+            self.fileHandler.setFormatter(formatter)
+            logger.addHandler(self.fileHandler)
+
+    def _log_hydra_config_and_log_file(self):
+        """Log hydra config to bucket. In the future this should be logged to mlflow"""
+        # logs file (if it exists)
+        if self.f_log_file is not None:
+            storage_client = storage.Client()
+            bucket = storage_client.get_bucket(self.output_bucket)
+            f_log_name = Path(self.f_log_file).name
+            info(f"Saving log file...")
+            (
+                bucket
+                .blob(posixpath.join(self.gcs_output_path_this_run, f_log_name))
+                .upload_from_filename(self.f_log_file)
+            )
+
+        path_hydra_config = self.path_local_model / '.hydra'
+        # For now, copy the logic from mlflow.log_artifacts()
+        if path_hydra_config.is_dir():
+            info(f"Saving hydra config...")
+            # mlflow.log_artifacts(str(path_hydra_config), 'hydra')
+            # Note: this function only expects the path, so we need to exclude
+            #  `gcs://{bucket_name}/` from the run path
+            upload_folder_to_gcs(
+                bucket_name=self.output_bucket,
+                gcs_output_root=self.gcs_output_path_this_run,
+                local_dir=path_hydra_config,
+                gcs_new_subfolder='hydra',
+                verbose=False,
+                dry_run=False
+            )
+
+
+def upload_folder_to_gcs(
+        bucket_name: str,
+        gcs_output_root: str,
+        local_dir: Union[str, Path],
+        gcs_new_subfolder: str = None,
+        verbose: bool = False,
+        dry_run: bool = False,
+) -> None:
+    """Wrapper around gcs to upload files in a folder recursively
+    based on mlflow.log_artifacts()
+    """
+    if verbose:
+        info(f"dry_run={dry_run}")
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(bucket_name)
+
+    if gcs_new_subfolder is None:
+        dest_path = gcs_output_root
+    else:
+        dest_path = f"{gcs_output_root}/{gcs_new_subfolder}"
+
+    local_dir = os.path.abspath(local_dir)
+    for (root, _, filenames) in os.walk(local_dir):
+        print(root)
+        upload_path = dest_path
+
+        if root != local_dir:
+            rel_path = os.path.relpath(root, local_dir)
+            # rel_path = relative_path_to_artifact_path(rel_path)
+            upload_path = posixpath.join(dest_path, rel_path)
+
+        for f in filenames:
+            f_gcs_path = posixpath.join(upload_path, f)
+            f_local = posixpath.join(root, f)
+            if verbose:
+                info(f"Uploading file\n  from: {f_local}\n  to: {bucket_name}/{f_gcs_path}")
+
+            if not dry_run:
+                bucket.blob(f_gcs_path).upload_from_filename(f_local)
+
 
 
 def get_embeddings_as_df(
