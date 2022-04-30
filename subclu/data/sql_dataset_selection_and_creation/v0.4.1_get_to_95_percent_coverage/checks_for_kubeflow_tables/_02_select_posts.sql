@@ -33,21 +33,35 @@ SELECT
   , COUNT(DISTINCT post_id) as post_id_count_unique
 FROM posts_lang_and_meta
 ;
--- Test counts (2 days)
--- row_count	subreddit_count_unique  post_id_count_unique
--- 1,573,476    61,071                  1,573,476
+-- Test counts (2 days) [no post limit per subreddit]
+-- row_count	post_id_count_unique    subreddit_count_unique
+-- 1,573,476    1,573,476               61,071
 
 
 -- Check `posts_lang_and_meta_top`
 SELECT
   COUNT(*) as row_count
-  , COUNT(DISTINCT subreddit_id) as subreddit_count_unique
   , COUNT(DISTINCT post_id) as post_id_count_unique
+  , COUNT(DISTINCT subreddit_id) as subreddit_count_unique
 FROM posts_lang_and_meta_top
 ;
--- Test counts (2 days)
--- row_count    subreddit_count_unique	post_id_count_unique
--- 1,403,593    61,071                  1,403,593
+-- Test counts (2 days). ~3 min 14 sec @ 2,000 posts per subreddit
+-- row_count    post_id_count_unique	subreddit_count_unique
+-- 1,470,955    1,470,955               61,071
+
+
+-- Check `posts_final_clean_top`
+--  This table should have the same counts as the table before
+--  The diff is that it should have new cols with clean text
+SELECT
+  COUNT(*) as row_count
+  , COUNT(DISTINCT subreddit_id) as subreddit_count_unique
+  , COUNT(DISTINCT post_id) as post_id_count_unique
+FROM posts_final_clean_top
+;
+-- Test counts (2 days). ~3 min 16 sec @ 2,000 posts per subreddit
+-- row_count    post_id_count_unique	subreddit_count_unique
+-- 1,470,955    1,470,955               61,071
 
 
 
