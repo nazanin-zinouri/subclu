@@ -83,3 +83,26 @@ FROM ocr_text_agg
 -- ========================
 -- Check for final table
 -- ===
+SELECT
+  COUNT(*) as row_count
+  , COUNT(DISTINCT post_id) as post_id_count_unique
+  , COUNT(DISTINCT subreddit_id) as subreddit_count_unique
+FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220428`
+;
+-- Test with 7 days worth of posts:
+-- row_count    post_id_count_unique    subreddit_count_unique
+-- 4,401,293    4,401,293               77,345
+
+
+
+-- Get most common post URL domains
+SELECT
+  post_url_domain
+  , COUNT(*) post_count
+
+FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220427`
+WHERE 1=1
+GROUP BY 1
+ORDER BY 2 DESC
+-- LIMIT 100
+;
