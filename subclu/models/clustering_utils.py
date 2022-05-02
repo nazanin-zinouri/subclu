@@ -611,28 +611,39 @@ def reshape_df_to_get_1_cluster_per_row(
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_topic: str = 'cluster_topic_mix',
         get_one_column_per_sub_id: bool = False,
+        l_groupby_cols: iter = None,
+        agg_subreddit_ids: bool = True,
+        l_sort_cols: str = None,
         verbose: bool = False,
 ) -> pd.DataFrame:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
     """
-    l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
-    l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
+    if l_groupby_cols is None:
+        l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
+        l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
+
+    if l_sort_cols is None:
+        l_sort_cols = [col_new_cluster_val]
+
+    d_aggs = {
+        col_counterpart_count: ('subreddit_id', 'nunique'),
+        col_list_cluster_names: ('subreddit_name', list),
+    }
+    if agg_subreddit_ids:
+        d_aggs[col_list_cluster_ids] = ('subreddit_id', list)
+
     df_cluster_per_row = (
         df_labels
         .groupby(l_groupby_cols)
         .agg(
-            **{
-                col_counterpart_count: ('subreddit_id', 'nunique'),
-                col_list_cluster_names: ('subreddit_name', list),
-                col_list_cluster_ids: ('subreddit_id', list),
-            }
+            **d_aggs
         )
-        .sort_values(by=[col_new_cluster_val], ascending=True)
+        .sort_values(by=l_sort_cols, ascending=True)
         .reset_index()
     )
-    print(df_cluster_per_row.shape)
+    print(f"{df_cluster_per_row.shape}  <- df.shape")
 
     if get_one_column_per_sub_id:
         # Convert the list of subs into a df & merge back with original sub (each sub should be in a new column)
@@ -650,10 +661,12 @@ def reshape_df_to_get_1_cluster_per_row(
     # and to remove the brackets
     for col_list_ in [col_list_cluster_names, col_list_cluster_ids]:
         try:
+            # Treating as a string is faster than .apply() to process each item in list
+            #    .apply(lambda x: ', '.join(x))
             df_cluster_per_row[col_list_] = (
                 df_cluster_per_row[col_list_]
-                .apply(lambda x: ', '.join(x))
                 .astype(str)
+                .str[1:-1]
                 .str.replace("'", "")
             )
         except KeyError:
