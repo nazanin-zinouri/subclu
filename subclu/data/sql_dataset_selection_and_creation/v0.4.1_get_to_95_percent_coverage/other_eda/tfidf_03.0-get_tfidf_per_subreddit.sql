@@ -1,9 +1,41 @@
-WITH
+-- Get TF-IDF at subreddit level
+DECLARE MIN_NGRAM_COUNT DEFAULT 10;
+DECLARE MIN_DF NUMERIC DEFAULT 0.06;
+DECLARE MAX_DF NUMERIC DEFAULT 0.92;
 
-ngram_counts_per_subreddit AS (
+WITH ngram_counts_per_subreddit AS (
     -- By default start with subreddit level, need to change this to get cluster-level
-    SELECT *
+    SELECT
+        * EXCEPT(ngram)
+        , TRIM(ngram) as ngram
     FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211214`
+    WHERE 1=1
+        AND COALESCE(TRIM(ngram), '') NOT IN (
+            -- German
+            'eine', 'einen', 'für', 'nicht', 'der', 'wenn', 'dass', 'dann'
+            , 'ich', 'und', 'zu', 'sich', 'von', 'als', 'meine', 'wird', 'sind'
+            , 'jetzt', 'aber'
+
+            -- English
+            , 'i', 'the', 'they', 'and', 'that', 'you', 'to', 'to the'
+            , 'she', 'shes', 'her', 'i was', 'she was', 'he was', 'that she', 'that he', 'that i'
+            , 'her and', 'didnt', 'her to', 'she has', 'he has', 'what to', 'what to do', 'to do'
+            , 'with him', 'with her', 'with me', 'and she', 'and he', 'and i', 'and you'
+            , 'told her', 'told him', 'told me', 'at what', 'but at'
+            , 'be sure to', 'be sure', 'where you can', 'an answer'
+            , 'often as', 'if you didnt', 'if you', 'you can also'
+            , 'for', 'this', 'get', 'the city'
+            , 'when your', 'when my', 'when her', 'when his', 'when i'
+            , 'made with', 'how do', 'what if', 'why do', 'here to'
+            , 'view all comments', 'to sort', 'asked that', 'click here'
+            , 'you can', 'i can', 'he can', 'she can', 'we can', 'they can'
+            , 'to your', 'to my', 'to his', 'to her', 'to us', 'to them'
+            , 'get a lot'
+
+            -- French, Spanish, Others
+            , 'de la', 'à', 'en la', 'en el', 'a', 'me', 'el', 'una', 'del'
+            , 'je', 'por', 'a la', 'que se', 'que les'
+        )
 )
 
 , ngram_total_words AS (
@@ -53,7 +85,30 @@ ngram_counts_per_subreddit AS (
            FROM ngram_total_words
         ) AS t
 )
-
+, tf_idf_raw AS (
+    -- We can save this "raw" table
+    --   and apply filters on demand like: min count, min & max df
+    SELECT
+        *
+        , tf*idf AS tfidf
+    FROM ngram_tf AS t
+        LEFT JOIN ngram_idf AS i
+            USING(ngram)
+)
+, tf_idf_with_rank AS (
+    SELECT
+        subreddit_id
+        , ngram
+        , ROW_NUMBER() OVER (PARTITION BY subreddit_id ORDER BY tfidf DESC, ngram_count DESC) as ngram_rank_in_subreddit
+        , tfidf
+        , ngram_count
+        , * EXCEPT(subreddit_id, ngram, tfidf, ngram_count)
+    FROM tf_idf_raw
+    WHERE 1=1
+        AND df >= MIN_DF
+        AND df <= MAX_DF
+    ORDER BY subreddit_id ASC, tfidf DESC
+)
 -- Check totals
 -- SELECT *
 -- FROM ngram_total_words
@@ -83,8 +138,19 @@ ngram_counts_per_subreddit AS (
 -- ;
 
 -- Check IDF
-SELECT *
-FROM ngram_idf
-ORDER BY idf DESC
+-- SELECT *
+-- FROM ngram_idf
+-- ORDER BY idf DESC
+-- LIMIT 3000
+-- ;
+
+
+-- Check TF-IDF
+SELECT a.subreddit_name, t.*
+FROM tf_idf_with_rank AS t
+    LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS a
+        USING (subreddit_id)
+WHERE ngram_rank_in_subreddit <= 40
+ORDER BY subreddit_name, ngram_rank_in_subreddit
 LIMIT 3000
 ;
