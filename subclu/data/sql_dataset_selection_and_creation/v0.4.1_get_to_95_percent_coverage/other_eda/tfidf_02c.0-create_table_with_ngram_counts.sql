@@ -2,22 +2,20 @@
 
 
 DECLARE REGEX_REPLACE_CLEAN_MEDIA_LINKS STRING DEFAULT
-    -- This ismostly meant to catch images and videos hosted by reddit
-    r"(\!?\[)(\w{3,})(\]\()(\w{6,}|[\w\s\|</>+;@#\?\!'_,.:\-=&%]{7,})(\s+\"[\w\s\|</>+;@#\?\!'_,{}\(\).:\-]+\"\s*|\s+'[\w\s\|</>+;@#\?\!\"_,{}\(\).:\-]+'\s*)?(\))";
+    r"(\!\[)(\w{3,6})(\]\()(\w{6,}|[\w\s\|</>+;@#\?\!'_,.:\-]{7,80})(\s+\"[\w\s\|</>+;@#\?\!'_,{}\(\).:\-]+\"\s*|\s+'[\w\s\|</>+;@#\?\!\"_,{}\(\).:\-]+'\s*)?(\))";
 
 DECLARE REGEX_STOPWORDS_TO_REMOVE STRING DEFAULT
-    -- These are mostly English stop words with some Spanish mixed in.
-    --  For other languages, we'll need to filter after the fact
-    r"\b[tT]he[ymn]?\s|\b[^\.][tT]o\s|\b[Ii] am\b|\bde la\s|\b[^\.]de[^/]\s|\b[Ee]st[oae]?s?n?y?\b|\bpara\b|\B:post-|\ba? ?las?\s|\b[Ii]s\s|\b[Ii]t[\s,]|\b[Ii]t'?s\s|\ba[st]\s|\b[Dd]oes\b|&nbsp;|&#x200B;|\b[Tt]h[ieo]se?\s|\b[Tt]hat\s|\b[Ff]or\s|\b[Oo]n\s|\b'[ds]\b|\b[Ii]'[md]\s|\b[Ii]'ll\s|\b[Pp]orque\s|\b[Cc]uando\s|\b[Tt]odos?\s|\b[Ww]e're\s|\b[Yy]ou'?re?\s|\b[Tt]o\s|\b[Ii]\s|\b[Aa]nd\s|\b[Yy]ou\s|\b[Ss]?[Hh]e\s|\b[Hh]ers?\b|\b[Hh]i[ms]\s|\b[AaWw]e?re\s|\b[Ww]as\s|\b[Dd]o\s|\b[Dd]oes\s|\ban?\s|\b[Bb]ut\s|\b[Mm]y\s|\b[mBb]e\s|\b[Tt]?[Hh]ere[\.\s]|\b[Ww]ith\s|\b[Cc]an\s|\b[Cc]ould\s|\b[Tt]heir\s|\b[Hh]ave\s|\b[Hh]ad\s|\b[Ff]rom\s|\b[Ss]uch\s|\bof\s|\sin\b";
+    r"\bthe\b|\bto\b|\bde la\b|\bde\b|\best[oae]?s?n?y?\b|\bpara\b|\B:post-|\ba? ?las?|\bis it\b|\bis\b|\bdoes\b";
 
 DECLARE REGEX_REMOVE STRING DEFAULT
-    -- URL/UTM, S & M's from OCR, some punctuation
-    r"(?i)\bi\.|https?:?//?|www\.?|\.com/watch|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b'\b|¿|…\B|—\B|\.gif|.jpe?g|\.org";
+    -- URL/UTM, contractions, S & M's from OCR, some punctuation
+    r"(?i)\bi\.|https?:?//?|www\.?|&[a-z\\_]{2,}=[a-z\\_]+|\?[a-z\\_]{2,}=[a-z\\_]+|\.html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b'\b|¿|…\B|—\B|\.gif|.jpe?g|\.org";
 
 DECLARE REGEX_REPLACE_WITH_SPACE STRING DEFAULT
-    r"(?i)/search|/status/|&nbsp;|%[0-9a-f]{4}|%[0-9a-f]{2}|\n&#x200B;|%\w{2}|[”–·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|&amp;|[\)!\('\.\"\]\[\*\{\}]+|\b\d+\b|”|」|\s&\s|\s@\s";
+    r"(?i)/status/|&nbsp;|%[0-9a-f]{4}|%[0-9a-f]{2}|\n&#x200B;|%\w{2}|[”–·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|&amp;|[\)!\('\.\"\]\[\*\{\}]+|\b\d+\b|”|」|\s&\s|\s@\s";
 
 
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215`
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_text_test_20211215`
 AS (
 WITH
@@ -105,6 +103,13 @@ WITH
             )
         GROUP BY subreddit_id, TRIM(ngram)
     )
+    , ngram_per_subreddit AS (
+        SELECT
+            *
+            , (1 + array_length(regexp_extract_all(ngram, ' '))) AS ngram_type
+            , CHAR_LENGTH(ngram) AS ngram_char_len
+        FROM ngram_per_subreddit_raw
+    )
 
 
 -- Check clean text regexes
@@ -117,5 +122,14 @@ SELECT
 FROM preprocessed_text AS p
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_posts_top_no_geo_20211214` AS t
         ON p.post_id = t.post_id
+
+
+
+-- Select n-grams for tf-idf & BM25
+-- SELECT *
+-- FROM ngram_per_subreddit
+-- WHERE ngram_count >= 3
+
+-- ORDER BY subreddit_id, ngram_count DESC
 
 );  -- close CREATE table parens
