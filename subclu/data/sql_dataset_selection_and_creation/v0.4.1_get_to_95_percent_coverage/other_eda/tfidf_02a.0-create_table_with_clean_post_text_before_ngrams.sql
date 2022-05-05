@@ -18,8 +18,8 @@ DECLARE REGEX_REMOVE_FROM_OCR STRING DEFAULT
     r"(?i)\s[ms]+\s+[ms]+\b|\bx\sx\s?x?\b";
 
 DECLARE REGEX_REMOVE STRING DEFAULT
-    -- URL/UTM, S & M's from OCR, some punctuation
-    r"(?i)[iv]\.redd\.it|\bi\.|https?:?//?|www\.?|\.com/watch|\.mp4|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.s?html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b[’']\b|¿|…\B|—\B|\.gif|.jpe?g|\.org";
+    -- URL/UTM, some punctuation
+    r"(?i)[iv]\.redd\.it|reddit.com/gallery|\bi\.|https?:?//?|www\.?|\.com/watch|\.mp4|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.s?html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b[’']\b|¿|…\B|—\B|\.gif|.jpe?g|\.org";
 
 DECLARE REGEX_REPLACE_WITH_SPACE STRING DEFAULT
     r"(?i)/search|/status/|&nbsp;|\bá\b|%[0-9a-f]{4}|%[0-9a-f]{2}|\n&#x200B;|%\w{2}|[\^”–“·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|&amp;|[\)!\('\.\"\]\[\*\{\}]+|\b\d+\b|”|」|\s&\s|\s@\s";

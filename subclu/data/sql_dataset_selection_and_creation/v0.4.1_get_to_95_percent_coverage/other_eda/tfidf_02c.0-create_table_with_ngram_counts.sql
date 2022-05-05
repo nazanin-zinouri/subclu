@@ -1,4 +1,5 @@
--- Create test table to count ngrams once and then reuse them as a separate step
+-- Create test table to count ngrams
+--  Then in a separate query we can use them to calculate tf-idf & bm25
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215`
 AS (
@@ -33,7 +34,9 @@ WITH
         WHERE ngram IS NOT NULL
             AND ngram NOT IN(
                 '', ' ', ' ', '   ', '    ', '     '
-                -- Common English tokens
+                -- Common English tokens are now mostly in the REGEX to clean the text
+                , 'she', 'youtu', 'the', 'not', 'my', 'by', 'you'
+                , 't', 'r'
 
             )
         GROUP BY subreddit_id, TRIM(ngram)
@@ -55,8 +58,8 @@ SELECT
 FROM ngram_per_subreddit AS n
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS sc
                 ON n.subreddit_id = sc.subreddit_id
-WHERE ngram_count >= 3
+WHERE ngram_count >= 4
 
-ORDER BY subreddit_id, ngram_count DESC
+ORDER BY subreddit_name, ngram_count DESC
 
 );  -- close CREATE table parens

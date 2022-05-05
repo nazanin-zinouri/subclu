@@ -1,5 +1,5 @@
 -- Get TF-IDF & BM25 at subreddit level
---  The best strategy might be to get the top 5 from TF-IDF and top 5 from BM25
+--  The best strategy might be to get the top N from TF-IDF and top M from BM25
 
 DECLARE MIN_NGRAM_COUNT DEFAULT 11;
 DECLARE MIN_DF NUMERIC DEFAULT 0.06;
@@ -9,56 +9,42 @@ DECLARE MAX_DF NUMERIC DEFAULT 0.98;
 --  [0,3] Could be higher than 3 | [0.5,2.0] "Optimal" starting range
 --  High -> staturation is slower (books)
 --  Low  -> downweight counts quickly (news articles)
-DECLARE K1 NUMERIC DEFAULT 32.0;
+DECLARE K1 NUMERIC DEFAULT 24.0;
 
 -- b  = 0.75 doc length penalty.  0 -> no penalty
 --  [0,1] MUST be between 0 & 1 | [0.3, 0.9] "optimal" starting range
 --  High -> broad articles, penalize a lot
 --  Low  -> detailed/focused technical articles (low penalty)
-DECLARE B NUMERIC DEFAULT 0.30;
+DECLARE B NUMERIC DEFAULT 0.50;
 
 
 WITH ngram_counts_per_subreddit AS (
     -- By default start with subreddit level, need to change this to get cluster-level
     SELECT
-        * EXCEPT(ngram)
-        , TRIM(ngram) as ngram
-    FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211214`
+        *
+    FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215`
     WHERE 1=1
         AND COALESCE(TRIM(ngram), '') NOT IN (
             -- German
             'eine', 'einen', 'einem', 'für', 'nicht', 'der', 'wenn', 'dass', 'dann'
             , 'ich', 'und', 'zu', 'sich', 'von', 'als', 'meine', 'meines', 'meinen', 'wird', 'sind'
             , 'jetzt', 'aber', 'in der', 'mehr', 'zum', 'keine', 'keinen', 'wie', 'wir', 'haben'
-            , 'ich dann', 'irgendwann', 'ist', 'auf'
+            , 'ich dann', 'irgendwann', 'ist', 'auf', 'auch', 'oder', 'vor', 'sie'
+            , 'werden', 'mich', 'habe', 'nur', 'ihr', 'das', 'ein', 'une', 'noch', 'du'
 
-            -- English
-            , 'i', 'the', 'they', 'and', 'that', 'you', 'to', 'to the'
-            , 'she', 'shes', 'him', 'her', 'i was', 'she was', 'he was', 'that she', 'that he', 'that i'
-            , 'her and', 'didnt', 'her to', 'she has', 'he has', 'what to', 'what to do', 'to do'
-            , 'with him', 'with her', 'with me', 'and she', 'and he', 'and i', 'and you'
-            , 'told her', 'told him', 'told me', 'at what', 'but at'
-            , 'be sure to', 'be sure', 'where you can', 'an answer'
-            , 'often as', 'if you didnt', 'if you', 'you can also'
-            , 'for', 'this', 'get', 'the city'
-            , 'when your', 'when my', 'when her', 'when his', 'when i'
-            , 'made with', 'how do', 'what if', 'why do', 'here to'
-            , 'view all comments', 'to sort', 'asked that', 'click here'
-            , 'you can', 'i can', 'he can', 'she can', 'we can', 'they can'
-            , 'to your', 'to my', 'to his', 'to her', 'to us', 'to them'
-            , 'you to', 'me to', 'he to', 'her to', 'us to', 'them to'
-            , 'get a lot', 'but she', 'but he', 'but i', 'but we', 'i dont'
-            , 'i am', 'she is', 'he is', 'you are', 'they are', 'we are'
-            , 'i was', 'she was', 'he was', 'you were', 'they were', 'we were'
-            , 'my'
+            -- English: most are now part of regex that removes most stopwords at the start
+            , 'she', 'be', 'youtu', 'the', 'not', 'my', 'by', 'you'
 
             -- French, Spanish, Others
+            , 'hay', 'ser', 'fue', 'por el', 'se', 'al'
             , 'de la', 'à', 'en la', 'en el', 'a', 'me', 'el', 'una', 'del'
             , 'je', 'por', 'a la', 'de la', 'de los', 'lo que'
             , 'que', 'que se', 'que les', 'qué', 'más', 'que no', 'nous'
             , 'pero', 'algo', 'muy', 'nada', 'hace', 'hacer', 'tengo', 'tiene'
             , 'hasta', 'de las', 'desde', 'no se', 'no me', 'no te', 'no le'
             , 'estaba', 'cuando', 'como', 'esta'
+            , 'pas', 'les', 'des'
+            , 'porque', 'y'
         )
 )
 
@@ -144,18 +130,24 @@ WITH ngram_counts_per_subreddit AS (
     SELECT
         subreddit_id
         , ngram
-        , ROW_NUMBER() OVER (PARTITION BY subreddit_id ORDER BY bm25 DESC, ngram_count DESC) as ngram_rank_bm25
-        , ROW_NUMBER() OVER (PARTITION BY subreddit_id ORDER BY tfidf DESC, ngram_count DESC) as ngram_rank_tfidf
-        , bm25
-        , tfidf
-        , ngram_count
-        , * EXCEPT(subreddit_id, ngram, tfidf, bm25, ngram_count)
-    FROM tf_idf_and_bm25_raw
-    WHERE 1=1
-        AND df >= MIN_DF
-        AND df <= MAX_DF
-        AND ngram_count >= MIN_NGRAM_COUNT
-    ORDER BY subreddit_id ASC, tfidf DESC
+        , ((ngram_rank_bm25 + ngram_rank_tfidf) / 2) AS ngram_rank_avg
+        , t.* EXCEPT(subreddit_id, ngram)
+    FROM (
+        SELECT
+            subreddit_id
+            , ngram
+            , ROW_NUMBER() OVER (PARTITION BY subreddit_id ORDER BY bm25 DESC, ngram_count DESC) as ngram_rank_bm25
+            , ROW_NUMBER() OVER (PARTITION BY subreddit_id ORDER BY tfidf DESC, ngram_count DESC) as ngram_rank_tfidf
+            , bm25
+            , tfidf
+            , ngram_count
+            , * EXCEPT(subreddit_id, ngram, tfidf, bm25, ngram_count)
+        FROM tf_idf_and_bm25_raw
+        WHERE 1=1
+            AND df >= MIN_DF
+            AND df <= MAX_DF
+            AND ngram_count >= MIN_NGRAM_COUNT
+    ) AS t
 )
 
 
@@ -169,46 +161,8 @@ FROM tf_idf_with_rank AS t
         USING (subreddit_id)
 WHERE 1=1
     AND (
-        ngram_rank_bm25 <= 5
-        OR ngram_rank_tfidf <= 5
+        ngram_rank_bm25 <= 3
+        OR ngram_rank_tfidf <= 3
     )
-ORDER BY subreddit_name, ngram_rank_bm25
-LIMIT 3000
+ORDER BY subreddit_name, ngram_rank_avg
 ;
-
-
--- Check total words
--- SELECT *
--- FROM ngram_total_words
--- ;
-
-
--- Check TF
--- SELECT
---     a.subreddit_name
---     , ntf.*
--- FROM ngram_tf AS ntf
---     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS a
---       USING (subreddit_id)
--- ORDER BY tf DESC
--- LIMIT 3000
--- ;
-
-
--- Check ngram in docs
--- SELECT
---     *
--- FROM ngram_in_docs AS nd
---     WHERE 1=1
---         -- no idea why there are some ngrams with whitespace b/c this doesn't get rid of them
---         AND ngram != '   '
--- ORDER BY n_docs_with_ngram DESC
--- LIMIT 3000
--- ;
-
--- Check IDF
--- SELECT *
--- FROM ngram_idf
--- ORDER BY idf DESC
--- LIMIT 3000
--- ;
