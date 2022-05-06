@@ -58,7 +58,7 @@ SELECT
 FROM ngram_per_subreddit AS n
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS sc
                 ON n.subreddit_id = sc.subreddit_id
-WHERE ngram_count >= 4
+WHERE ngram_count >= 3
 
 ORDER BY subreddit_name, ngram_count DESC
 

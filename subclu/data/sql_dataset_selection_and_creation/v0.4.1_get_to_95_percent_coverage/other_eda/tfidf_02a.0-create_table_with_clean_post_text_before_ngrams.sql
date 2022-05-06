@@ -10,7 +10,7 @@ DECLARE REGEX_FLAIR_REPLACE_WITH_SPACE STRING DEFAULT
 DECLARE REGEX_STOPWORDS_TO_REMOVE STRING DEFAULT
     -- These are mostly English stop words with some Spanish mixed in.
     --  For other languages, we'll need to filter after the fact
-    r"(?i)\b[tT]he[ymn]?[,!\.\?]?\s|\b[Tt]o\s|\b[Ii] am\b|\bde la\s|\sde[l]\b|\b[Ee]st[oae]?s?n?y?\b|\bpara\s|\ba? ?las?\s|\b[Ii]s\s|\b[Ii]t[\s,\?!]|\b[Ii]t[’']?s\s|\b[Aa][st]\s|&nbsp;|&#x200B;|\b[Tt]h[ieo]se?\s|\b[Tt]hat[’']?[s,!\.\?]?\s|\b[Ff]or[,!\.\?]?\s|\b[Oo]n\s|\b[Ii][’'][md]\s|\b[Ii]?[’']ll\s|\b[Pp]orque\s|\b[Cc]uando\s|\b[Tt]odos?\s|\b[Ww]e[’']re\s|\b[Yy]ou[’']?re?\s|\b[Ii]\s|\b[Aa]nd\s|\b[Yy]ou\s|\b[Ss]?[Hh]e\s|\b[Hh]ers?\b|\b[Hh]i[ms]\s|\b[AaWw]e?re\s|\b[Ww]as\s|\b[Dd]o\s|\b[Dd]oes[,!\.\?]?\s|\ban?\s|\b[Bb]ut\s|\b[Mm]y\s|\b[mBb]e\s|\b[Tt]?[Hh]ere[\.\s]|\b[Ww]ith\s|\b[Cc]an[’']?t?\b|\bg[eo]t\b|\b[Cc]ould\b|\bwon't\b|\btheir\b|\b[Hh]ave\b|\b[Hh]ad\b|\b[Ff]rom\s|\b[Ss]uch\s|\bof\s|\sin\b|\bI?[’']ve|\b[Dd]oe?s?n[’']t[\s,\?!]|\bor\s|\b[Ww]e\s|\bwill\s|\by[’']all\s|\b[Aa]ll\s|\b[Aa]ny\s|\bsome\s|\bnone\s|\banyone\s|\bsomeone\b|\bsomething\b|\banything\b|\bnothing\b|\beveryone\b|\bif\b|\bwould\b|\bso\b|\bnot?\b|\byes\b|\b[wy]/o\b|\bé\s|\b[’'][ds]\s";
+    r"(?i)\bthe[ymn]?[\s:;,!\.\?]|\bto\s|\bi am\s|\bde la\s|\bEst[oae]?s?n?y?\b|\bpara\s|\ba? ?las?\s|\bIs\s|\bIt[\s,:;\?!]|\bIt[’']?s\s|\bA[st]\s|&nbsp;|&#x200B;|\bTh[ieo]se?[\s:;,!\.\?]|\bThat[’']?[s,!\.\?]?\s|\bFor[,!\.\?]?\s|\bOn\s|\bI[’'][md]\s|\bPorque\s|\bCuando\s|\bTodos?\s|\bWe[’']re\s|\bYou[’']?re?\s|\bI\s|\bAnd\s|\bYou\s|\bS?He\s|\bHers?\b|\bHi[ms]\s|\b[AW]e?re\s|\bWas\s|\bDo\s|\bDoes[,!\.\?]?\s|\ban?\s|\bBut\s|\bMy\s|\b[mB]e\s|\bT?Here[\s,\.:;\?!]|\bWith\s|\bCan[’']t\s|\bCan\s|\bG[eo]t\s|\bGotta\s|\bCould\b|\bWon[’']t\b|\btheir\b|\bThey[’']re\s|\bHave\b|\bHaven['’]t\s|\bHadn['’]t\s|\bHad\b|\bFrom\s|\bSuch\s|\bof\s|\sin\b|\bI?[’']ve\s|\bDoes\b|\bDo\s|\bDon['’]t\b|\bDoesn[’']t[\s,\.:;\?!]|\bor\s|\bWe\s|\bWill\s|\by[’']all\s|\sAll\b|\bAny\s|\bSome\s|\bNone\s|\bAnyone\s|\bSomeone\b|\bSomething\b|\banything\b|\beveryone\b|\bif\b|\bwould\b|\bso\b|\bnot?\b|\byes\s|\bBy\s|\bAuch\s|\b[’'][ds]\b|\b[’']re\b|\bI?[’']ll\b|\bI?[’']ve\b|\b&apos;s?\b";
 
 DECLARE REGEX_REMOVE_FROM_OCR STRING DEFAULT
     -- OCR can introduce noise from repeated characters that we need to remove. Be more aggressive & remove anything too short
@@ -18,10 +18,10 @@ DECLARE REGEX_REMOVE_FROM_OCR STRING DEFAULT
 
 DECLARE REGEX_REMOVE STRING DEFAULT
     -- URLs, UTMs, some punctuation
-    r"(?i)[iv]\.redd\.it|reddit.com/gallery|reddit.com/[ru]\b|\bi\.|https?:?//?|www\.?|\.com/watch|\.mp4|\.jsp|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.s?html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b[’']\b|¿|…\B|—\B|\.gif|.jpe?g|\.org|\.net|\.gg";
+    r"(?i)\?[^vcid]\w*=[^\s\(\)]+|&\w+=[^\s\(\)]+|%3f\w+%3D[^\s\(\)]+|%3f\w+=[^\s\(\)]+|%26\w+%3D[^\s\(\)]+|[iv]\.redd\.it|reddit.com/gallery|reddit.com/[ru]\b|\bi\.|https?:?//?|www\.?|\.com/watch|\.mp4|\.jsp|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.s?html?|\.com|\b[’']\b|¿|…\B|—\B|\.gif|.jpe?g|\.org|\.net|\.gg";
 
 DECLARE REGEX_REPLACE_WITH_SPACE STRING DEFAULT
-    r"(?i)[_/\\]+\d+[_/\\]|/search|/status/|/comments/|/[a-z]/|\b\d+\b|&nbsp;|\sá\s|%[0-9a-f]{4}|%[0-9a-f]{2}|\n&#x200B;|%\w{2}|[\^”–“·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|&amp;|[\)!\('\.\"\]\[\*\{\}]+|”|」|\s&\s|\s@\s";
+    r"(?i)&[a-z]{3,4};|[\-\/\.][a-z][\-\/\.]|[_/\\]+\d+[_/\\]|/search|/status/|/comments/|\b\d+\b|\sá\s|\sé\s|%[0-9a-f]{4}|%[0-9a-f]{2}|\b[wy]/o\b|\sdel?\s|\n&#x200B;|%\w{2}|[\^”–“·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|[\)!\('\.\"\]\[\*\{\}]+|”|」|¬|\s&\s|\s@\s";
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_text_test_20211215`

@@ -2,12 +2,12 @@
 --  The best strategy might be to get the top N from TF-IDF and top M from BM25
 
 -- EXCLUDE rare words
-DECLARE MIN_NGRAM_COUNT DEFAULT 5;
+DECLARE MIN_NGRAM_COUNT DEFAULT 4;
 DECLARE MIN_DOCS_WITH_NGRAM NUMERIC DEFAULT 2;  -- 1= no filter
 DECLARE MIN_DF NUMERIC DEFAULT 0.0;  -- 0= no filter. higher num -> exclude rare words
 
 -- EXCLUDE common words
-DECLARE MAX_DF NUMERIC DEFAULT 0.99;  -- 1.0= no filter. lower num -> exclude common words
+DECLARE MAX_DF NUMERIC DEFAULT 0.98;  -- 1.0= no filter. lower num -> exclude common words
 
 -- k1 = 1.2 term frequency saturation paramete.
 --  [0,3] Could be higher than 3 | [0.5,2.0] "Optimal" starting range
@@ -31,33 +31,33 @@ WITH ngram_counts_per_subreddit AS (
     WHERE 1=1
         AND ngram_count >= MIN_NGRAM_COUNT
         -- For testing, filter subreddit names here, otherwise the IDF will be wrong
-        AND subreddit_name IN (
-            '1fcnuernberg'
-            , 'askreddit', 'fragreddit'
-            , '12datesofchristmastv'
-            , '2islamist4you', '30mais'
-            , '0hthaatsjaay', '0sanitymemes', '1110asleepshower'
+        -- AND subreddit_name IN (
+        --     '1fcnuernberg'
+        --     , 'askreddit', 'fragreddit'
+        --     , '12datesofchristmastv'
+        --     , '2islamist4you', '30mais'
+        --     , '0hthaatsjaay', '0sanitymemes', '1110asleepshower'
 
-            , 'newsg', 'ich_iel'
-            , 'legaladvice', 'fatfire'
-            , 'newparents', 'medicine'
-            , 'netherlands', 'london'
-            , 'lgbt'
-            , 'cooking'
+        --     , 'newsg', 'ich_iel'
+        --     , 'legaladvice', 'fatfire'
+        --     , 'newparents', 'medicine'
+        --     , 'netherlands', 'london'
+        --     , 'lgbt'
+        --     , 'cooking'
 
-            , 'ucla', 'maliciouscompliance'
-            , 'writing', 'relationship_advice', 'fitness'
-            , 'wallstreetbets', 'ethereum'
-            , 'foofighters', 'edm', 'movies', 'music'
+        --     , 'ucla', 'maliciouscompliance'
+        --     , 'writing', 'relationship_advice', 'fitness'
+        --     , 'wallstreetbets', 'ethereum'
+        --     , 'foofighters', 'edm', 'movies', 'music'
 
-            , 'fuckcars', 'cars', 'cycling'
-            , 'formula1', 'fifa', 'fussball'
-            , 'torontoraptors', 'baseball', 'nhl', 'nba', 'soccer', 'nfl', 'mma', 'mlb'
-            , 'de', 'mexico', 'france', 'argentina', 'india', 'memexico'
-            , 'explainlikeimfive', 'space', 'pics', 'economy'
-            , 'worldnews', 'todayilearned'
-            , 'skyrim', 'breath_of_the_wild', 'gaming', 'steam', 'eldenring'
-        )
+        --     , 'fuckcars', 'cars', 'cycling'
+        --     , 'formula1', 'fifa', 'fussball'
+        --     , 'torontoraptors', 'baseball', 'nhl', 'nba', 'soccer', 'nfl', 'mma', 'mlb'
+        --     , 'de', 'mexico', 'france', 'argentina', 'india', 'memexico'
+        --     , 'explainlikeimfive', 'space', 'pics', 'economy'
+        --     , 'worldnews', 'todayilearned'
+        --     , 'skyrim', 'breath_of_the_wild', 'gaming', 'steam', 'eldenring'
+        -- )
         -- Exclude stop words
         AND COALESCE(TRIM(ngram), '') NOT IN (
             -- German
@@ -69,7 +69,7 @@ WITH ngram_counts_per_subreddit AS (
 
             -- English: most are now part of regex that removes most stopwords at the start
             , 'she', 'be', 'youtu', 'the', 'not', 'my', 'by', 'you', 'your'
-            , 'its', 'was'
+            , 'its', 'was', 'yep'
 
             -- French, Spanish, Others
             , 'hay', 'ser', 'fue', 'por el', 'se', 'al'
@@ -205,10 +205,10 @@ FROM tf_idf_with_rank AS t
 
 WHERE 1=1
     AND (
-        ngram_rank_bm25 <= 6
-        OR ngram_rank_tfidf <= 6
+        ngram_rank_bm25 <= 5
+        OR ngram_rank_tfidf <= 5
     )
 
 ORDER BY subreddit_name, ngram_rank_avg
-LIMIT 5000
+-- LIMIT 5000
 -- );  -- close create TABLE
