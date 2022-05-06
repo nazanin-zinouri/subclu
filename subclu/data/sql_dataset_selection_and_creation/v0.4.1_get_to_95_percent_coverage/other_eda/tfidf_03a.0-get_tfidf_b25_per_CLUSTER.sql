@@ -27,41 +27,16 @@ WITH ngram_counts_per_subreddit AS (
     -- By default start with subreddit level, need to change this to get cluster-level
     SELECT
         -- Set the cluster grain here:
-        a.k_0040_label AS cluster_id
-        , n.*
+        a.k_0070_label AS cluster_id
+        , ngram
+        , SUM(ngram_count) AS ngram_count
     FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215` AS n
         LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a_full` AS a
         USING (subreddit_id)
     WHERE 1=1
         AND ngram_count >= MIN_NGRAM_COUNT
         -- For testing, filter subreddit names here, otherwise the IDF will be wrong
-        -- AND subreddit_name IN (
-        --     '1fcnuernberg'
-        --     , 'askreddit', 'fragreddit'
-        --     , '12datesofchristmastv'
-        --     , '2islamist4you', '30mais'
-        --     , '0hthaatsjaay', '0sanitymemes', '1110asleepshower'
 
-        --     , 'newsg', 'ich_iel'
-        --     , 'legaladvice', 'fatfire'
-        --     , 'newparents', 'medicine'
-        --     , 'netherlands', 'london'
-        --     , 'lgbt'
-        --     , 'cooking'
-
-        --     , 'ucla', 'maliciouscompliance'
-        --     , 'writing', 'relationship_advice', 'fitness'
-        --     , 'wallstreetbets', 'ethereum'
-        --     , 'foofighters', 'edm', 'movies', 'music'
-
-        --     , 'fuckcars', 'cars', 'cycling'
-        --     , 'formula1', 'fifa', 'fussball'
-        --     , 'torontoraptors', 'baseball', 'nhl', 'nba', 'soccer', 'nfl', 'mma', 'mlb'
-        --     , 'de', 'mexico', 'france', 'argentina', 'india', 'memexico'
-        --     , 'explainlikeimfive', 'space', 'pics', 'economy'
-        --     , 'worldnews', 'todayilearned'
-        --     , 'skyrim', 'breath_of_the_wild', 'gaming', 'steam', 'eldenring'
-        -- )
         -- Exclude stop words
         AND COALESCE(TRIM(ngram), '') NOT IN (
             -- German
@@ -70,6 +45,82 @@ WITH ngram_counts_per_subreddit AS (
             , 'jetzt', 'aber', 'in der', 'mehr', 'zum', 'keine', 'keinen', 'wie', 'wir', 'haben'
             , 'ich dann', 'irgendwann', 'ist', 'auf', 'auch', 'oder', 'vor', 'sie'
             , 'werden', 'mich', 'habe', 'nur', 'ihr', 'das', 'ein', 'une', 'noch', 'du'
+
+            -- Stop words from other languages
+            , 'să', 'det', 'det är', 'je', 'în', 'är', 'jeg', 'sh', 'ppy', 'sh scores', 'continuare'
+            , 'resultat', 'me r', 'mogu', 'svt se', 'som', 'noen', 'ett', 'har'
+            , 'že', 'da je', 'det er', 'få', 'ikke', 'för', 'på', 'och', 'jag'
+            , 'att det', 'inte', 'sapmi', 'hvad', 'mycket', 'kako', 'hogy', 'egy'
+            , 'form i'
+            , 'artstation assets images', 'assets images images', 'youpoll me r', 'youpoll'
+            , 'anime planet anime', 'planet anime', 'thanks hate', 'control out'
+            , 'esteve aqui', 'judge judy judge'
+            , 'routine help'
+            , '7i16384', 'enjoy video think', 'video think doing', 'think doing good'
+            , 'job consider subscribing', 'good job consider'
+            , '1e1 3m5'
+            , '3m7 1e1 3m5'
+            , 'over round'
+            , 'w paypal', 'new ★'
+            , 'pleurotus ostreatus', 'oyster pleurotus'
+            , 'what maximum', 'need included', 'f imgur'
+            , 'image avatar'
+            , 'link comments redgifs', 'comments redgifs'
+            , 'source comment'
+            , 'link source comment'
+            , 'comment profile', 'before link comments', 'before link', 'seen before link', 'link comments'
+            , 'telegram nos comentários', 'telegram nos', 'server discord', 'discord server discord'
+            , 'free side', 'movies of all', 'movies of', 'of all time', 'of all', 'of', 'all', 'most demanded'
+            , 'premium lifetime'
+            , 'table provided rolfsweather', 'provided rolfsweather'
+            , '7i16384 8i8192', '8i8192', '3m5', '3a'
+            , 'ko na', 'kasi', 'only north', 'redejobs'
+            , 'state f', '1cp', 'year results', 'date quality', 'dradio'
+            , 'blev', 'bilo', 'skal', 'ljudi', 'jsem', 'eller', 'author u'
+
+            , '`', '` `'
+            , 'l l l', 'j j j', 'l l', 'j j', 'j', 'l'
+            , '3a 3y', '3a 4y', 'data 3m7', '3m7', '3m7 1e1'
+            , 'aon aon aon', 'aon aon', 'us7', 'ako', 'you pressed', 'gmail discord'
+            , 'click above', 'pes pes pes', 'pes pes', 'him told', 'her told'
+            , 'cum cum cum', 'cum cum'
+
+            -- Flares
+            , 'always yummy youtube', 'recipe always'
+            , 'posted on', 'redejobs job'
+            , 'binance en', 'use learn', 'date fri'
+            , 'peak pro', 'important clarify', 'know more details'
+            , 'stillness', 'objs', 'version clip'
+            , 'la1ere', 'yards yards'
+            , 'krak grenades', 'frag krak'
+            , 'guilty guilty guilty', 'out out out', 'hi hi hi', 'hi hi', 'out out'
+            , '❁', 'sh scores osu', 'ppy sh', 'osu ppy sh'
+            , 'points comments', 'earn keep'
+
+            , 'battlefield battlefield battlefield'
+            , 'battlefield battlefield', 'aramco aramco aramco', 'aramco aramco'
+            , 'cyberpunk cyberpunk cyberpunk', 'cyberpunk cyberpunk'
+            , 'pancakeswap finance swap'
+            , 'extremely easy use', 'en register'
+            , 'x2003'
+            , 'res cloudinary'
+            , 'image upload'
+            , 'la1ere francetvinfo fr'
+            , 'judy judge judy'
+            , 'forsen forsen forsen'
+            , 'e9dj69yainqhvepk81jhsytacl0uxkwk5zfmnfe49tq3vun9av'
+            , 'ontario ca en'
+            , 'last day week'
+            , 'nu nl', 'saintrampaljim'
+            , 'very based', 'rampal'
+            , 'set increases', 'retreat cost weakness'
+            , 'length weight', 'off lowest', 'games detail'
+            , 'sp open'
+
+            -- URLs
+            , 'open spotify album', 'open spotify track'
+            , 'de file dradio', 'file dradio', 'dradio de file', 'mp3 dradio'
+            , 'img image'
 
             -- English: most are now part of regex that removes most stopwords at the start
             , 'she', 'be', 'youtu', 'the', 'not', 'my', 'by', 'you', 'your'
@@ -87,6 +138,11 @@ WITH ngram_counts_per_subreddit AS (
             , 'porque', 'y', 'e', 'o', 'na', 'com', 'con', 'los', 'de', 'isso'
             , 'ele', 'meu', 'es'
         )
+
+
+    -- WE NEED TO GROUP BY because otherwise we'll get duplicate ngrams per cluster
+    GROUP BY 1, 2
+
 )
 
 , ngram_total_words AS (
@@ -213,8 +269,8 @@ FROM tf_idf_with_rank AS t
 
 WHERE 1=1
     AND (
-        ngram_rank_bm25 <= 10
-        OR ngram_rank_tfidf <= 10
+        ngram_rank_bm25 <= 7
+        OR ngram_rank_tfidf <= 7
     )
 
 ORDER BY cluster_id, ngram_rank_avg
