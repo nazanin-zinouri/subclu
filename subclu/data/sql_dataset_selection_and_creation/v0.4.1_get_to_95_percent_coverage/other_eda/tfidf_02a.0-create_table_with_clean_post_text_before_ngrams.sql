@@ -1,6 +1,5 @@
 -- Create test table to count ngrams once and then reuse them as a separate step
 
-
 DECLARE REGEX_REPLACE_CLEAN_MEDIA_LINKS STRING DEFAULT
     -- This is mostly meant to catch images and videos hosted by reddit
     r"(\!?\[)(\w{3,})(\]\()(\w{6,}|[\w\s\|</>+;@#\?\!'_,.:\-=&%]{7,})(\s+\"[\w\s\|</>+;@#\?\!'_,{}\(\).:\-]+\"\s*|\s+'[\w\s\|</>+;@#\?\!\"_,{}\(\).:\-]+'\s*)?(\))";
@@ -11,18 +10,18 @@ DECLARE REGEX_FLAIR_REPLACE_WITH_SPACE STRING DEFAULT
 DECLARE REGEX_STOPWORDS_TO_REMOVE STRING DEFAULT
     -- These are mostly English stop words with some Spanish mixed in.
     --  For other languages, we'll need to filter after the fact
-    r"\b[tT]he[ymn]?\s|\bto\s|\b[Ii] am\b|\bde la\s|\b[^\.]de[^/]\s|\b[Ee]st[oae]?s?n?y?\b|\bpara\b|\ba? ?las?\s|\b[Ii]s\s|\b[Ii]t[\s,]|\b[Ii]t[’']?s\s|\ba[st]\s|\b[Dd]oes\b|&nbsp;|&#x200B;|\b[Tt]h[ieo]se?\s|\b[Tt]hat\s|\b[Ff]or\s|\b[Oo]n\s|\b[’'][ds]\b|\b[Ii][’'][md]\s|\b[Ii][’']ll\s|\b[Pp]orque\s|\b[Cc]uando\s|\b[Tt]odos?\s|\b[Ww]e[’']re\s|\b[Yy]ou[’']?re?\s|\b[Ii]\s|\b[Aa]nd\s|\b[Yy]ou\s|\b[Ss]?[Hh]e\s|\b[Hh]ers?\b|\b[Hh]i[ms]\s|\b[AaWw]e?re\s|\b[Ww]as\s|\b[Dd]o\s|\b[Dd]oes\s|\ban?\s|\b[Bb]ut\s|\b[Mm]y\s|\b[mBb]e\s|\b[Tt]?[Hh]ere[\.\s]|\b[Ww]ith\s|\b[Cc]an\s|\b[Cc]ould\s|\b[Tt]heir\s|\b[Hh]ave\s|\b[Hh]ad\s|\b[Ff]rom\s|\b[Ss]uch\s|\bof\s|\sin\b|\bI?[’']ve";
+    r"(?i)\b[tT]he[ymn]?[,!\.\?]?\s|\b[Tt]o\s|\b[Ii] am\b|\bde la\s|\sde[l]\b|\b[Ee]st[oae]?s?n?y?\b|\bpara\s|\ba? ?las?\s|\b[Ii]s\s|\b[Ii]t[\s,\?!]|\b[Ii]t[’']?s\s|\b[Aa][st]\s|&nbsp;|&#x200B;|\b[Tt]h[ieo]se?\s|\b[Tt]hat[’']?[s,!\.\?]?\s|\b[Ff]or[,!\.\?]?\s|\b[Oo]n\s|\b[Ii][’'][md]\s|\b[Ii]?[’']ll\s|\b[Pp]orque\s|\b[Cc]uando\s|\b[Tt]odos?\s|\b[Ww]e[’']re\s|\b[Yy]ou[’']?re?\s|\b[Ii]\s|\b[Aa]nd\s|\b[Yy]ou\s|\b[Ss]?[Hh]e\s|\b[Hh]ers?\b|\b[Hh]i[ms]\s|\b[AaWw]e?re\s|\b[Ww]as\s|\b[Dd]o\s|\b[Dd]oes[,!\.\?]?\s|\ban?\s|\b[Bb]ut\s|\b[Mm]y\s|\b[mBb]e\s|\b[Tt]?[Hh]ere[\.\s]|\b[Ww]ith\s|\b[Cc]an[’']?t?\b|\bg[eo]t\b|\b[Cc]ould\b|\bwon't\b|\btheir\b|\b[Hh]ave\b|\b[Hh]ad\b|\b[Ff]rom\s|\b[Ss]uch\s|\bof\s|\sin\b|\bI?[’']ve|\b[Dd]oe?s?n[’']t[\s,\?!]|\bor\s|\b[Ww]e\s|\bwill\s|\by[’']all\s|\b[Aa]ll\s|\b[Aa]ny\s|\bsome\s|\bnone\s|\banyone\s|\bsomeone\b|\bsomething\b|\banything\b|\bnothing\b|\beveryone\b|\bif\b|\bwould\b|\bso\b|\bnot?\b|\byes\b|\b[wy]/o\b|\bé\s|\b[’'][ds]\s";
 
 DECLARE REGEX_REMOVE_FROM_OCR STRING DEFAULT
-    -- OCR can introduce noise from repeated characters that we need to remove
-    r"(?i)\s[ms]+\s+[ms]+\b|\bx\sx\s?x?\b";
+    -- OCR can introduce noise from repeated characters that we need to remove. Be more aggressive & remove anything too short
+    r"(?i)\.[a-z]+\b|\b[_/\-\\’']?[a-z]{1,2}[_/\-\\]?\b|\bimg_|\b[dw]on'?t?\b|\bcom\b|\bnet\b|\bget\b|\blets?\b|\b[il]{2,}\b";
 
 DECLARE REGEX_REMOVE STRING DEFAULT
-    -- URL/UTM, some punctuation
-    r"(?i)[iv]\.redd\.it|reddit.com/gallery|\bi\.|https?:?//?|www\.?|\.com/watch|\.mp4|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.s?html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b[’']\b|¿|…\B|—\B|\.gif|.jpe?g|\.org";
+    -- URLs, UTMs, some punctuation
+    r"(?i)[iv]\.redd\.it|reddit.com/gallery|reddit.com/[ru]\b|\bi\.|https?:?//?|www\.?|\.com/watch|\.mp4|\.jsp|&[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\?[a-z\\_%\d]+=[a-z\\_%\d\.\-_]+|\.s?html?|\.com|\ss+\s+s+\b|\sm\s+s\b|\s+m\s+m\b|\b[’']\b|¿|…\B|—\B|\.gif|.jpe?g|\.org|\.net|\.gg";
 
 DECLARE REGEX_REPLACE_WITH_SPACE STRING DEFAULT
-    r"(?i)/search|/status/|&nbsp;|\bá\b|%[0-9a-f]{4}|%[0-9a-f]{2}|\n&#x200B;|%\w{2}|[\^”–“·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|&amp;|[\)!\('\.\"\]\[\*\{\}]+|\b\d+\b|”|」|\s&\s|\s@\s";
+    r"(?i)[_/\\]+\d+[_/\\]|/search|/status/|/comments/|/[a-z]/|\b\d+\b|&nbsp;|\sá\s|%[0-9a-f]{4}|%[0-9a-f]{2}|\n&#x200B;|%\w{2}|[\^”–“·。;:%,\-=_\+\$\?\<\>’~#\\\/]+|\s?\| *:?-?:? *|&amp;|[\)!\('\.\"\]\[\*\{\}]+|”|」|\s&\s|\s@\s";
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_text_test_20211215`

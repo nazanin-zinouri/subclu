@@ -1,9 +1,13 @@
 -- Get TF-IDF & BM25 at subreddit level
 --  The best strategy might be to get the top N from TF-IDF and top M from BM25
 
-DECLARE MIN_NGRAM_COUNT DEFAULT 11;
-DECLARE MIN_DF NUMERIC DEFAULT 0.06;
-DECLARE MAX_DF NUMERIC DEFAULT 0.98;
+-- EXCLUDE rare words
+DECLARE MIN_NGRAM_COUNT DEFAULT 5;
+DECLARE MIN_DOCS_WITH_NGRAM NUMERIC DEFAULT 2;  -- 1= no filter
+DECLARE MIN_DF NUMERIC DEFAULT 0.0;  -- 0= no filter. higher num -> exclude rare words
+
+-- EXCLUDE common words
+DECLARE MAX_DF NUMERIC DEFAULT 0.99;  -- 1.0= no filter. lower num -> exclude common words
 
 -- k1 = 1.2 term frequency saturation paramete.
 --  [0,3] Could be higher than 3 | [0.5,2.0] "Optimal" starting range
@@ -17,13 +21,44 @@ DECLARE K1 NUMERIC DEFAULT 24.0;
 --  Low  -> detailed/focused technical articles (low penalty)
 DECLARE B NUMERIC DEFAULT 0.50;
 
-
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_top_tfidf_bm25_20211215`
+-- AS (
 WITH ngram_counts_per_subreddit AS (
     -- By default start with subreddit level, need to change this to get cluster-level
     SELECT
         *
     FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215`
     WHERE 1=1
+        AND ngram_count >= MIN_NGRAM_COUNT
+        -- For testing, filter subreddit names here, otherwise the IDF will be wrong
+        AND subreddit_name IN (
+            '1fcnuernberg'
+            , 'askreddit', 'fragreddit'
+            , '12datesofchristmastv'
+            , '2islamist4you', '30mais'
+            , '0hthaatsjaay', '0sanitymemes', '1110asleepshower'
+
+            , 'newsg', 'ich_iel'
+            , 'legaladvice', 'fatfire'
+            , 'newparents', 'medicine'
+            , 'netherlands', 'london'
+            , 'lgbt'
+            , 'cooking'
+
+            , 'ucla', 'maliciouscompliance'
+            , 'writing', 'relationship_advice', 'fitness'
+            , 'wallstreetbets', 'ethereum'
+            , 'foofighters', 'edm', 'movies', 'music'
+
+            , 'fuckcars', 'cars', 'cycling'
+            , 'formula1', 'fifa', 'fussball'
+            , 'torontoraptors', 'baseball', 'nhl', 'nba', 'soccer', 'nfl', 'mma', 'mlb'
+            , 'de', 'mexico', 'france', 'argentina', 'india', 'memexico'
+            , 'explainlikeimfive', 'space', 'pics', 'economy'
+            , 'worldnews', 'todayilearned'
+            , 'skyrim', 'breath_of_the_wild', 'gaming', 'steam', 'eldenring'
+        )
+        -- Exclude stop words
         AND COALESCE(TRIM(ngram), '') NOT IN (
             -- German
             'eine', 'einen', 'einem', 'für', 'nicht', 'der', 'wenn', 'dass', 'dann'
@@ -33,7 +68,8 @@ WITH ngram_counts_per_subreddit AS (
             , 'werden', 'mich', 'habe', 'nur', 'ihr', 'das', 'ein', 'une', 'noch', 'du'
 
             -- English: most are now part of regex that removes most stopwords at the start
-            , 'she', 'be', 'youtu', 'the', 'not', 'my', 'by', 'you'
+            , 'she', 'be', 'youtu', 'the', 'not', 'my', 'by', 'you', 'your'
+            , 'its', 'was'
 
             -- French, Spanish, Others
             , 'hay', 'ser', 'fue', 'por el', 'se', 'al'
@@ -44,7 +80,8 @@ WITH ngram_counts_per_subreddit AS (
             , 'hasta', 'de las', 'desde', 'no se', 'no me', 'no te', 'no le'
             , 'estaba', 'cuando', 'como', 'esta'
             , 'pas', 'les', 'des'
-            , 'porque', 'y'
+            , 'porque', 'y', 'e', 'o', 'na', 'com', 'con', 'los', 'de', 'isso'
+            , 'ele', 'meu', 'es'
         )
 )
 
@@ -53,8 +90,8 @@ WITH ngram_counts_per_subreddit AS (
     --  If we want to do it by cluster we'd need to join with a table that has cluster IDs
     SELECT
         subreddit_id  -- change this param to get a cluster grouping
-        , COUNT(*) OVER() AS n_docs  -- how many subreddits/clusters (for idf)
 
+        , COUNT(*) OVER() AS n_docs  -- how many subreddits/clusters (for idf)
         , SUM(ngram_count) AS total_count
 
     FROM ngram_counts_per_subreddit
@@ -128,9 +165,11 @@ WITH ngram_counts_per_subreddit AS (
 )
 , tf_idf_with_rank AS (
     SELECT
-        subreddit_id
-        , ngram
+        t.subreddit_id
+        , t.ngram
         , ((ngram_rank_bm25 + ngram_rank_tfidf) / 2) AS ngram_rank_avg
+        , ngram_type
+        , ngram_char_len
         , t.* EXCEPT(subreddit_id, ngram)
     FROM (
         SELECT
@@ -144,10 +183,14 @@ WITH ngram_counts_per_subreddit AS (
             , * EXCEPT(subreddit_id, ngram, tfidf, bm25, ngram_count)
         FROM tf_idf_and_bm25_raw
         WHERE 1=1
+            -- We need to filter out before we calculate ranks
             AND df >= MIN_DF
             AND df <= MAX_DF
-            AND ngram_count >= MIN_NGRAM_COUNT
+            AND n_docs_with_ngram >= MIN_DOCS_WITH_NGRAM
     ) AS t
+    -- Join to get the len & type of ngram (unigram, bigram, trigram)
+    LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215` AS n
+        ON t.subreddit_id = n.subreddit_id AND t.ngram = n.ngram
 )
 
 
@@ -159,10 +202,13 @@ SELECT
 FROM tf_idf_with_rank AS t
     LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a` AS a
         USING (subreddit_id)
+
 WHERE 1=1
     AND (
-        ngram_rank_bm25 <= 3
-        OR ngram_rank_tfidf <= 3
+        ngram_rank_bm25 <= 6
+        OR ngram_rank_tfidf <= 6
     )
+
 ORDER BY subreddit_name, ngram_rank_avg
-;
+LIMIT 5000
+-- );  -- close create TABLE
