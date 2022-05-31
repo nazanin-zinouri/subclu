@@ -59,3 +59,47 @@ WHERE 1=1
 
 ORDER BY subreddit_name, relevance_combined_score DESC
 ;
+
+
+-- Investigate subreddits that were no longer geo-relevant
+--  after a change in standard-dev country filter
+--  Most subs were porn and relevant to small countries like Puerto Rico & Netherlands
+SELECT
+    -- o.*
+    COALESCE(nc.subreddit_name, o.subreddit_name) as subreddit_name
+    , nc.users_l7
+    , nc.posts_not_removed_l28
+    , nc.activity_7_day
+    , nc.active
+
+    , n.geo_relevant_countries
+    , o.geo_relevant_countries
+
+    , o.users_l7
+    , o.posts_not_removed_l28
+    , o.activity_7_day
+    , o.active
+FROM `reddit-relevance.tmp.subclu_subreddit_candidates_20220527` AS nc
+    LEFT JOIN `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220527` AS n
+        ON nc.subreddit_id = n.subreddit_id
+    FULL OUTER JOIN `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220526` AS o
+        ON nc.subreddit_id = o.subreddit_id
+
+WHERE 1=1
+    -- subs not in the new selected list
+    AND n.subreddit_id IS NULL
+
+    -- and were in the old list
+    AND o.subreddit_id IS NOT NULL
+
+    -- that were country relevant in the old list + over min activity thresholds
+    AND (
+        o.geo_relevant_country_count IS NOT NULL
+        AND nc.activity_7_day >= 5
+        AND nc.posts_not_removed_l28 >= 8
+    )
+
+    -- that weren't country relevant in the old list
+    -- AND o.geo_relevant_country_count IS NULL
+
+ORDER BY nc.users_l7 DESC

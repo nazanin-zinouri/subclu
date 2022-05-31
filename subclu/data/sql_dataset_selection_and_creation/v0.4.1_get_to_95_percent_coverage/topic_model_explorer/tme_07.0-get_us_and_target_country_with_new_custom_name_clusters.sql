@@ -6,7 +6,7 @@
 -- ===
 DECLARE GEO_TARGET_COUNTRY_CODE STRING DEFAULT '{{ geo_country_code }}';
 
-DECLARE MIN_USERS_PERCENT_BY_SUBREDDIT_L28 NUMERIC DEFAULT 0.20; -- default is 0.14 (14%)
+DECLARE MIN_USERS_PERCENT_BY_SUBREDDIT_L28 NUMERIC DEFAULT 0.18; -- default is 0.14 (14%)
 DECLARE MIN_USERS_PERCENT_BY_COUNTRY_STANDARDIZED NUMERIC DEFAULT 3.0; -- default is 3.0
 
 -- Variables for subreddits to show
@@ -25,10 +25,14 @@ WITH
 -- Define US subreddits
 subreddits_relevant_us AS (
     SELECT
-        sa.* EXCEPT(users_l7_rank_100, users_l7_rank_400)
+        sa.* EXCEPT(
+            users_l7_rank_100, users_l7_rank_400
+            , posts_l7_rank_100, posts_l7_rank_400
+            , app_users_l7, app_users_l28
+        )
         , m.k_0100_label_name
         -- , m.k_0400_label_name
-        , ROW_NUMBER() OVER (PARTITION BY m.k_0100_label_name ORDER BY users_l7 DESC, users_l28 DESC) as users_l7_rank_top_topic
+
         -- Output table only groups by top level, so we don't need lower level rank here
         -- , ROW_NUMBER() OVER (PARTITION BY m.k_0400_label_name ORDER BY users_l7 DESC, users_l28 DESC) as users_l7_rank_subtopic
     FROM `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_activity` AS sa
@@ -49,10 +53,26 @@ subreddits_relevant_us AS (
 
 , top_subreddits_per_cluster_us AS (
     -- Here we get the names of the top N subreddits in the country
+    --  exclude over_18 subreddits for NAMES ONLY
     SELECT
         k_0100_label_name
         , STRING_AGG(subreddit_name, ', ' ORDER BY users_l7_rank_top_topic) AS top_subreddits_us
-    FROM subreddits_relevant_us
+
+    FROM (
+        SELECT
+            k_0100_label_name
+            , subreddit_name
+            , ROW_NUMBER() OVER (PARTITION BY k_0100_label_name ORDER BY users_l7 DESC, users_l28 DESC) as users_l7_rank_top_topic
+        FROM subreddits_relevant_us
+        WHERE 1=1
+            AND (
+                k_0100_label_name NOT IN ('Porn & Celebrity', 'Relationships, Adult Content, Dating')
+                AND COALESCE(over_18, '') != 't'
+            )
+            OR (
+                k_0100_label_name IN ('Porn & Celebrity', 'Relationships, Adult Content, Dating')
+            )
+    )
     WHERE 1=1
         AND users_l7_rank_top_topic <= N_US_SUBREDDITS_IN_AGG_SUMMARY
     GROUP BY 1
@@ -97,9 +117,12 @@ subreddits_relevant_us AS (
 -- Define Target-country subreddits
 , subreddits_relevant_geo AS (
     SELECT
-        sa.* EXCEPT(users_l7_rank_100, users_l7_rank_400)
+        sa.* EXCEPT(
+            users_l7_rank_100, users_l7_rank_400
+            , posts_l7_rank_100, posts_l7_rank_400
+            , app_users_l7, app_users_l28
+        )
         , m.k_0100_label_name
-        , ROW_NUMBER() OVER (PARTITION BY m.k_0100_label_name ORDER BY users_l7 DESC, users_l28 DESC) as users_l7_rank_top_topic
 
     FROM `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_activity` AS sa
         INNER JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddit_relevance_beta_20220502` AS rel
@@ -116,15 +139,29 @@ subreddits_relevant_us AS (
         )
         AND geo_country_code = GEO_TARGET_COUNTRY_CODE
 
-        -- Optional: Exclude NSFW subreddits in mostly SFW clusters
-        AND COALESCE(m.use_for_global_tfidf, true) != false
 )
 , top_subreddits_per_cluster_geo AS (
     -- Here we get the names of the top N subreddits in the country
     SELECT
         k_0100_label_name
         , STRING_AGG(subreddit_name, ', ' ORDER BY users_l7_rank_top_topic) AS top_subreddits_geo
-    FROM subreddits_relevant_geo
+    FROM (
+        SELECT
+            k_0100_label_name
+            , subreddit_name
+            , ROW_NUMBER() OVER (PARTITION BY k_0100_label_name ORDER BY users_l7 DESC, users_l28 DESC) as users_l7_rank_top_topic
+        FROM subreddits_relevant_geo
+        WHERE 1=1
+            AND (
+                k_0100_label_name NOT IN ('Porn & Celebrity', 'Relationships, Adult Content, Dating')
+                AND COALESCE(over_18, '') != 't'
+            )
+            OR (
+                k_0100_label_name IN ('Porn & Celebrity', 'Relationships, Adult Content, Dating')
+            )
+            -- Optional: Exclude NSFW subreddits in mostly SFW clusters
+            -- AND COALESCE(m.use_for_global_tfidf, true) != false
+    )
     WHERE 1=1
         AND users_l7_rank_top_topic <= N_GEO_SUBREDDITS_IN_AGG_SUMMARY
     GROUP BY 1
@@ -231,5 +268,5 @@ FROM (
     -- LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_cluster_k100_top_ratings` AS pr1
     --     ON tf.cluster_id = pr1.k_0100_label
 
-ORDER BY 1
+ORDER BY subreddits_in_cluster_count_geo DESC
 ;
