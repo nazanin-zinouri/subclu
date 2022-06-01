@@ -1,13 +1,19 @@
 -- Get TF-IDF & BM25 at subreddit level
 --  The best strategy might be to get the top N from TF-IDF and top M from BM25
 
+-- Top words to keep in table
+DECLARE MAX_NGRAM_RANK_TFIDF NUMERIC DEFAULT 200;
+DECLARE MAX_NGRAM_RANK_BM25 NUMERIC DEFAULT 200;
+
 -- EXCLUDE rare words
-DECLARE MIN_NGRAM_COUNT DEFAULT 4;
+DECLARE MIN_NGRAM_COUNT DEFAULT 2;
 DECLARE MIN_DOCS_WITH_NGRAM NUMERIC DEFAULT 2;  -- 1= no filter
 DECLARE MIN_DF NUMERIC DEFAULT 0.0;  -- 0= no filter. higher num -> exclude rare words
 
 -- EXCLUDE common words
-DECLARE MAX_DF NUMERIC DEFAULT 0.98;  -- 1.0= no filter. lower num -> exclude common words
+-- 1.0= no filter. lower num -> exclude MORE words
+--    Example: 0.9 -> exclude words tht appear in 90% of documents (clusters)
+DECLARE MAX_DF NUMERIC DEFAULT 0.985;
 
 -- k1 = 1.2 term frequency saturation paramete.
 --  [0,3] Could be higher than 3 | [0.5,2.0] "Optimal" starting range
@@ -21,68 +27,34 @@ DECLARE K1 NUMERIC DEFAULT 24.0;
 --  Low  -> detailed/focused technical articles (low penalty)
 DECLARE B NUMERIC DEFAULT 0.50;
 
--- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_top_tfidf_bm25_20211215`
--- AS (
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_top_tfidf_bm25_20211215`
+AS (
 WITH ngram_counts_per_subreddit AS (
     -- By default start with subreddit level, need to change this to get cluster-level
     SELECT
-        *
-    FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215`
+        -- Set the subreddit or cluster grain here:
+        a.subreddit_id
+        , n.ngram
+        , SUM(ngram_count) AS ngram_count
+    FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215` AS n
+        LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a_full` AS a
+            USING (subreddit_id)
+        LEFT JOIN (
+            SELECT DISTINCT TRIM(ngram) AS ngram
+            FROM `reddit-employee-datasets.david_bermejo.ngram_stop_words`
+        ) AS sw
+            ON n.ngram = sw.ngram
     WHERE 1=1
+        -- AND n.ngram_char_len >= 2
         AND ngram_count >= MIN_NGRAM_COUNT
+
         -- For testing, filter subreddit names here, otherwise the IDF will be wrong
-        -- AND subreddit_name IN (
-        --     '1fcnuernberg'
-        --     , 'askreddit', 'fragreddit'
-        --     , '12datesofchristmastv'
-        --     , '2islamist4you', '30mais'
-        --     , '0hthaatsjaay', '0sanitymemes', '1110asleepshower'
 
-        --     , 'newsg', 'ich_iel'
-        --     , 'legaladvice', 'fatfire'
-        --     , 'newparents', 'medicine'
-        --     , 'netherlands', 'london'
-        --     , 'lgbt'
-        --     , 'cooking'
-
-        --     , 'ucla', 'maliciouscompliance'
-        --     , 'writing', 'relationship_advice', 'fitness'
-        --     , 'wallstreetbets', 'ethereum'
-        --     , 'foofighters', 'edm', 'movies', 'music'
-
-        --     , 'fuckcars', 'cars', 'cycling'
-        --     , 'formula1', 'fifa', 'fussball'
-        --     , 'torontoraptors', 'baseball', 'nhl', 'nba', 'soccer', 'nfl', 'mma', 'mlb'
-        --     , 'de', 'mexico', 'france', 'argentina', 'india', 'memexico'
-        --     , 'explainlikeimfive', 'space', 'pics', 'economy'
-        --     , 'worldnews', 'todayilearned'
-        --     , 'skyrim', 'breath_of_the_wild', 'gaming', 'steam', 'eldenring'
-        -- )
         -- Exclude stop words
-        AND COALESCE(TRIM(ngram), '') NOT IN (
-            -- German
-            'eine', 'einen', 'einem', 'für', 'nicht', 'der', 'wenn', 'dass', 'dann'
-            , 'ich', 'und', 'zu', 'sich', 'von', 'als', 'meine', 'meines', 'meinen', 'wird', 'sind'
-            , 'jetzt', 'aber', 'in der', 'mehr', 'zum', 'keine', 'keinen', 'wie', 'wir', 'haben'
-            , 'ich dann', 'irgendwann', 'ist', 'auf', 'auch', 'oder', 'vor', 'sie'
-            , 'werden', 'mich', 'habe', 'nur', 'ihr', 'das', 'ein', 'une', 'noch', 'du'
+        AND sw.ngram IS NULL
 
-            -- English: most are now part of regex that removes most stopwords at the start
-            , 'she', 'be', 'youtu', 'the', 'not', 'my', 'by', 'you', 'your'
-            , 'its', 'was', 'yep'
-
-            -- French, Spanish, Others
-            , 'hay', 'ser', 'fue', 'por el', 'se', 'al'
-            , 'de la', 'à', 'en la', 'en el', 'a', 'me', 'el', 'una', 'del'
-            , 'je', 'por', 'a la', 'de la', 'de los', 'lo que'
-            , 'que', 'que se', 'que les', 'qué', 'más', 'que no', 'nous'
-            , 'pero', 'algo', 'muy', 'nada', 'hace', 'hacer', 'tengo', 'tiene'
-            , 'hasta', 'de las', 'desde', 'no se', 'no me', 'no te', 'no le'
-            , 'estaba', 'cuando', 'como', 'esta'
-            , 'pas', 'les', 'des'
-            , 'porque', 'y', 'e', 'o', 'na', 'com', 'con', 'los', 'de', 'isso'
-            , 'ele', 'meu', 'es'
-        )
+    -- WE NEED TO GROUP BY because otherwise we'll get duplicate ngrams per cluster
+    GROUP BY 1, 2
 )
 
 , ngram_total_words AS (
@@ -189,8 +161,11 @@ WITH ngram_counts_per_subreddit AS (
             AND n_docs_with_ngram >= MIN_DOCS_WITH_NGRAM
     ) AS t
     -- Join to get the len & type of ngram (unigram, bigram, trigram)
-    LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215` AS n
-        ON t.subreddit_id = n.subreddit_id AND t.ngram = n.ngram
+    LEFT JOIN (
+        SELECT DISTINCT ngram, ngram_type, ngram_char_len
+        FROM `reddit-employee-datasets.david_bermejo.subreddit_ngram_test_20211215`
+    ) AS n
+        ON t.ngram = n.ngram
 )
 
 
@@ -205,10 +180,9 @@ FROM tf_idf_with_rank AS t
 
 WHERE 1=1
     AND (
-        ngram_rank_bm25 <= 5
-        OR ngram_rank_tfidf <= 5
+        ngram_rank_bm25 <= MAX_NGRAM_RANK_BM25
+        OR ngram_rank_tfidf <= MAX_NGRAM_RANK_TFIDF
     )
 
 ORDER BY subreddit_name, ngram_rank_avg
--- LIMIT 5000
--- );  -- close create TABLE
+);  -- close create TABLE
