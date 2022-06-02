@@ -22,7 +22,7 @@ data_loader_kwargs:
   columns:
     - subreddit_id
     - subreddit_name
-    - subreddit_name_title_related_subs_and_clean_descriptions
+    - subreddit_meta_for_embeddings
   df_format: 'pandas'
   unique_check: false
   verbose: true
@@ -34,12 +34,13 @@ n_files_slice_end: null
 process_individual_files: true
 
 # Values for vectorizing methods/functions
-# TODO(djb): how to handle LIST of columns to concat
-col_text_for_embeddings: subreddit_name_title_related_subs_and_clean_descriptions
+# If you want to concat text, do it at SQL stage
+#  concat text on the fly no longer supported b/c it's hard to save & replicate
+col_text_for_embeddings: subreddit_meta_for_embeddings
 
 model_name: use_multilingual_3
-batch_inference_rows: 1600
-limit_first_n_chars: 1900
+batch_inference_rows: 1500
+limit_first_n_chars: 2000
 limit_first_n_chars_retry: 700
 get_embeddings_verbose: true
 cols_index:  # subreddit_default_
@@ -51,7 +52,7 @@ cols_index:  # subreddit_default_
 # Change n_jobs(parallel jobs) & logging for hydra itself
 hydra:
   # launcher:
-    # override the number of jobs for joblib
+    # # override the number of jobs for joblib. For vectirizing use a single job
     # n_jobs: 11
   job_logging:
     formatters:
