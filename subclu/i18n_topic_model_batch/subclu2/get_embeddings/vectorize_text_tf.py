@@ -2,7 +2,7 @@
 Class & functions to get embeddings from text with USE-multilingual.
 Meant to be used in kubeflow but should be flexible enough to be used outside of it too.
 
-- Only meant for USE or other tensor-hub models (Not meant to use FSE/FastText)
+- Only meant for USE or other tensor-hub models (NOT meant to use FSE/FastText)
 """
 import gc
 import logging
@@ -485,7 +485,6 @@ def upload_folder_to_gcs(
                 bucket.blob(f_gcs_path).upload_from_filename(f_local)
 
 
-
 def get_embeddings_as_df(
         model: callable,
         df: pd.DataFrame,
@@ -509,7 +508,7 @@ def get_embeddings_as_df(
     - ~2 seconds:   on list
     - ~1 minute:    on text column df['text'].apply(model)
 
-    TODO(djb):  For each recursive call, use try/except!!
+    For each recursive call, use try/except.
       That way if one batch fails, the rest of the batches can proceed!
     """
     # Import errors here so that we can set the environment variable to suppress
