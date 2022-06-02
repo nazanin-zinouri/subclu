@@ -68,19 +68,25 @@ def vectorize_text(
     #  get full value hydra call instead of having to write it twice
     key_for_gcs_path = cfg['gcs_path_text_key']
 
-    vect = VectorizeText(
-        data_loader_kwargs={
-            **cfg['data_loader_kwargs'],
-            **{
-                'bucket_name': cfg['data_text']['bucket_name'],
-                'gcs_path': cfg['data_text'][key_for_gcs_path],
-                'local_cache_path': cfg['local_cache_path'],
+    data_loader_kwargs_ = {
+        **cfg['data_loader_kwargs'],
+        **{
+            'bucket_name': cfg['data_text']['bucket_name'],
+            'gcs_path': cfg['data_text'][key_for_gcs_path],
+            'local_cache_path': cfg['local_cache_path'],
 
-                'n_sample_files': cfg.get('n_sample_files'),
-                'n_files_slice_start': cfg.get('n_files_slice_start'),
-                'n_files_slice_end': cfg.get('n_sample_files'),
-            }
-        },
+            'n_sample_files': cfg.get('n_sample_files'),
+            'n_files_slice_start': cfg.get('n_files_slice_start'),
+            'n_files_slice_end': cfg.get('n_sample_files'),
+        }
+    }
+    print(f"Data Loader kwags:")
+    for k, v in data_loader_kwargs_.items():
+        print(f"  {k}: {v}")
+        del k, v
+
+    vect = VectorizeText(
+        data_loader_kwargs=data_loader_kwargs_,
         **{k: v for k, v in cfg.items() if k not in ['data_test', 'data_loader_kwargs']},
         **{'gcs_output_path': cfg['data_text'][key_for_gcs_path]}
     )
@@ -179,10 +185,8 @@ class VectorizeText:
 
         t_start_subs_vect = datetime.utcnow()
         if self.process_individual_files:
-            # branch A: process each file individually
-            # TODO(djb): iterate over N files to get the text & get embeddings
-            #  will move away from SQL and back to GCS b/c files make it easier to run
-            #  in parallel
+            # branch A: process each file individually to save RAM overhead
+            log.info(f"  Loading & Processing each file independently")
             self.data_loader.local_cache()
 
             for f_, df_ in LogTQDM(
@@ -207,7 +211,7 @@ class VectorizeText:
 
         else:
             # branch B: process input as one df
-            log.info(f"Loading text...")
+            log.info(f"Loading all files as a single df...")
             df_text = self.data_loader.read_as_one_df()
 
             df_vect = self._vectorize_single_df(

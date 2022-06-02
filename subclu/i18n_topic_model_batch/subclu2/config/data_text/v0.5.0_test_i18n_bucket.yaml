@@ -1,5 +1,5 @@
 dataset_name: 'v0.5.0 inputs. ~80k subreddits'
-bucket_name: 'gazette-models-temp'
+bucket_name: 'i18n-subreddit-clustering'
 folder_subreddits_text_and_meta: 'i18n_topic_model_batch/runs/20220602/subreddits/text'
 folder_posts_text_and_meta: 'i18n_topic_model_batch/runs/20220602/posts/text'
 folder_comments_text_and_meta: 'i18n_topic_model_batch/runs/20220602/comments/text'
