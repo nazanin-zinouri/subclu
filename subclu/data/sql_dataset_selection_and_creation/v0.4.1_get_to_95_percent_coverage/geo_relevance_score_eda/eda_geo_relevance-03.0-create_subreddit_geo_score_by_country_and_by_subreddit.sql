@@ -154,7 +154,7 @@ AS (
         , users_l7
         , geo.*
     FROM final_geo_output AS geo
-        LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_candidates_posts_no_removed_20220122` AS c
+        LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_candidates_posts_no_removed_20220212` AS c
             ON geo.subreddit_id = c.subreddit_id
 
     ORDER BY total_users_in_subreddit DESC, subreddit_name, users_percent_by_country DESC

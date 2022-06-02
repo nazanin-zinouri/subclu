@@ -1,0 +1,20 @@
+dataset_name: 'Random subreddits from subreddits_lookup to test inference'
+subreddit_meta:
+  data_loader_name: 'LoadSubredditsSQL'
+  data_loader_kwargs:
+    table: subreddit_lookup
+    dataset: ds_v2_postgres_tables
+    project_name: 'data-prod-165221'
+    columns: 'subreddit_id, LOWER(name) AS subreddit_name'
+    col_unique_check: 'subreddit_id'
+    concat_text_cols: "CONCAT(name, '. ', COALESCE(title, ''), '. ', COALESCE(description, ''))"
+    col_concat_text: 'concat_text'
+    limit_clause: 'LIMIT 25000'
+    unique_check: true
+    verbose: false
+    log_query: true
+    sql_template: 'subreddit_lookup'
+
+posts: null
+
+comments: null

@@ -45,6 +45,7 @@ _L_MATURE_CLUSTERS_TO_EXCLUDE_FROM_QA_ = [
     '0001-0001-0002-0002-0002-0003-0003-0003-0008-0015-0019',
     '0001-0001-0002-0002-0002-0003-0003-0003-0008-0015-0020',
     '0001-0001-0002-0002-0002-0003-0003-0003-0009',
+    '0001-0001-0003-0003-0003-0004',
     '0001-0001-0003-0003-0003-0004-0004-0004-0010-0018-0025-0028',
     '0001-0001-0003-0003-0003-0004-0004-0004-0010-0019',
     '0001-0001-0003-0003-0003-0004-0005-0005',
@@ -92,8 +93,7 @@ _L_MATURE_CLUSTERS_TO_EXCLUDE_FROM_QA_ = [
 
     # '0008-0013',  # thegirlsurvivalguide could be good to show, but prob not for ppl looking at r/onlinedating...?
     # 0008-0013-0023-0032-0034-0044-0046-0064 is a can of worms... but it includes askreaddit, feminism
-    #  and other LGBTQ subs that could be good for some people...
-    '0008-0013',
+    #  and other LGBTQ subs that could be good for some people. Rely on QA process sort it out.
     '0008-0014-0025-0034-0036-0046-0048-0066',
     '0008-0014-0025-0034-0036-0046-0048-0066-0190-0378',
     '0008-0014-0025-0034-0036-0047-0049-0067',
@@ -616,26 +616,25 @@ def remove_sensitive_clusters_and_subs(
     print(f"{df_qa_clean.shape} <- Shape AFTER dropping sensitive clusters")
 
     # subreddit-level
-    df_qa_clean = (
-        df_qa_clean[~df_qa_clean['subreddit_name'].isin(additional_subs_to_filter)]
-    )
-    print(f"{df_qa_clean.shape} <- Shape AFTER dropping flagged subs A")
+    if additional_subs_to_filter is not None:
+        df_qa_clean = (
+            df_qa_clean[~df_qa_clean['subreddit_name'].isin(additional_subs_to_filter)]
+        )
+        print(f"{df_qa_clean.shape} <- Shape AFTER dropping flagged subs A")
 
     df_qa_clean = (
         df_qa_clean[~df_qa_clean['subreddit_name'].isin(_L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_)]
     )
-
-    # subreddit-title matches
     print(f"{df_qa_clean.shape} <- Shape AFTER dropping flagged subs B")
+
+    # subreddit-name matches
     for word_ in _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_:
         df_qa_clean = (
             df_qa_clean[~df_qa_clean['subreddit_name'].str.contains(word_, na=False)]
         )
-
     print(f"{df_qa_clean.shape} <- Shape AFTER dropping covid-related subs")
 
     print(f"{len(df_qa) - len(df_qa_clean):,.0f} <- Total subreddits removed")
-
     if print_qa_check:
         print(f"\nQA keyword subreddit checks:")
         print_subreddit_name_qa_checks(

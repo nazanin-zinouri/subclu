@@ -443,7 +443,7 @@ def vectorize_text_to_embeddings(
                 # If a batch (n-rows in a file) fails, get_embeddings_as_df() will retry with
                 #  a lower `limit_first_n_chars` value. However, that may not be enough if too many comments
                 #  in a batch are really long. In that case, I have 2 try/excepts to reduce the `batch_size`
-                #  which should make it more likely for a job to complete even if the input batch_size was too hight.
+                #  which should make it more likely for a job to complete even if the input batch_size was too high.
                 try:
                     df_vect_comments = get_embeddings_as_df(
                         model=model,

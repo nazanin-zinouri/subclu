@@ -211,6 +211,35 @@ pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[inference_4gpus_tf_234]" --use-deprecated=legacy-resolver
 ```
 
+# Get credentials to run BigQuery queries from VM
+You can use the gcloud CLI to get credentials -- similar to what you do in Colab.
+<br>These are the commands to authenticate and logout. Run it on a terminal (CLI)
+
+**NOTE** make sure to logout after using the VM!
+
+### Login
+```bash
+# login
+gcloud auth application-default login
+
+# Check authentication accounts available
+gcloud auth list
+```
+
+This is the same process as colab.
+1. Type in the command. The command will give you a link.
+2. Copy the link and go to it on your browser. Follow the instructions to confirm your account.
+3. Copy the authentication token and paste it in the CLI prompt. 
+
+
+### Logout
+```bash
+# logout/remove auth
+gcloud auth application-default revoke
+```
+
+**NOTE** make sure to logout after using the VM! Unlike Colab, the VM persists your credentials.
+
 
 # Running mlflow-server on GCP
 

@@ -342,19 +342,27 @@ def create_dynamic_clusters_clean(
         col_rated_e,
         'relevant to cluster/ other subreddits in cluster',
         'safe to show in relation to cluster',
-        col_link_to_sub,
 
         # cols for notes
         'country relevance notes',
-        'rating or cluster notest',
+        'rating or cluster notes',
         #  # 'cluster relevance notes',
+        col_link_to_sub,
 
         col_subs_in_cluster_count,
         col_list_cluster_names,
 
-        'allow_discovery',
+        # why did a sub get marked as geo or culturally relevant?
+        #  can use them to sort
+        'posts_for_modeling_count',
+        'users_l7',
+        'geo_relevance_default',
+        'relevance_percent_by_subreddit',
+        'relevance_percent_by_country_standardized',
+        'b_users_percent_by_subreddit',
+        'e_users_percent_by_country_standardized',
 
-        'total_users_in_subreddit_l28',
+        'allow_discovery',
         'rating_name',
 
         'over_18',
@@ -362,22 +370,12 @@ def create_dynamic_clusters_clean(
         'primary_topic',
         col_subreddit_topic_mix,
 
-        'posts_for_modeling_count',
-        'users_l7',
-        # why did a sub get marked as geo or culturally relevant?
-        #  can use them to sort
-        'geo_relevance_default',
-        'relevance_percent_by_subreddit',
-        'relevance_percent_by_country_standardized',
-        'b_users_percent_by_subreddit',
-        'e_users_percent_by_country_standardized',
         'd_users_percent_by_country_rank',
-        col_model_sort_order,
 
         'c_users_percent_by_country',
         'users_in_subreddit_from_country_l28',
-        'total_users_in_country_l28',
 
+        col_model_sort_order,
         col_new_cluster_val,
         col_new_cluster_name,
         col_new_cluster_prim_topic,
@@ -404,15 +402,18 @@ def create_dynamic_clusters_clean(
 
     # re-order & rename the columns so their easier to see in google sheets
     # Sorty by cluster label b/c sometimes a sub won't be clustered dynamically next to closest neighbors!
+    # Also sort by users_l7 so that we know which subreddits are the most popular/valuable per cluster
+    l_cols_sort_by_ = [col_new_cluster_val, 'users_l7']
+    sort_ascending_ = [True, False]
     df_dynamic_clean = (
         df_dynamic_clean[l_cols_clean_final_for_qa]
-        .sort_values(by=[col_new_cluster_val, col_model_sort_order], ascending=True)
+        .sort_values(by=l_cols_sort_by_, ascending=sort_ascending_)
         # do final renaming only when saving, otherwise, it's a pain to adjust or look things up?
         .rename(columns={c: c.replace('_', ' ') for c in l_cols_clean_final_for_qa[:]})
     )
     df_dynamic_raw = (
         df_dynamic_raw
-        .sort_values(by=[col_new_cluster_val, col_model_sort_order], ascending=True)
+        .sort_values(by=l_cols_sort_by_, ascending=sort_ascending_)
     )
 
     return df_dynamic_raw, df_dynamic_clean
@@ -610,28 +611,39 @@ def reshape_df_to_get_1_cluster_per_row(
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_topic: str = 'cluster_topic_mix',
         get_one_column_per_sub_id: bool = False,
+        l_groupby_cols: iter = None,
+        agg_subreddit_ids: bool = True,
+        l_sort_cols: str = None,
         verbose: bool = False,
 ) -> pd.DataFrame:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
     """
-    l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
-    l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
+    if l_groupby_cols is None:
+        l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
+        l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
+
+    if l_sort_cols is None:
+        l_sort_cols = [col_new_cluster_val]
+
+    d_aggs = {
+        col_counterpart_count: ('subreddit_id', 'nunique'),
+        col_list_cluster_names: ('subreddit_name', list),
+    }
+    if agg_subreddit_ids:
+        d_aggs[col_list_cluster_ids] = ('subreddit_id', list)
+
     df_cluster_per_row = (
         df_labels
         .groupby(l_groupby_cols)
         .agg(
-            **{
-                col_counterpart_count: ('subreddit_id', 'nunique'),
-                col_list_cluster_names: ('subreddit_name', list),
-                col_list_cluster_ids: ('subreddit_id', list),
-            }
+            **d_aggs
         )
-        .sort_values(by=[col_new_cluster_val], ascending=True)
+        .sort_values(by=l_sort_cols, ascending=True)
         .reset_index()
     )
-    print(df_cluster_per_row.shape)
+    print(f"{df_cluster_per_row.shape}  <- df.shape")
 
     if get_one_column_per_sub_id:
         # Convert the list of subs into a df & merge back with original sub (each sub should be in a new column)
@@ -649,10 +661,12 @@ def reshape_df_to_get_1_cluster_per_row(
     # and to remove the brackets
     for col_list_ in [col_list_cluster_names, col_list_cluster_ids]:
         try:
+            # Treating as a string is faster than .apply() to process each item in list
+            #    .apply(lambda x: ', '.join(x))
             df_cluster_per_row[col_list_] = (
                 df_cluster_per_row[col_list_]
-                .apply(lambda x: ', '.join(x))
                 .astype(str)
+                .str[1:-1]
                 .str.replace("'", "")
             )
         except KeyError:

@@ -1,0 +1,158 @@
+-- Use this text to test regexes used to clean up subreddit meta
+-- meta = name, title, description, public description (from subreddit_lookup)
+-- For sub-meta it's mostly about removing markup/markdown
+
+[](//afl.reddit.com)
+*****
+
+**(A) Rules for all the subreddit all the time:**
+
+1. **Be respectful and civil to others and do not stir drama.**  You can
+
+2. **Give constructive and accurate feedback.**
+
+r/FoodPorn_ja
+r/science_jp
+r/software_ja
+r/japan_anime
+>###**Welcome to /r/Burgers!**
+Post anything and everything to do with burgers.
+
+https://www.reddit.com/message/compose?to=%2Fr%2Fasoiaf
+
+**Please remember our premier rule: be polite and courteous to everybody.**
+
+**Got a question for a European, about Europe or anything Europe related? Then you came to the right place!**
+
+---
+
+**Select a flair (flag) by clicking the flair edit button above. The bottom option allows custom flairs: use :flag-xx: to add the flags themselves. Please only use the custom flair option for locations.**
+
+
+-- pipes used for tables
+ ---
+
+||  |
+
+||||
+|--|--|--|
+|[Personal](/r/AskEurope/search?q=flair%3APersonal&restrict_sr=on  "Personal")|[Culture](/r/AskEurope/search?q=flair%3ACulture&restrict_sr=on "Culture")|[Politics](/r/AskEurope/search?q=flair%3APolitics&restrict_sr=on "Politics")|
+|[Food](/r/AskEurope/search?q=flair%3AFood&restrict_sr=on "Food")|[History](/r/AskEurope/search?q=flair%3AHistory&restrict_sr=on "History")|[Work](/r/AskEurope/search?q=flair%3AWork&restrict_sr=on "Work")|
+|[Travel](/r/AskEurope/search?q=flair%3ATravel&restrict_sr=on "Travel")|[Foreign](/r/AskEurope/search?q=flair%3AForeign&restrict_sr=on "Foreign")|[Sports](/r/AskEurope/search?q=flair%3ASports&restrict_sr=on "Sports")|
+|[Language](/r/AskEurope/search?q=flair%3ALanguage&restrict_sr=on "Language")|[Education](/r/AskEurope/search?q=flair%3AEducation&restrict_sr=on "Education")|[Meta](/r/AskEurope/search?q=flair%3AMeta&restrict_sr=on "Meta")|
+
+S|M|T|W|T|F|S
+:-:|:-:|:-:|:-:|:-:|:-:|:-:
+ | | | | |**^1 [](/r/braves "Won 8-7")**|*^2 [](/r/tampabayrays "Won 8-2")*
+**^3 [](/r/orioles "12:05, BSNO")**|**^4
+
+ | | | | | | | |
+:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+: :|: :|: :|: :|: :|:
+ | | | |:      :|
+Filters | [For Sale Only]
+|||
+|:--|:--|
+|:--|--:|
+[Abigail Breslin](/r/AbigailBreslin)|[Aimee Teegarden](/r/AimeeTeegarden)
+[Alexandria Deberry](/r/AlexandriaDeberry)|[Alexis Knapp](/r/AlexisKnapp)
+[Aly Michalka](/r/Aly_Michalka)|[Amanda Bynes](/r/Amanda_Bynes)
+[Amanda Michalka](/r/AmandaMichalka)|[Ariana Grande](/r/ArianaGrande)
+
+>##Friends of [/r/bodyperfection](http://reddit.com/r/bodyperfection)
+* [holdthemoan](https://www.reddit.com/r/holdthemoan)
+* [RealGirls](https://www.reddit.com/r/RealGirls)
+* [OnOff] (/r/OnOff)
+* [Amateur] (/r/Amateur)
+
+r/hawktalk
+Round	|	Game	|	Result
+:-:	|	:---	|	:-:
+Round 1	|	**Norf @ MCG**	|  **78-58**
+Round 2	|	Port @ AO	|                  **120-56**
+Round 3	|	*Carlton @ MCG*      |
+
+2|Sevilla sevilla|29|+21|57
+3|Barcelona barcelona|28|+27|54
+4|Atletico Madrid atleticomadrid|29|+17|54
+
+[](//www.facebook.com/hawthornfc)
+[](//twitter.com/HawthornFC)
+[](//plus.google.com/115812227589908911804/videos)
+[](//youtube.com/user/watchhawkstv)
+
+
+####**Rules & Information**
+
+>
+- This subreddit is for images, videos, or discussion about Burgers.
+>
+- Please use [Imgur](//www.imgur.com) or reddit for images.
+>
+- Be respectful to other users.
+
+#**Related Subreddits**
+- /r/EatSandwiches
+- /r/TonightsDinner
+- /r/FastFood
+- /r/doener
+- /r/Grilling
+- /r/Pizza
+
+HOTAS (**H**ands **O**n **T**hrottle **A**nd **S**tick)
+
+* [Reviews] (https://t3chtronics.wordpress.com/reviews/)
+
+* Sales
+
+* DIY
+
+
+animearmpits
+Welcome to animearmpits, a place where there are lots of anime armpits!
+
+
+#RULES
+
+* Don't be an asshole to anyone, we're all friends here!
+
+=
+Related Communities
+----------------------------------
+/r/Gardening
+/r/GardenWild
+/r/Plants
+/r/Greenhouses
+/r/Permaculture
+/r/PlantedTank
+/r/Houseplants
+/r/IndoorGarden
+/r/OrganicGardening
+/r/MasterGardener
+/r/Landscaping
+/r/SavageGarden
+/r/Farming
+Communities Continued —
+----------------------------------
+/r/Flowers
+/r/Roses
+
+ >
+[東方 Reddit Network](/r/multihub/comments/1nlrle/%E6%9D%B1%E6%96%B9project_touhou_project_reddits) -
+/r/touhou -
+/r/TOUHOUMUSIC -
+/r/mspainttouhou -
+
+[Video Explanation of the Power Grid](https://www.youtube.com/playlist?list=PLTZM4MrZKfW-ftqKGSbO-DwDiOGqNmq53)
+
+This is a sub-reddit for operators of the various power grids that span the globe.
+
+---
+##Rules
+**1\. Follow [Reddiquette](https://www.reddithelp.com/hc/en-us/articles/205926439)**
+
+>* By Brand
+* [Atwood](http://www.reddit.com/r/EDCexchange/search?q=title%3A%5BAtwood%5D&sort=new&restrict_sr=on)
+* [Benchmade](http://www.reddit.com/r/EDCexchange/search?q=title%3A%5BBenchmade%5D&sort=new&restrict_sr=on)
+* [Fenix](http://www.reddit.com/r/EDCexchange/search?q=title%3A%5BFenix%5D&sort=new&restrict_sr=on)
+

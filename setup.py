@@ -186,6 +186,9 @@ EXTRAS_REQUIRE = {
         "tensorflow-text == 2.3.0",
 
         "Werkzeug == 2.0.1",
+
+        # test alternative API to read & write to bigQuery
+        "pandas-gbq < 0.17.4",
     ],
 
     "tensorflow_233": [
@@ -331,7 +334,7 @@ EXTRAS_REQUIRE = {
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.4.1',
+    version='0.5.0',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',

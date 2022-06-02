@@ -626,10 +626,10 @@ def get_git_hash() -> str:
     """
     try:
         git_hash = (
-        subprocess.check_output(['git', 'rev-parse', 'HEAD'])
-        .strip()
-        .decode('ascii')
-    )
+            subprocess.check_output(['git', 'rev-parse', 'HEAD'])
+            .strip()
+            .decode('ascii')
+        )
     except OSError:
         git_hash = None
 
