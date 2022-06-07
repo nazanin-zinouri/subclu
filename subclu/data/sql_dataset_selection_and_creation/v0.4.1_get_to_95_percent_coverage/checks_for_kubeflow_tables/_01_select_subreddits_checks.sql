@@ -74,3 +74,40 @@ ORDER BY LOWER(name)
 
 LIMIT 1000
 ;
+
+
+-- Check how many posts each subreddit has.
+--  Use to help how many subs have 3+ posts in L28 days
+-- Selected subreddit counts & percentiles
+SELECT
+    COUNT(*) as row_count
+    , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+    , COUNT(DISTINCT subreddit_name) AS subreddit_name_unique_count
+    , SUM(
+        IF(posts_not_removed_l28 >= 1, 1, 0)
+    ) AS subreddits_1_plus_posts
+    , SUM(
+        IF(posts_not_removed_l28 >= 2, 1, 0)
+    ) AS subreddits_2_plus_posts
+    , SUM(
+        IF(posts_not_removed_l28 >= 3, 1, 0)
+    ) AS subreddits_3_plus_posts
+    , SUM(
+        IF(posts_not_removed_l28 >= 4, 1, 0)
+    ) AS subreddits_4_plus_posts
+    , SUM(
+        IF(posts_not_removed_l28 >= 5, 1, 0)
+    ) AS subreddits_5_plus_posts
+
+    , MIN(posts_not_removed_l28) AS posts_not_removed_l28_min
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(25)] AS posts_not_removed_l28_p25
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(30)] AS posts_not_removed_l28_p30
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(35)] AS posts_not_removed_l28_p35
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(40)] AS posts_not_removed_l28_p40
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(50)] AS posts_not_removed_l28_median
+    , AVG(posts_not_removed_l28) AS posts_not_removed_l28_avg
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(95)] AS posts_not_removed_l28_p95
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(99)] AS posts_not_removed_l28_p99
+
+FROM `reddit-relevance.tmp.subclu_subreddit_candidates_20220603`
+;
