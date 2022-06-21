@@ -75,6 +75,26 @@ ORDER BY LOWER(name)
 LIMIT 1000
 ;
 
+-- Ballpark numbers
+-- row_count	 207k
+-- subreddit_id_unique_count	 207k
+-- subreddit_name_unique_count	 207k
+-- subreddits_1_plus_posts	 207k
+-- subreddits_2_plus_posts	 176
+-- subreddits_3_plus_posts	 154
+-- subreddits_4_plus_posts	 140
+-- subreddits_5_plus_posts	 126
+-- posts_not_removed_l28_min	1
+-- posts_not_removed_l28_p25	2
+-- posts_not_removed_l28_p30	3
+-- posts_not_removed_l28_p35	4
+-- posts_not_removed_l28_p40	5
+-- posts_not_removed_l28_median	     8
+-- posts_not_removed_l28_p75	    33
+-- posts_not_removed_l28_avg	   130
+-- posts_not_removed_l28_p95	   386
+-- posts_not_removed_l28_p99	 1,997
+-- posts_not_removed_l28_max   375k
 
 -- Check how many posts each subreddit has.
 --  Use to help how many subs have 3+ posts in L28 days
@@ -98,6 +118,9 @@ SELECT
     , SUM(
         IF(posts_not_removed_l28 >= 5, 1, 0)
     ) AS subreddits_5_plus_posts
+    , SUM(
+        IF(posts_not_removed_l28 >= 6, 1, 0)
+    ) AS subreddits_6_plus_posts
 
     , MIN(posts_not_removed_l28) AS posts_not_removed_l28_min
     , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(25)] AS posts_not_removed_l28_p25
@@ -106,8 +129,116 @@ SELECT
     , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(40)] AS posts_not_removed_l28_p40
     , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(50)] AS posts_not_removed_l28_median
     , AVG(posts_not_removed_l28) AS posts_not_removed_l28_avg
+    , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(75)] AS posts_not_removed_l28_p75
     , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(95)] AS posts_not_removed_l28_p95
     , APPROX_QUANTILES(posts_not_removed_l28, 100)[OFFSET(99)] AS posts_not_removed_l28_p99
+    , MAX(posts_not_removed_l28) AS posts_not_removed_l28_max
 
-FROM `reddit-relevance.tmp.subclu_subreddit_candidates_20220603`
+FROM `reddit-relevance.tmp.subclu_subreddit_candidates_20220621`
 ;
+
+
+-- Debug duplicates
+-- Dupe subreddits:
+--   jenfoxuwu -> diff:           activity_7_day, submits_7_day, comments_7_day
+--   test_automation_001 -> diff: activity_7_day, submits_7_day, comments_7_day, active, highly_active
+WITH subs_ranked AS (
+    SELECT
+        c.*
+        -- Rank by sub_name
+        , ROW_NUMBER() OVER(
+            PARTITION BY subreddit_name
+            ORDER BY users_l7
+        ) AS rank_sub_name
+        -- Rank by sub_id
+        , ROW_NUMBER() OVER(
+            PARTITION BY subreddit_id
+            ORDER BY users_l7
+        ) AS rank_sub_id
+    FROM `reddit-relevance.tmp.subclu_subreddit_candidates_20220619` AS c
+)
+
+, subs_duplicated AS (
+  SELECT DISTINCT
+    subreddit_id
+    , subreddit_name
+  FROM subs_ranked
+  WHERE 1=1
+  AND (
+    rank_sub_name >= 2
+    OR rank_sub_id >= 2
+  )
+)
+
+SELECT
+  *
+FROM subs_ranked
+WHERE 1=1
+  AND subreddit_id IN (SELECT subreddit_id FROM subs_duplicated)
+  OR subreddit_name IN (SELECT subreddit_name from subs_duplicated)
+
+ORDER BY subreddit_name
+;
+
+-- ===============
+-- Check for dupes (CTEs)
+-- ===
+-- SELECT
+--     COUNT(*) as row_count
+--     , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+--     , COUNT(DISTINCT subreddit_name) AS subreddit_name_unique_count
+-- FROM final_meta
+
+
+-- SELECT
+--     *
+-- FROM subs_with_views_and_posts_raw
+-- WHERE 1=1
+--     AND subreddit_name IN (
+--     'jenfoxuwu', 'test_automation_001'
+--   )
+-- ;
+
+
+-- SELECT
+--     *
+-- FROM subs_above_view_and_post_threshold
+-- WHERE 1=1
+--     AND subreddit_name IN (
+--     'jenfoxuwu', 'test_automation_001'
+--   )
+-- ;
+
+-- SELECT
+--     *
+-- FROM unique_posters_per_subreddit
+-- WHERE 1=1
+--     AND subreddit_id IN (
+--     't5_3z2use', 't5_4sdleo'
+--   )
+-- ;
+
+
+-- SELECT
+--     -- this one had dupes
+--     *
+-- FROM final_meta
+-- WHERE 1=1
+--     AND subreddit_name IN (
+--     'jenfoxuwu', 'test_automation_001'
+--   )
+-- ;
+
+
+-- Duplicated subreddit_ids root query:
+SELECT *
+FROM `data-prod-165221.ds_subreddit_whitelist_tables.active_subreddits`
+WHERE DATE(_PARTITIONTIME) = (CURRENT_DATE() - 2) -- "2022-06-17"
+  AND (
+      subreddit_name IN (
+      'jenfoxuwu', 'test_automation_001'
+    )
+    OR subreddit_id IN (
+      't5_3z2use', 't5_4sdleo'
+    )
+  )
