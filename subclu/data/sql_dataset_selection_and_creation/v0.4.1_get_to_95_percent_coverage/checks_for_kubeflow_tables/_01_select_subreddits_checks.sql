@@ -242,3 +242,14 @@ WHERE DATE(_PARTITIONTIME) = (CURRENT_DATE() - 2) -- "2022-06-17"
       't5_3z2use', 't5_4sdleo'
     )
   )
+
+
+-- Check new column for subreddit seeds
+--  This way we can get subreddit meta & posts for all subreddits
+--  But only use some subreddits as seeds to create topic clusters
+SELECT
+    subreddit_seed_for_clusters
+    , COUNT(DISTINCT subreddit_id) AS subreddit_count
+FROM `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220620`
+GROUP BY 1
+;
