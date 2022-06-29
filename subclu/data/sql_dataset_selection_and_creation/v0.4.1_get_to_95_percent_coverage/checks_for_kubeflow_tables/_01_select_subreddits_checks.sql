@@ -140,6 +140,7 @@ FROM `reddit-relevance.tmp.subclu_subreddit_candidates_20220621`
 
 -- Debug duplicates
 -- Dupe subreddits:
+--   jenfoxuwu=t5_3z2use
 --   jenfoxuwu -> diff:           activity_7_day, submits_7_day, comments_7_day
 --   test_automation_001 -> diff: activity_7_day, submits_7_day, comments_7_day, active, highly_active
 WITH subs_ranked AS (
@@ -252,4 +253,31 @@ SELECT
     , COUNT(DISTINCT subreddit_id) AS subreddit_count
 FROM `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220620`
 GROUP BY 1
+;
+
+
+-- Check new column for subreddit seeds
+--  This way we can get subreddit meta & posts for all subreddits
+--  But only use some subreddits as seeds to create topic clusters
+SELECT
+    subreddit_seed_for_clusters
+    , COUNT(DISTINCT subreddit_id) AS subreddit_count
+FROM `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220622`
+GROUP BY 1
+;
+
+
+-- Check new column for subreddit seeds + relevant countries for some sports subs
+SELECT
+    *
+FROM `reddit-relevance.tmp.subclu_subreddits_for_modeling_20220622`
+
+WHERE 1=1
+    AND subreddit_name IN (
+        'formula1', 'lewishamilton', 'sergioperez', 'redbullracing', 'maxverstappen33'
+        , 'cricket', 'ipl', 'premierleague', 'afl'
+        -- , 'golf', 'nba'
+        , 'football', 'soccer', 'ligamx', 'bundesliga', 'fcbarcelona', 'realmadrid'
+    )
+ORDER BY users_l7 DESC
 ;
