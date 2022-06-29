@@ -193,7 +193,8 @@ class VectorizeText:
                 self.data_loader.yield_files_and_dfs(),
                 total=self.data_loader.n_local_parquet_files_,
                 desc='Files in batch: ',
-                mininterval=20, ascii=True,
+                mininterval=24, ascii=True,
+                ncols=70,
                 logger=log
             ):
                 gc.collect()
@@ -588,7 +589,7 @@ def get_embeddings_as_df(
             info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
         for i in LogTQDM(
-            iteration_chunks, mininterval=11, ascii=True,  ncols=80,
+            iteration_chunks, mininterval=12, ascii=True,  ncols=80,
             desc='  Vectorizing: ',
             logger=log,  # position=0, leave=True,
         ):
