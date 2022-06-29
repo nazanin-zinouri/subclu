@@ -1,0 +1,6 @@
+dataset_name: 'v0.5.0 inputs. ~80k seed subreddits, ~190k total subreddits'
+bucket_name: 'i18n-subreddit-clustering'
+
+folder_subreddits_text_and_meta: 'i18n_topic_model_batch/runs/20220629/subreddits/text'
+folder_post_and_comment_text_and_meta: 'i18n_topic_model_batch/runs/20220629/post_and_comment_text_combined/text_subreddit_seeds'
+folder_post_and_comment_text_and_meta_non_seed: 'i18n_topic_model_batch/runs/20220629/post_and_comment_text_combined/text_non_subreddit_seeds'
