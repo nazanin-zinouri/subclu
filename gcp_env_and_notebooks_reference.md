@@ -32,6 +32,7 @@ For jupyterlab configuration, see:
 [jupyterlab_configuration.md](references/jupyterlab_configuration.md)
 
 
+
 # Sync an existing GCP notebook VM
 Before running a new job on a VM, use this checklist to make sure that the VM has the latest:
 - mlruns database (latest experiments data from mlflow)
@@ -68,6 +69,17 @@ Change your active configuration with:
 ```bash
 gcloud config configurations activate default
 ```
+
+### SSH into Jupyter Lab [optional/debug]
+For some reason, the URLs to connect to a VM can sometimes break (you get a 403 error). If that's the case, you can use SSH to create a tunnel to the VM and connect "locally" to the VM. This is the same method used to connect to the MLflow server below.
+<br>See the shell fxn named `dj_ssh_jupyterlab` so it's easy to switch between multiple VMs.
+
+Example:
+```shell
+ssh -N -L 8081:localhost:8080 djb-subclu-inference-tf-2-3-20210630.us-west1-b.data-prod-165221
+```
+Then you can connect to the VM at this address:<br>
+http://127.0.0.1:8081/lab?
 
 ## 1. Sync mlflow database manually
 - Check which `sqlite` database has the latest info (largest size & latest updates) & copy to all subfolders
