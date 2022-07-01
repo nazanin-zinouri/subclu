@@ -712,17 +712,17 @@ def save_pd_df_to_parquet_in_chunks(
 
         if target_mb_size is None:
             if mem_usage_mb < 100:
-                target_mb_size = 80
+                target_mb_size = 120
             elif 100 <= mem_usage_mb < 1000:
-                target_mb_size = 250
-            elif 1000 <= mem_usage_mb < 3000:
                 target_mb_size = 350
+            elif 1000 <= mem_usage_mb < 3000:
+                target_mb_size = 450
             else:
                 # We have some dfs that can take up over 156GB of RAM. So we need to increase the
                 #  target_mb size, otherwise we'll end up with thousands of tiny dfs. example:
                 # INFO | "  156,726.2 MB <- Memory usage"
                 # INFO | "   2,090  <- target Dask partitions      75.0 <- target MB partition size"
-                target_mb_size = 480
+                target_mb_size = 550
 
         n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
 
