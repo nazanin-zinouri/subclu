@@ -70,6 +70,37 @@ Change your active configuration with:
 gcloud config configurations activate default
 ```
 
+### Change your VM type
+Sometimes you can't edit a VM in the console, but you can edit in it through the CLI. CLI documentation
+- https://cloud.google.com/compute/docs/instances/changing-machine-type-of-stopped-instance#gcloud
+- https://cloud.google.com/sdk/gcloud/reference/compute/instances/set-machine-type
+
+For example, you can change your machine type (change CPU count & memory/RAM).
+Here's a list of machine types:
+- https://cloud.google.com/compute/docs/machine-types
+- https://cloud.google.com/compute/docs/general-purpose-machines
+```bash
+# General purpose:
+n1-highmem-96   |  96 vCPUs |  624 GB Memory
+
+# Memory-optimized:
+m1-highmem-96   |  96 vCPUs | 1433 GB Memory
+
+m1-ultramem-80  |  80 vCPUs | 1922 GB Memory
+m1-ultramem-160 | 160 vCPUs | 3844 GB Memory
+```
+
+Example commands
+```bash
+# 0. Make sure the VM is stopped!
+gcloud compute instances stop VM_NAME
+
+# 1. Change the machine type:
+gcloud compute instances set-machine-type djb-100-2021-04-28-djb-eda-german-subs \
+  --machine-type=m1-megamem-96
+```
+
+
 ### SSH into Jupyter Lab [optional/debug]
 For some reason, the URLs to connect to a VM can sometimes break (you get a 403 error). If that's the case, you can use SSH to create a tunnel to the VM and connect "locally" to the VM. This is the same method used to connect to the MLflow server below.
 <br>See the shell fxn named `dj_ssh_jupyterlab` so it's easy to switch between multiple VMs.
