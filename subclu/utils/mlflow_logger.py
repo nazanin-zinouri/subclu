@@ -696,8 +696,6 @@ def save_pd_df_to_parquet_in_chunks(
         write_index: bool = True,
 ) -> None:
     """
-    TODO(djb)
-
     Dask doesn't support multi-index dataframes, so you may need to reset_index()
     before calling this function.
     Maybe it's ok to reset_index and I can set it again on read?
@@ -714,17 +712,17 @@ def save_pd_df_to_parquet_in_chunks(
 
         if target_mb_size is None:
             if mem_usage_mb < 100:
-                target_mb_size = 50
+                target_mb_size = 80
             elif 100 <= mem_usage_mb < 1000:
-                target_mb_size = 100
+                target_mb_size = 250
             elif 1000 <= mem_usage_mb < 3000:
-                target_mb_size = 200
+                target_mb_size = 350
             else:
                 # We have some dfs that can take up over 156GB of RAM. So we need to increase the
                 #  target_mb size, otherwise we'll end up with thousands of tiny dfs. example:
                 # INFO | "  156,726.2 MB <- Memory usage"
                 # INFO | "   2,090  <- target Dask partitions      75.0 <- target MB partition size"
-                target_mb_size = 330
+                target_mb_size = 480
 
         n_dask_partitions = 1 + int(mem_usage_mb // target_mb_size)
 
@@ -732,7 +730,7 @@ def save_pd_df_to_parquet_in_chunks(
              f"\t {target_mb_size:6,.1f} <- target MB partition size"
              )
 
-    # info(f"Saving parquet files to:\n  {path}...")
+        # info(f"Saving parquet files to:\n  {path}...")
         (
             dd.from_pandas(df, npartitions=n_dask_partitions)
             .to_parquet(path, write_index=write_index)
