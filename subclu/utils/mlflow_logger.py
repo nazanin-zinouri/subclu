@@ -64,8 +64,6 @@ class MlflowLogger:
                 tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
                 mlflow.set_tracking_uri(tracking_uri)
             except (OSError, FileNotFoundError):
-                # local (laptop)
-                'C02FD08QMD6V'
                 path_mlruns_db = Path(f"/Users/david.bermejo/repos/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
                 Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
                 tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
@@ -124,6 +122,14 @@ class MlflowLogger:
             'v0.4.1_mUSE_clustering_new_metrics',
             'v0.4.1_nearest_neighbors_test',
             'v0.4.1_nearest_neighbors',
+
+            # v0.5.0 experiments
+            'v0.5.0_mUSE_aggregates_test',
+            'v0.5.0_mUSE_aggregates',
+            'v0.5.0_mUSE_clustering_test',
+            'v0.5.0_mUSE_clustering',
+            'v0.5.0_nearest_neighbors_test',
+            'v0.5.0_nearest_neighbors',
 
         ]
         for i, exp in enumerate(l_experiments):
