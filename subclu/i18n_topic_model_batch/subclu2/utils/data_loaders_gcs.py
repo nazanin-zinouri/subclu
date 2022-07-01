@@ -44,7 +44,10 @@ class LoadSubredditsGCS:
         """"""
         self.bucket_name = bucket_name
         self.gcs_path = gcs_path
-        self.columns = [str(_) for _ in columns]
+        if columns is not None:
+            self.columns = [str(_) for _ in columns]
+        else:
+            self.columns = None
         self.col_unique_check = col_unique_check
         self.df_format = df_format
 
