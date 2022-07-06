@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from dask import dataframe as dd
 
 from scipy.cluster.hierarchy import fcluster, leaves_list
 from sklearn.pipeline import Pipeline
@@ -360,18 +361,55 @@ class ClusterEmbeddings:
     def _load_metadata_for_filtering(self) -> pd.DataFrame:
         """Load metadata to filter embeddings"""
         log.warning(f"** Loading metadata **")
-        return LoadSubreddits(
-            bucket_name=self.data_text_and_metadata['bucket_name'],
-            folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
-            folder_posts=self.data_text_and_metadata['folder_posts_text_and_meta'],
-            columns=None,
-            # col_new_manual_topic=col_manual_labels,
-        ).read_apply_transformations_and_merge_post_aggs(
-            cols_post='post_count_only_',
-            df_format='dask',
-            read_fxn='dask',
-            unique_check=False,
-        )
+        try:
+            df_subs = LoadSubreddits(
+                bucket_name=self.data_text_and_metadata['bucket_name'],
+                folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
+                folder_posts=self.data_text_and_metadata['folder_posts_text_and_meta'],
+                columns=None,
+                # col_new_manual_topic=col_manual_labels,
+            ).read_apply_transformations_and_merge_post_aggs(
+                cols_post='post_count_only_',
+                df_format='dask',
+                read_fxn='dask',
+                unique_check=False,
+            )
+        except Exception as e:
+            # in new case we might have post-meta mixed with post+comments, so use
+            #  a different place to load subreddit metadata from
+            log.warning(f"  Error loading subreddit meta: {e}")
+
+            log.info(f"  Loading subreddit meta")
+            df_subs = LoadSubreddits(
+                bucket_name=self.data_text_and_metadata['bucket_name'],
+                folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
+                columns=['subreddit_id', 'subreddit_name', 'primary_topic'],
+                # col_new_manual_topic=col_manual_labels,
+            ).read_raw()
+
+            log.info(f"  Loading POSTS meta")
+            # calculate the # of posts for modeling
+            col_posts_for_modeling = 'posts_for_modeling_count'
+            df_posts = dd.read_parquet(
+                f"gs://{self.data_text_and_metadata['bucket_name']}/"
+                f"{self.data_text_and_metadata['folder_post_and_comment_text_and_meta']}/*.parquet",
+                columns=['post_id', 'subreddit_id']
+            ).compute()
+            df_posts_per_sub = (
+                df_posts
+                .groupby('subreddit_id', as_index=False)
+                .agg(
+                    **{
+                        col_posts_for_modeling: ('post_id', 'nunique')
+                   }
+                )
+            )
+            df_subs = df_subs.merge(
+                df_posts_per_sub,
+                how='left',
+                on='subreddit_id',
+            )
+        return df_subs
 
     def _apply_filtering(
             self,
@@ -601,7 +639,7 @@ class ClusterEmbeddings:
         if 3000 <= self.n_max_clusters_to_check_for_optimal_k:
             s_k_to_evaluate = (
                 s_k_to_evaluate |
-                set(np.arange(3000, 1 + self.n_max_clusters_to_check_for_optimal_k, 200))
+                set(np.arange(3000, 1 + self.n_max_clusters_to_check_for_optimal_k, 250))
             )
         # explicitly add n_max clusters in case intervals missed it
         s_k_to_evaluate = s_k_to_evaluate | {self.n_max_clusters_to_check_for_optimal_k}
