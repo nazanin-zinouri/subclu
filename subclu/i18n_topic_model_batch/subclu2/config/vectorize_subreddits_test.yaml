@@ -1,6 +1,6 @@
 config_description: "Config to do a simple test to vectorize subreddit descriptions"
 defaults:
-  - data_text: subreddits_sql_test.yaml
+  - data_text_and_metadata: subreddits_sql_test.yaml
 
 text_col_for_embeddings: concat_text
 
