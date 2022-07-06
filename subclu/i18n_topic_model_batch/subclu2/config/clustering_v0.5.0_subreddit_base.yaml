@@ -1,0 +1,65 @@
+# Use this config to get aggregate embeddings
+defaults:
+  - data_text_and_metadata: v0.5.0_model
+  - data_embeddings_to_cluster: v0.5.0_2022_07_01-muse_lowercase_false
+  - clustering_algo: agg_clustering
+
+  # use joblib to run jobs in parallel
+  - override hydra/launcher: joblib
+
+  # Doc: https://hydra.cc/docs/upgrades/1.0_to_1.1/default_composition_order/
+  #  by adding _self_ AFTER defaults, the config in this file will over-ride defaults
+  #  If you want the defaults to override the config values in this config,
+  #   declare _self_ BEFORE the defaults
+  - _self_  # new for hydra 1.1
+
+embeddings_to_cluster: 'df_sub_level_agg_c1_post_comments_and_sub_desc'
+n_sample_embedding_rows: null
+n_max_clusters_to_check_for_optimal_k: 4000
+
+# Filter out posts or subreddits BEFORE aplying clustering algo.
+#  Useful when some subreddits only have 1 or 2 posts so there's not
+#   enough signal and/or they create noisy clusters.
+filter_embeddings:
+  filter_subreddits:
+    filter: true
+    filter_column: posts_for_modeling_count
+    minimum_column_value: 3
+
+mlflow_tracking_uri: 'sqlite'
+mlflow_experiment_name: 'v0.4.1_mUSE_clustering_new_metrics'  # 'v0.4.1_mUSE_clustering_test'
+
+pipeline_config:
+  # If normalize=True then cosine_distance=(normalize + euclidean distance)
+  #  Needed for AgglomerativeClustering(ward) and other clustering algos that
+  #  are limited to euclidean distance
+  normalize:
+    add_step: true
+    name: Normalizer
+    kwargs_:
+      norm: l2
+  reduce:
+    add_step: false
+    name: TruncatedSVD
+    kwargs_:
+      n_components: 128
+
+
+# Change n_jobs(parallel jobs) & logging for hydra itself
+hydra:
+  launcher:
+    # override the number of jobs for joblib
+    n_jobs: 11
+  job_logging:
+    formatters:
+      simple:
+        # format: '`%(asctime)s` | `%(name)s` | `%(levelname)s` | `%(message)s`'
+        format: '`%(asctime)s` | `%(levelname)s` | `%(message)s`'
+  # Change location of logging - by default it might try to create logs in
+  #  home/david.bermejo instead of home/jupyter
+  #  https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: /home/jupyter/subreddit_clustering_i18n/hydra_runs/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: /home/jupyter/subreddit_clustering_i18n/hydra_runs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
