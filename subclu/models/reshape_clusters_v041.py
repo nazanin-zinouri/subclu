@@ -260,6 +260,7 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
     'ttc30',
 
     # other
+    'pussypassdenied',
     'fuck',
     'shincheonji',
     'cults',
@@ -275,6 +276,7 @@ _L_SENSITIVE_SUBREDDITS_TO_EXCLUDE_FROM_FPRS_ = [
 
     # hunting is next to animal/nature subs...
     #  probably not a great experience for animal-lovers to see hunting stuff
+    #  (unless it's in a hunting cluster... but it's not in v0.4.1)
     'huntingaustralia',
 
 ]
