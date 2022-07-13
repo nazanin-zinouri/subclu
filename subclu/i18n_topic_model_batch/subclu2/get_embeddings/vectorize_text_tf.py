@@ -193,7 +193,8 @@ class VectorizeText:
                 self.data_loader.yield_files_and_dfs(),
                 total=self.data_loader.n_local_parquet_files_,
                 desc='Files in batch: ',
-                mininterval=20, ascii=True,
+                mininterval=24, ascii=True,
+                ncols=70,
                 logger=log
             ):
                 gc.collect()
@@ -224,8 +225,7 @@ class VectorizeText:
         # mlflow.log_metric('vectorizing_time_minutes_subreddit_meta',
         #                   total_time_subs_vect / timedelta(minutes=1)
         #                   )
-        # TODO(djb): log the configuration used to create these embeddings
-        # log hydra config
+        # Log the configuration used to create these embeddings
         self._log_hydra_config_and_log_file()
 
         # finish logging total time + end mlflow run
@@ -415,18 +415,6 @@ class VectorizeText:
 
     def _log_hydra_config_and_log_file(self):
         """Log hydra config to bucket. In the future this should be logged to mlflow"""
-        # logs file (if it exists)
-        if self.f_log_file is not None:
-            storage_client = storage.Client()
-            bucket = storage_client.get_bucket(self.output_bucket)
-            f_log_name = Path(self.f_log_file).name
-            info(f"Saving log file...")
-            (
-                bucket
-                .blob(posixpath.join(self.gcs_output_path_this_run, f_log_name))
-                .upload_from_filename(self.f_log_file)
-            )
-
         path_hydra_config = self.path_local_model / '.hydra'
         # For now, copy the logic from mlflow.log_artifacts()
         if path_hydra_config.is_dir():
@@ -442,6 +430,17 @@ class VectorizeText:
                 verbose=False,
                 dry_run=False
             )
+            # logs file (if it exists)
+            if self.f_log_file is not None:
+                storage_client = storage.Client()
+                bucket = storage_client.get_bucket(self.output_bucket)
+                f_log_name = Path(self.f_log_file).name
+                info(f"Saving log file...")
+                (
+                    bucket
+                        .blob(posixpath.join(self.gcs_output_path_this_run, f_log_name))
+                        .upload_from_filename(self.f_log_file)
+                )
 
 
 def upload_folder_to_gcs(
@@ -590,7 +589,7 @@ def get_embeddings_as_df(
             info(f"Getting embeddings in batches of size: {batch_size}")
         l_df_embeddings = list()
         for i in LogTQDM(
-            iteration_chunks, mininterval=11, ascii=True,  ncols=80,
+            iteration_chunks, mininterval=12, ascii=True,  ncols=80,
             desc='  Vectorizing: ',
             logger=log,  # position=0, leave=True,
         ):

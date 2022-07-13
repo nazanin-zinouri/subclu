@@ -1,3 +1,50 @@
+-- Check len of post text for embedding (title, body, OCR, flair, URL)
+SELECT
+    COUNT(*) as row_count
+    , COUNT(DISTINCT post_id) AS post_unique_count
+    , COUNT(DISTINCT subreddit_id) AS subreddit_id_unique_count
+    , COUNT(DISTINCT subreddit_name) AS subreddit_name_unique_count
+
+    -- , SUM(
+    --     CASE WHEN (active = TRUE) THEN 1
+    --     ELSE 0
+    --     END
+    -- ) AS active_subreddit_count
+
+    , MIN(post_text_for_embeddings_len) AS post_len_min
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(1)] AS post_len_p01
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(5)] AS post_len_p05
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(10)] AS post_len_p10
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(25)] AS post_len_p25
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(50)] AS post_len_median
+    , ROUND(AVG(post_text_for_embeddings_len), 2)     AS post_len_avg
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(75)] AS post_len_p75
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(85)] AS post_len_p85
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(90)] AS post_len_p90
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(95)] AS post_len_p95
+    , APPROX_QUANTILES(post_text_for_embeddings_len, 100)[OFFSET(99)] AS post_len_p99
+    , MAX(post_text_for_embeddings_len)               AS post_len_max
+
+FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220622`
+;
+-- Post Full text (title, body, OCR, flair, URL). Sample (2022-06-26)
+--   zero -> post title contained only periods, slashes or other punctuation
+-- post_len_min	 0
+-- post_len_p01	 9
+-- post_len_p05	 22
+-- post_len_p10	 32
+-- post_len_p25	 53
+-- post_len_median	 89
+-- post_len_avg	 203.3
+-- post_len_p75	 212
+-- post_len_p85	 382
+-- post_len_p90	 572
+-- post_len_p95	 997
+-- post_len_p99	 1,020
+-- post_len_max	 69,863
+
+
+-- Check len of ONLY post title + body
 SELECT
     COUNT(*) as row_count
     , COUNT(DISTINCT post_id) AS post_unique_count
@@ -11,23 +58,22 @@ SELECT
     -- ) AS active_subreddit_count
 
     , MIN(post_title_and_body_text_clean_len) AS post_len_min
+    , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(25)] AS post_len_p25
     , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(50)] AS post_len_median
-    , AVG(post_title_and_body_text_clean_len) AS sub_desc_len_avg
+    , ROUND(AVG(post_title_and_body_text_clean_len), 2)     AS post_len_avg
     , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(75)] AS post_len_p75
     , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(85)] AS post_len_p85
     , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(90)] AS post_len_p90
     , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(95)] AS post_len_p95
     , APPROX_QUANTILES(post_title_and_body_text_clean_len, 100)[OFFSET(99)] AS post_len_p99
+    , MAX(post_title_and_body_text_clean_len)               AS post_len_max
 
-FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220501`
-
--- WHERE 1=1
+FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220622`
 ;
 
 -- Sample results (7 days)
 -- row_count	post_unique_count	subreddit_id_unique_count	subreddit_name_unique_count
 -- 4,383,428	4,383,428	75,907	75,907
-
 
 -- Sample results (7 days)
 -- Distribution of len(post title + post body)
@@ -51,21 +97,23 @@ SELECT
     , COUNT(DISTINCT subreddit_name) AS subreddit_name_unique_count
 
     , SUM(
-        CASE WHEN (ocr_text_len IS NOT NULL) THEN 1
+        CASE WHEN (ocr_text_clean_len IS NOT NULL) THEN 1
             ELSE 0
         END
     ) AS posts_with_ocr_text
 
-    , MIN(ocr_text_len) AS ocr_text_len_min
-    , APPROX_QUANTILES(ocr_text_len, 100)[OFFSET(50)] AS ocr_text_len_median
-    , AVG(ocr_text_len) AS ocr_text_len_avg
-    , APPROX_QUANTILES(ocr_text_len, 100)[OFFSET(75)] AS ocr_text_len_p75
-    , APPROX_QUANTILES(ocr_text_len, 100)[OFFSET(85)] AS ocr_text_len_p85
-    , APPROX_QUANTILES(ocr_text_len, 100)[OFFSET(90)] AS ocr_text_len_p90
-    , APPROX_QUANTILES(ocr_text_len, 100)[OFFSET(95)] AS ocr_text_len_p95
-    , APPROX_QUANTILES(ocr_text_len, 100)[OFFSET(99)] AS ocr_text_len_p99
+    , MIN(ocr_text_clean_len) AS ocr_text_len_min
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(25)] AS ocr_text_len_p25
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(50)] AS ocr_text_len_median
+    , AVG(ocr_text_clean_len) AS ocr_text_len_avg
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(75)] AS ocr_text_len_p75
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(85)] AS ocr_text_len_p85
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(90)] AS ocr_text_len_p90
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(95)] AS ocr_text_len_p95
+    , APPROX_QUANTILES(ocr_text_clean_len, 100)[OFFSET(99)] AS ocr_text_len_p99
+    , MAX(ocr_text_clean_len) AS ocr_text_len_max
 
-FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220501`
+FROM `reddit-relevance.tmp.subclu_posts_for_modeling_20220628`
 ;
 
 -- Sample results (7 days)

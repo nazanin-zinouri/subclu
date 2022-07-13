@@ -68,9 +68,9 @@ def get_venn_sets2(
     else:
         set_b = iter_b
 
-    print(f"{len(set_a):6,.0f} <- {a_name}")
-    print(f"{len(set_b):6,.0f} <- {b_name}")
-    print(f"{len(set_a | set_b):6,.0f} <- {a_name} + {b_name}")
+    print(f"{len(set_a):11,.0f} <- {a_name}")
+    print(f"{len(set_b):11,.0f} <- {b_name}")
+    print(f"{len(set_a | set_b):11,.0f} <- {a_name} + {b_name}")
 
     d_ = dict()
     d_[f"{a_name}_only"] = set(iter_a) - set(iter_b)
@@ -79,6 +79,8 @@ def get_venn_sets2(
 
     d_[f"{b_name}_only"] = set(iter_b) - set(iter_a)
 
+    for k_, s_ in d_.items():
+        print(f"{len(s_):11,.0f} <- {k_}")
     return d_
 
 
