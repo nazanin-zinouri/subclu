@@ -1,6 +1,12 @@
 dataset_name: 'v0.5.0 inputs. ~80k seed subreddits, ~190k total subreddits'
 bucket_name: 'i18n-subreddit-clustering'
 
+# Alt = ran on a different day, but with the same partition parameters
 folder_subreddits_text_and_meta: 'i18n_topic_model_batch/runs/20220629/subreddits/text'
+folder_subreddits_text_and_meta_alt: 'i18n_topic_model_batch/runs/20220707/subreddits/text'
+folder_posts_text_and_meta: 'i18n_topic_model_batch/runs/20220707/posts'
+folder_comments_text_and_meta: 'i18n_topic_model_batch/runs/20220707/comments'
+
 folder_post_and_comment_text_and_meta: 'i18n_topic_model_batch/runs/20220629/post_and_comment_text_combined/text_subreddit_seeds'
+folder_post_and_comment_text_and_meta_alt: 'i18n_topic_model_batch/runs/20220707/post_and_comment_text_combined/text_subreddit_seeds'
 folder_post_and_comment_text_and_meta_non_seed: 'i18n_topic_model_batch/runs/20220629/post_and_comment_text_combined/text_non_subreddit_seeds'
