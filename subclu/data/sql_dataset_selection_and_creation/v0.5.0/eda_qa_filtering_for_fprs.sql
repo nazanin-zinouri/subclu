@@ -1,6 +1,10 @@
--- Create query to filter out subreddits for FPRs
+-- Create query to apply QA to filter out subreddits for FPRs
 
--- Define sensitive topics (actualy & predicted) to filter out
+DECLARE PARTITION_DATE DATE DEFAULT (CURRENT_DATE() - 2);
+
+-- Define sensitive topics (actual & predicted) to filter out
+-- NOTE: we can't DECLARE variables this in a VIEW ;_; so we should create a table, otherwise we'd have to copy & paste
+--   the topics list 4+ times and it's too easy to screw it up
 DECLARE SENSITIVE_TOPICS DEFAULT [
     'Addiction Support'
     , 'Activism'
@@ -12,11 +16,54 @@ DECLARE SENSITIVE_TOPICS DEFAULT [
 ];
 
 
-WITH base_filters AS (
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags`
+PARTITION BY pt
+AS (
+
+WITH
+subs_geo_custom_agg AS (
+    -- Select subreddits that meet country + relevance + activity thresholds
+    SELECT
+        geo.subreddit_id
+
+        -- Order so that we get (Mexico, US) only, and not both: (US, Mexico) AND (Mexico, US)
+        , STRING_AGG(geo.country_name, ', ' ORDER BY geo.country_name) AS geo_relevant_countries
+        , STRING_AGG(geo.geo_country_code, ', ' ORDER BY geo.geo_country_code) AS geo_relevant_country_codes
+        , COUNT(geo.geo_country_code) AS geo_relevant_country_count
+    FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_relevance_beta_20220705` AS geo
+        INNER JOIN `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_full` AS c
+            ON geo.subreddit_id = c.subreddit_id
+
+    WHERE 1=1
+        -- Assume that all subs in model meet activity thresholds
+
+        -- Pick subreddits that qualify under at least one metric/threshold
+        --   Use the numeric values in case the defined threshold change
+        AND (
+            geo_relevance_default = TRUE
+            OR users_percent_by_subreddit_l28 >= 0.145
+            OR users_percent_by_country_standardized >= 2.5
+            -- Try the combined score to include a few more relevant subreddits
+            OR relevance_combined_score >= 0.175
+        )
+        -- pick subs that are relevant to target countries
+        AND (
+            geo.geo_country_code IN (
+                'AU', 'CA', 'GB', 'IN', 'FR', 'DE', 'IT', 'MX', 'BR'
+                , 'ES', 'SE', 'RO', 'NL', 'TR', 'PH'
+                , 'GR', 'AU', 'AR', 'CO', 'BE', 'CH', 'PO', 'SA', 'CR', 'PA'
+                , 'IR', 'IE'
+            )
+        )
+    GROUP BY 1
+)
+
+, base_filters AS (
     -- Use subquery so we don't have to define detailed & generic filter twice
     SELECT
         *
         , SPLIT(taxonomy_filter_detail, '-')[SAFE_OFFSET(0)] AS taxonomy_filter
+        , SPLIT(taxonomy_filter_detail, '-')[SAFE_OFFSET(1)] AS taxonomy_filter_reason
         , SPLIT(predictions_filter_detail, '-')[SAFE_OFFSET(0)] AS predictions_filter
 
     FROM (
@@ -24,13 +71,14 @@ WITH base_filters AS (
             c.subreddit_id
             , s.over_18
             , s.allow_discovery
-            , (COALESCE(sm.geo_relevant_country_count, 0) >= 1) AS i18n_relevant_sub
-            , c.k_0400_label
+            , (COALESCE(geo.geo_relevant_country_count, 0) >= 1) AS i18n_relevant_sub
             , m.k_0100_label_name
             , c.k_1000_majority_primary_topic AS k_1000_majority_topic
             , c.k_1000_label
-            , sm.geo_relevant_country_count
-            , sm.geo_relevant_countries
+            , geo.geo_relevant_country_count
+            , geo.geo_relevant_country_codes
+            , geo.geo_relevant_countries
+
             , c.subreddit_name
 
             , nt.primary_topic
@@ -38,6 +86,7 @@ WITH base_filters AS (
             , nt.rating_name
             , vr.predicted_rating
             , vt.predicted_topic
+            , asr.users_l7
 
             -- Flag based on NSFW clusters
             , IF(m.k_1000_label_recommend = 'no', 'remove', NULL) sensitive_cluster_filter
@@ -70,18 +119,31 @@ WITH base_filters AS (
             END AS predictions_filter_detail
 
         FROM `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_full` AS c
+            -- Reduce list to only subs we'll use for FPR right away?
+            LEFT JOIN subs_geo_custom_agg AS geo
+                ON c.subreddit_id = geo.subreddit_id
+
+            -- Get subreddit activity so we can prioritize larger/more active subs
+            LEFT JOIN (
+                SELECT * FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+                WHERE DATE(pt) = PARTITION_DATE
+            ) AS asr
+                ON c.subreddit_name = LOWER(asr.subreddit_name)
             LEFT JOIN (
                 SELECT
                     subreddit_id, over_18, allow_discovery
+                    , verdict, is_spam, is_deleted, deleted
+                    , type, quarantine
                 FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-                WHERE dt = CURRENT_DATE() - 2
+                WHERE dt = PARTITION_DATE
             ) AS s
                 ON c.subreddit_id = s.subreddit_id
             LEFT JOIN (
                 SELECT * FROM `data-prod-165221.cnc.shredded_crowdsource_topic_and_rating`
-                WHERE pt = (CURRENT_DATE() - 2)
+                WHERE pt = PARTITION_DATE
             ) AS nt
                 ON c.subreddit_id = nt.subreddit_id
+
             LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_manual_names` m
                 ON c.k_1000_label = m.k_1000_label
             LEFT JOIN `reddit-employee-datasets.david_bermejo.subclu_subreddits_for_modeling_20220705` AS sm
@@ -101,102 +163,167 @@ WITH base_filters AS (
                 WHERE rating_prediction_score >= 0.5
             ) AS vr
                 ON c.subreddit_id = vr.subreddit_id
+
+        WHERE 1=1
+            -- OPTIONAL: Exclude spam, removed, & sketchy subs
+            AND COALESCE(s.verdict, '') != 'admin-removed'
+            AND COALESCE(s.is_spam, FALSE) = FALSE
+            AND COALESCE(s.is_deleted, FALSE) = FALSE
+            AND s.deleted IS NULL
+            AND COALESCE(s.type, '') IN ('public', 'private', 'restricted')
+            AND COALESCE(s.quarantine, FALSE) = FALSE
     )
 )
 , combined_filters AS (
     -- Again, use subquery to reduce the need to define case statements twice
     SELECT
-        * EXCEPT(sensitive_cluster_filter, taxonomy_filter_detail, predictions_filter_detail, taxonomy_filter, predictions_filter)
-        , SPLIT(combined_filter_detail, '-')[SAFE_OFFSET(0)] AS combined_filter
+        PARTITION_DATE AS pt
+        , subreddit_id
+        , over_18
+        , allow_discovery
+        , geo_relevant_countries
+        , users_l7
+        , subreddit_name
+        , primary_topic
+        , rating_short
+        , predicted_rating
+        , predicted_topic
         , CASE
-            WHEN SPLIT(combined_filter_detail, '-')[SAFE_OFFSET(1)] IN (
-                'no_predictions', 'sensitive_cluster', 'over_18', 'allow_discovery_f'
+            WHEN combined_filter_reason IN (
+                'sensitive_cluster', 'over_18', 'allow_discovery_f'
+                , 'predictions_clean', 'predictions_missing'
+                , 'rating', 'topic', 'rating_and_topic'
             ) THEN NULL
-            ELSE SPLIT(combined_filter_detail, '-')[SAFE_OFFSET(1)]
+            ELSE combined_filter_reason
         END AS taxonomy_action
-        , taxonomy_filter_detail, predictions_filter_detail, sensitive_cluster_filter, taxonomy_filter, predictions_filter
+        , combined_filter_detail
+        , combined_filter
+        , combined_filter_reason
+        , taxonomy_filter_detail
+        , predictions_filter_detail
+        , sensitive_cluster_filter
+
+        , * EXCEPT (
+            subreddit_id
+            , over_18
+            , allow_discovery
+            , geo_relevant_countries
+            , users_l7
+            , subreddit_name
+            , primary_topic
+            , rating_short
+            , predicted_rating
+            , predicted_topic
+            , combined_filter_detail
+            , combined_filter
+            , combined_filter_reason
+            , taxonomy_filter_detail
+            , predictions_filter_detail
+            , sensitive_cluster_filter
+        )
+
+
     FROM (
         SELECT
             *
-            -- NOTE that order of filters can make a big difference.
-            --   Remove over_18 & sensitive clusters first
-            , CASE
-                WHEN (over_18 = 't') THEN 'remove-over_18'
-                WHEN (sensitive_cluster_filter = 'remove') THEN 'remove-sensitive_cluster'
+            , SPLIT(combined_filter_detail, '-')[SAFE_OFFSET(0)] AS combined_filter
+            , SPLIT(combined_filter_detail, '-')[SAFE_OFFSET(1)] AS combined_filter_reason
+        FROM (
+            SELECT
+                *
+                -- NOTE that order of filters can make a big difference.
+                --   Remove over_18 & sensitive clusters first
+                , CASE
+                    WHEN (over_18 = 't') THEN 'remove-over_18'
+                    WHEN (sensitive_cluster_filter = 'remove') THEN 'remove-sensitive_cluster'
 
-                -- Exclude geo-subreddits that don't want to be discovered
-                --  NOTE: We can use them as seeds, but we can't use them as recommendations so we don't need to rate them
-                WHEN COALESCE(allow_discovery, '') = 'f' THEN 'remove-allow_discovery_f'
+                    -- Exclude geo-subreddits that don't want to be discovered
+                    --  NOTE: We can use them as seeds, but we can't use them as recommendations so we don't need to rate them
+                    WHEN COALESCE(allow_discovery, '') = 'f' THEN 'remove-allow_discovery_f'
 
-                WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'recommend') THEN 'recommend'
-                WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail IS NULL) THEN 'recommend-no_predictions'
-                -- Apply some overrides
+                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'recommend') THEN 'recommend-predictions_clean'
+                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail IS NULL) THEN 'recommend-predictions_missing'
 
-                -- Gaming & History subs sometimes get an "M" rating (incorrectly)
-                WHEN (
-                    (taxonomy_filter_detail = 'recommend')
-                    AND (predictions_filter_detail = 'remove-rating')
-                    AND (primary_topic IN ('Gaming', 'History'))
-                    AND (predicted_rating = 'M')
-                ) THEN 'recommend'
+                    -- Apply some overrides
+                    -- Gaming & History subs sometimes get an "M" rating (incorrectly)
+                    WHEN (
+                        (taxonomy_filter_detail = 'recommend')
+                        AND (predictions_filter_detail = 'remove-rating')
+                        AND (primary_topic IN ('Gaming', 'History'))
+                        AND (predicted_rating = 'M')
+                    ) THEN 'recommend'
 
-                -- Animal/pet subreddits about cats with "pussy" in the title get mis-rated
-                WHEN (
-                    (taxonomy_filter_detail = 'recommend')
-                    AND (predictions_filter = 'remove')
-                    AND (primary_topic = 'Animals and Pets')
-                    AND (predicted_rating = 'X')
-                ) THEN 'recommend'
+                    -- Animal/pet subreddits about cats with "pussy" in the title get mis-rated
+                    WHEN (
+                        (taxonomy_filter_detail = 'recommend')
+                        AND (predictions_filter = 'remove')
+                        AND (primary_topic = 'Animals and Pets')
+                        AND (predicted_rating = 'X')
+                    ) THEN 'recommend'
 
-                -- Sports subreddits mis-labeled as "fitness & nutrition"
-                WHEN (
-                    (taxonomy_filter_detail = 'recommend')
-                    AND (predictions_filter_detail = 'remove-topic')
-                    AND (primary_topic = 'Sports')
-                    AND (predicted_topic = 'Fitness and Nutrition')
-                    AND (predicted_rating = 'E')
-                ) THEN 'recommend'
+                    -- Sports subreddits mis-labeled as "fitness & nutrition"
+                    WHEN (
+                        (taxonomy_filter_detail = 'recommend')
+                        AND (predictions_filter_detail = 'remove-topic')
+                        AND (primary_topic = 'Sports')
+                        AND (predicted_topic = 'Fitness and Nutrition')
+                        AND (predicted_rating = 'E')
+                    ) THEN 'recommend'
 
-                -- Careers in medicine that get labeled as "medical"
-                WHEN (
-                    (taxonomy_filter_detail = 'recommend')
-                    AND (predictions_filter_detail = 'remove-topic')
-                    AND (primary_topic = 'Careers')
-                    AND (predicted_topic = 'Medical and Mental Health')
-                    AND (predicted_rating = 'E')
-                ) THEN 'recommend'
+                    -- Careers in medicine that get labeled as "medical"
+                    WHEN (
+                        (taxonomy_filter_detail = 'recommend')
+                        AND (predictions_filter_detail = 'remove-topic')
+                        AND (primary_topic = 'Careers')
+                        AND (predicted_topic = 'Medical and Mental Health')
+                        AND (predicted_rating = 'E')
+                    ) THEN 'recommend'
 
-                -- Remove & flag for review
-                WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'remove-rating') THEN 'remove-review_rating'
-                WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'remove-topic') THEN 'remove-review_topic'
-                WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove-review_rating_and_topic'
+                    -- Remove & flag for review
+                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'remove-rating') THEN 'remove-review_rating'
+                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'remove-topic') THEN 'remove-review_topic'
+                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove-review_rating_and_topic'
 
-                -- Recommend & flag missing topic/rating
-                WHEN (taxonomy_filter_detail = 'missing-rating') AND  (predictions_filter_detail = 'recommend') THEN 'recommend-missing_rating'
-                WHEN (taxonomy_filter_detail = 'missing-topic') AND   (predictions_filter_detail = 'recommend') THEN 'recommend-missing_topic'
-                WHEN (taxonomy_filter_detail = 'missing-rating_and_topic') AND (predictions_filter_detail = 'recommend') THEN 'recommend-missing_rating_and_topic'
+                    -- Recommend & flag missing topic/rating
+                    WHEN (taxonomy_filter_detail = 'missing-rating') AND  (predictions_filter_detail = 'recommend') THEN 'review-missing_rating'
+                    WHEN (taxonomy_filter_detail = 'missing-topic') AND   (predictions_filter_detail = 'recommend') THEN 'recommend-missing_topic'
+                    WHEN (taxonomy_filter_detail = 'missing-rating_and_topic') AND (predictions_filter_detail = 'recommend') THEN 'review-missing_rating_and_topic'
 
-                -- Flag missing topic/rating
-                WHEN (taxonomy_filter_detail = 'missing-rating') AND  (predictions_filter_detail IS NULL) THEN 'recommend-missing_rating'
-                WHEN (taxonomy_filter_detail = 'missing-topic') AND   (predictions_filter_detail IS NULL) THEN 'recommend-missing_topic'
-                WHEN (taxonomy_filter_detail = 'missing-rating_and_topic') AND (predictions_filter_detail IS NULL) THEN 'recommend-missing_rating_and_topic'
+                    -- Flag missing topic/rating
+                    WHEN (taxonomy_filter_detail = 'missing-rating') AND  (predictions_filter_detail IS NULL) THEN 'review-missing_rating'
+                    WHEN (taxonomy_filter_detail = 'missing-topic') AND   (predictions_filter_detail IS NULL) THEN 'review-missing_topic'
+                    WHEN (taxonomy_filter_detail = 'missing-rating_and_topic') AND (predictions_filter_detail IS NULL) THEN 'review-missing_rating_and_topic'
 
-                -- Apply remove cases last to allow overrides above
-                WHEN (taxonomy_filter_detail = 'remove-rating_and_topic') THEN 'remove'
-                WHEN (taxonomy_filter_detail = 'remove-rating') THEN 'remove'
-                WHEN (taxonomy_filter_detail = 'remove-topic') THEN 'remove'
+                    -- Apply remove cases last to allow overrides above
+                    WHEN (taxonomy_filter_detail = 'remove-rating_and_topic') THEN 'remove-rating_and_topic'
+                    WHEN (taxonomy_filter_detail = 'remove-rating') THEN 'remove-rating'
+                    WHEN (taxonomy_filter_detail = 'remove-topic') THEN 'remove-topic'
 
-                -- Remove by predicted-rating, for now apply general remove to be safe, might break it down if need to dig into details
-                WHEN (predictions_filter_detail = 'remove-rating') THEN 'remove'
-                WHEN (predictions_filter_detail = 'remove-topic') THEN 'remove'
-                WHEN (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove'
+                    -- Remove by predicted-rating, for now apply general remove to be safe, might break it down if need to dig into details
+                    WHEN (predictions_filter_detail = 'remove-rating') THEN 'remove'
+                    WHEN (predictions_filter_detail = 'remove-topic') THEN 'remove'
+                    WHEN (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove'
 
-                ELSE NULL
-            END AS combined_filter_detail
+                    ELSE NULL
+                END AS combined_filter_detail
 
-        FROM base_filters
+            FROM base_filters
+        )
     )
+    ORDER BY k_1000_label DESC, combined_filter_detail
 )
+
+SELECT * FROM combined_filters
+);  -- close CREATE table parens
+
+-- Check counts for each CTE
+-- SELECT
+--     (SELECT COUNT(*) FROM subs_geo_custom_agg) AS geo_rows
+--     , (SELECT COUNT(DISTINCT subreddit_id) FROM subs_geo_custom_agg) AS geo_subreddits
+--     , (SELECT COUNT(*) FROM base_filters) AS base_rows
+--     , (SELECT COUNT(DISTINCT subreddit_id) FROM base_filters) AS base_subreddits
+--     , (SELECT COUNT(*) FROM combined_filters) AS combined_rows
+--     , (SELECT COUNT(DISTINCT subreddit_id) FROM combined_filters) AS combined_subreddits
 
 
 -- Check interesting subs where taxonomy recommends but models remove
@@ -303,39 +430,40 @@ WITH base_filters AS (
 -- ;
 
 
--- Agg just the final filter + taxonomy action
--- SELECT
---     i18n_relevant_sub
---     , combined_filter
---     , taxonomy_action
---     , COUNT(DISTINCT subreddit_id) AS subreddit_count
---     -- , COUNT(*) row_count  -- Check for dupes
--- FROM combined_filters
--- WHERE 1=1
---     AND i18n_relevant_sub = TRUE
---     -- AND COALESCE(combined_filter_detail, '') NOT IN (
---     --     'remove-sensitive_cluster'
---     -- )
-
--- GROUP BY 1, 2, 3
--- -- ORDER BY 1, 2, 3
--- ORDER BY 4 DESC
--- ;
-
-
--- Get subreddits for taxonomy to review
+-- Agg just i18n, final filter + taxonomy action
 SELECT
-    *
+    i18n_relevant_sub
+    , combined_filter
+    , taxonomy_action
+    , COUNT(DISTINCT subreddit_id) AS subreddit_count
+    , SUM(users_l7) AS users_l7_sum
+    -- , COUNT(*) row_count  -- Check for dupes
 FROM combined_filters
 WHERE 1=1
-    AND i18n_relevant_sub = TRUE
-    AND combined_filter = 'recommend'
-    AND COALESCE(taxonomy_action, '') IN (
-        'missing_rating', 'missing_rating_and_topic'
-    )
+    -- AND i18n_relevant_sub = TRUE
     -- AND COALESCE(combined_filter_detail, '') NOT IN (
     --     'remove-sensitive_cluster'
     -- )
 
-ORDER BY k_1000_label
+GROUP BY 1, 2, 3
+-- ORDER BY 1, 2, 3
+ORDER BY 4 DESC
 ;
+
+
+-- View subreddits for taxonomy to review
+-- SELECT
+--     *
+-- FROM combined_filters
+-- WHERE 1=1
+--     AND i18n_relevant_sub = TRUE
+--     AND combined_filter = 'recommend'
+--     AND COALESCE(taxonomy_action, '') IN (
+--         'missing_rating', 'missing_rating_and_topic'
+--     )
+--     -- AND COALESCE(combined_filter_detail, '') NOT IN (
+--     --     'remove-sensitive_cluster'
+--     -- )
+
+-- ORDER BY k_1000_label
+-- ;
