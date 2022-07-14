@@ -51,7 +51,7 @@ FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_score_standard
 WHERE 1=1
     AND s.subreddit_name != 'profile'
     AND COALESCE(s.type, '') = 'public'
-    AND COALESCE(s.verdict, 'f') <> 'admin_removed'
+    AND COALESCE(s.verdict, 'f') <> 'admin-removed'
 
     AND(
         s.geo_relevance_default = TRUE

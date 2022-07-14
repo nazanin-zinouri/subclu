@@ -126,7 +126,7 @@ WITH
             AND subreddit_name_b NOT LIKE "%coronavirus%"
 
             -- exclude other subs
-            AND COALESCE(verdict, 'f') <> 'admin_removed'
+            AND COALESCE(verdict, 'f') <> 'admin-removed'
             AND COALESCE(is_spam, false) = false
             AND COALESCE(is_deleted, false) = false
             AND COALESCE(over_18, 'f') != 't'
@@ -173,7 +173,7 @@ WITH
 
             -- filters for US counterparts
             AND slo.subscribers >= 9000
-            AND COALESCE(verdict, 'f') <> 'admin_removed'
+            AND COALESCE(verdict, 'f') <> 'admin-removed'
             AND COALESCE(is_spam, false) = false
             AND COALESCE(is_deleted, false) = false
             AND COALESCE(over_18, 'f') != 't'

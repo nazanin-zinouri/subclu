@@ -94,7 +94,7 @@ WITH
     WHERE 1=1
         AND s.subreddit_name != 'profile'
         AND COALESCE(slo.type, '') = 'public'
-        AND COALESCE(slo.verdict, 'f') <> 'admin_removed'
+        AND COALESCE(slo.verdict, 'f') <> 'admin-removed'
 
     ),
     subs_and_countries_above_thresh AS (

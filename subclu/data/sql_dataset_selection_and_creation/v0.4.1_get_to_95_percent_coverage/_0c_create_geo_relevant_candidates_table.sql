@@ -224,7 +224,7 @@ FROM
 WHERE 1=1
     AND COALESCE(asr.users_l7, 0) >= MIN_USERS_L7
     AND COALESCE(asr.posts_l28, 0) >= MIN_POSTS_L28
-    AND COALESCE(verdict, 'f') <> 'admin_removed'
+    AND COALESCE(verdict, 'f') <> 'admin-removed'
     AND COALESCE(is_spam, false) = false
     AND COALESCE(is_deleted, false) = false
 --     AND (

@@ -39,7 +39,7 @@ WHERE 1=1
     AND ti.subreddit_id IS NOT NULL
 
     -- OPTIONAL: Exclude spam, removed, & sketchy subs
-    AND COALESCE(s.verdict, 'f') <> 'admin_removed'
+    AND COALESCE(s.verdict, 'f') <> 'admin-removed'
     AND COALESCE(s.is_spam, FALSE) = FALSE
     AND COALESCE(s.is_deleted, FALSE) = FALSE
     AND s.deleted IS NULL

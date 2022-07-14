@@ -156,7 +156,7 @@ WHERE 1=1
     )
 
     -- OPTIONAL: Exclude spam, removed, & sketchy subs
-    -- AND COALESCE(s.verdict, 'f') <> 'admin_removed'
+    -- AND COALESCE(s.verdict, 'f') <> 'admin-removed'
     -- AND COALESCE(s.is_spam, FALSE) = FALSE
     -- AND COALESCE(s.is_deleted, FALSE) = FALSE
     -- AND s.deleted IS NULL
