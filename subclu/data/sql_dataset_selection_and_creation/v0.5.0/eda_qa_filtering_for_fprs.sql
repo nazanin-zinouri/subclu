@@ -14,6 +14,12 @@ DECLARE SENSITIVE_TOPICS DEFAULT [
     , "Men's Health", 'Politics', 'Sexual Orientation'
     , 'Trauma Support', "Women's Health"
 ];
+DECLARE TARGET_COUNTRIES DEFAULT [
+    'AU', 'CA', 'GB', 'IN', 'FR', 'DE', 'IT', 'MX', 'BR'
+    , 'ES', 'SE', 'RO', 'NL', 'TR', 'PH'
+    , 'GR', 'AU', 'AR', 'CO', 'BE', 'CH', 'PO', 'SA', 'CR', 'PA'
+    , 'IR', 'IE'
+];
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags`
@@ -41,19 +47,14 @@ subs_geo_custom_agg AS (
         --   Use the numeric values in case the defined threshold change
         AND (
             geo_relevance_default = TRUE
-            OR users_percent_by_subreddit_l28 >= 0.145
+            OR users_percent_by_subreddit_l28 >= 0.14
             OR users_percent_by_country_standardized >= 2.5
             -- Try the combined score to include a few more relevant subreddits
             OR relevance_combined_score >= 0.175
         )
         -- pick subs that are relevant to target countries
         AND (
-            geo.geo_country_code IN (
-                'AU', 'CA', 'GB', 'IN', 'FR', 'DE', 'IT', 'MX', 'BR'
-                , 'ES', 'SE', 'RO', 'NL', 'TR', 'PH'
-                , 'GR', 'AU', 'AR', 'CO', 'BE', 'CH', 'PO', 'SA', 'CR', 'PA'
-                , 'IR', 'IE'
-            )
+            geo.geo_country_code IN UNNEST(TARGET_COUNTRIES)
         )
     GROUP BY 1
 )
