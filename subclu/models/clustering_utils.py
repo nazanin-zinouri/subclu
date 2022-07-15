@@ -380,6 +380,12 @@ def create_dynamic_clusters_clean(
         col_new_cluster_name,
         col_new_cluster_prim_topic,
     ]
+    # Add other cols at the end if they're not explicitly added
+    cols_to_check = [c for c in df_dynamic_raw.columns if not c.startswith('k_')]
+    l_cols_clean_final_for_qa = (
+            l_cols_clean_final_for_qa +
+            [c for c in cols_to_check if c not in l_cols_clean_final_for_qa]
+    )
 
     # copy existing columns from raw +
     l_cols_clean_existing = [c for c in l_cols_clean_final_for_qa if c in df_dynamic_raw.columns]
