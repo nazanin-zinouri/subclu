@@ -23,7 +23,7 @@ from typing import Union, Tuple, List
 # import hydra
 from tqdm import tqdm
 
-# import numpy as np
+import numpy as np
 import pandas as pd
 
 from google.cloud import bigquery
@@ -31,9 +31,9 @@ from google.cloud import bigquery
 from .clustering_utils import (
     create_dynamic_clusters
 )
-from ..utils.eda import (
-    reorder_array,
-)
+# from ..utils.eda import (
+#     reorder_array,
+# )
 
 
 # TODO(djb): use hydra to set default parameter values & run from CLI
@@ -47,7 +47,7 @@ class CreateFPRs:
     """
     def __init__(
             self,
-            target_countries: iter,
+            target_countries: float,
             output_bucket: str,
             gcs_output_path: str,
             cluster_labels_table: str,
@@ -57,10 +57,52 @@ class CreateFPRs:
             geo_min_users_percent_by_subreddit_l28: float = 0.14,
             geo_min_country_standardized_relevance: float = 2.4,
             partition_dt: str = "(CURRENT_DATE() - 2)",
+
+            col_new_cluster_val: str = 'cluster_label',
+            col_new_cluster_name: str = 'cluster_label_k',
+            col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
+            col_new_cluster_topic_mix: str = 'cluster_topic_mix',
             verbose: bool = False,
             **kwargs
     ) -> None:
-        """"""
+        """
+
+        Args:
+            target_countries:
+                List of countries to run through process
+            output_bucket:
+                Where to save JSON & parquet outputs
+            gcs_output_path:
+                Path withint bucket to save JSON & parquet outputs
+            cluster_labels_table:
+                BigQuery table that contains model's cluster labels
+            qa_table:
+                BigQuery table that contains QA logic
+            qa_pt:
+                partition date for QA table (best = latest available date with ratings & topics)
+            geo_relevance_table:
+                BigQuery table with geo-relevance scores
+            geo_min_users_percent_by_subreddit_l28:
+                Min threshold to mark a subreddit as relevant to a country & add to FPR
+            geo_min_country_standardized_relevance:
+                Min threshold to mark a subreddit as relevant to a country & add to FPR
+            partition_dt:
+                Partition date for for `over_18` and activity tables
+            col_new_cluster_val:
+                column for new dynamic cluster value (int: 55)
+            col_new_cluster_name:
+                column for new dynamic cluster name (k_0050_label)
+            col_new_cluster_prim_topic:
+                column for dynamic cluster's primary topic
+            col_new_cluster_topic_mix:
+                column that captures nested primary topic mix
+            verbose:
+                whether to show additional log outputs
+            **kwargs:
+
+        Returns: None
+            The data is saved to a bucket as JSON & parquet
+        """
         self.target_countries = target_countries
         self.output_bucket = output_bucket
         self.gcs_output_path = gcs_output_path
@@ -74,6 +116,12 @@ class CreateFPRs:
         self.geo_relevance_table = geo_relevance_table
         self.geo_min_users_percent_by_subreddit_l28 = geo_min_users_percent_by_subreddit_l28
         self.geo_min_country_standardized_relevance = geo_min_country_standardized_relevance
+
+        self.col_new_cluster_val = col_new_cluster_val
+        self.col_new_cluster_name = col_new_cluster_name
+        self.col_new_cluster_prim_topic = col_new_cluster_prim_topic
+        self.col_new_cluster_topic_mix = col_new_cluster_topic_mix
+
         self.verbose = verbose
 
         # set start time so we can use timestamp when saving outputs
@@ -95,11 +143,19 @@ class CreateFPRs:
     def create_fpr_(
             self,
             country_code,
-    ) -> None:
-        """Create fpr output for a single country"""
+    ) -> dict:
+        """
+        Create fpr output for a single country
+
+        Save outputs to a dict in case we want to analyze/pull data for a country
+        """
+        d_fpr = {
+            'df_labels_target': None,
+            'df_labels_target_dynamic_raw': None
+        }
 
         info(f"Getting geo-relevant subreddits in model for {country_code}...")
-        get_geo_relevant_subreddits_and_cluster_labels(
+        df_labels_target = get_geo_relevant_subreddits_and_cluster_labels(
             target_country=country_code,
             cluster_labels_table=self.cluster_labels_table,
             qa_table=self.qa_table,
@@ -109,10 +165,50 @@ class CreateFPRs:
             geo_min_country_standardized_relevance=self.geo_min_country_standardized_relevance,
             partition_dt=self.partition_dt,
         )
+        d_fpr['df_labels_target'] = df_labels_target
 
         info(f"Finding optimal k (#) of clusters...")
+        df_optimal_min_check, n_min_subs_in_cluster_optimal = get_table_for_optimal_dynamic_cluster_params(
+            df_labels_target=df_labels_target,
+            col_new_cluster_val=self.col_new_cluster_val,
+            col_new_cluster_name=self.col_new_cluster_name,
+            col_new_cluster_prim_topic=self.col_new_cluster_prim_topic,
+            col_new_cluster_topic_mix=self.col_new_cluster_topic_mix,
+            min_subs_in_cluster_list=np.arange(4, 11),
+            verbose=False,
+            return_optimal_min_subs_in_cluster=True,
+        )
+        info(f"  {n_min_subs_in_cluster_optimal} <-- Optimal k")
+        info(f"\n{df_optimal_min_check}")  # .rename(columns={c: c.split('_') for c in df_optimal_min_check.columns}))
 
-        info(f"Assigning clusters based on optimal k")
+        info(f"Assigning clusters based on optimal k...")
+        n_mix_start = 2  # how soon to start showing topic mix
+        # l_ix = ['subreddit_id', 'subreddit_name']
+        # col_subreddit_topic_mix = 'subreddit_full_topic_mix'
+        # col_full_depth_mix_count = 'subreddit_full_topic_mix_count'
+        # suffix_new_topic_mix = '_topic_mix_nested'
+        # col_new_cluster_val_int = 'cluster_label_int'
+
+        df_labels_target_dynamic_raw = create_dynamic_clusters(
+            df_labels_target,
+            agg_strategy='aggregate_small_clusters',
+            min_subreddits_in_cluster=n_min_subs_in_cluster_optimal,
+            l_cols_labels_input=None,
+            col_new_cluster_val=self.col_new_cluster_val,
+            col_new_cluster_name=self.col_new_cluster_name,
+            col_new_cluster_prim_topic=self.col_new_cluster_prim_topic,
+            n_mix_start=n_mix_start,
+            col_new_cluster_topic_mix=self.col_new_cluster_topic_mix,
+            # col_subreddit_topic_mix=self.col_subreddit_topic_mix,
+            # col_full_depth_mix_count=self.col_full_depth_mix_count,
+            # suffix_new_topic_mix=self.suffix_new_topic_mix,
+            # l_ix=l_ix,
+            verbose=False,
+            tqdm_log_col_iterations=False,
+        )
+        d_fpr['df_labels_target_dynamic_raw'] = df_labels_target_dynamic_raw
+
+        return d_fpr
 
 
 
@@ -286,12 +382,13 @@ def get_table_for_optimal_dynamic_cluster_params(
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
         col_new_cluster_topic_mix: str = 'cluster_topic_mix',
-        min_subs_in_cluster_list: list = None,
+        min_subs_in_cluster_list: iter = None,
         col_num_orph_subs: str = 'num_orphan_subreddits',
         col_num_subs_mean: str = 'num_subreddits_per_cluster_mean',
         col_num_subs_median: str = 'num_subreddits_per_cluster_median',
         return_optimal_min_subs_in_cluster: bool = False,
         verbose: bool = False,
+        tqdm_log_col_iterations: bool = False,
 ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, int]]:
     """We want to balance two things:
     - prevent orphan subreddits
@@ -301,10 +398,10 @@ def get_table_for_optimal_dynamic_cluster_params(
     and rolling up until we have at least N subreddits in one cluster.
     """
     if min_subs_in_cluster_list is None:
-        min_subs_in_cluster_list = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-    # even if cluster at k < 20 is generic, keep it to avoid orphan subs
-    #  For a while I used a slice to exclude the broadest clusters
-    #  but that left a lot of orphans
+        min_subs_in_cluster_list = [4, 5, 6, 7, 8, 9, 10]
+
+    # Rely on upstream query to cut-off recommendations at ~k=50
+    #  using clusters broader than that results in low quality outputs
     l_cols_labels = (
         [c for c in df_labels_target.columns
          if all([c != col_new_cluster_val, c.endswith('_label')])
@@ -329,6 +426,7 @@ def get_table_for_optimal_dynamic_cluster_params(
             col_new_cluster_name=col_new_cluster_name,
             col_new_cluster_prim_topic=col_new_cluster_prim_topic,
             verbose=verbose,
+            tqdm_log_col_iterations=tqdm_log_col_iterations,
         )
         d_run_clean = {
             **d_run_clean,
