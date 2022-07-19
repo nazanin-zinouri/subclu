@@ -58,7 +58,6 @@ class CreateFPRs:
             geo_min_country_standardized_relevance: float = 2.4,
             partition_dt: str = "(CURRENT_DATE() - 2)",
             verbose: bool = False,
-
             **kwargs
     ) -> None:
         """"""
@@ -86,6 +85,36 @@ class CreateFPRs:
         self.gcs_output_path_this_run = (
             f"{self.gcs_output_path}/{self.run_id}"
         )
+
+    def create_fprs(self) -> None:
+        """High level method to generate FPRs for all input countries"""
+        for country_code_ in tqdm(self.target_countries):
+            info(f"== Country: {country_code_} ==")
+            self.create_fpr_(country_code_)
+
+    def create_fpr_(
+            self,
+            country_code,
+    ) -> None:
+        """Create fpr output for a single country"""
+
+        info(f"Getting geo-relevant subreddits in model for {country_code}...")
+        get_geo_relevant_subreddits_and_cluster_labels(
+            target_country=country_code,
+            cluster_labels_table=self.cluster_labels_table,
+            qa_table=self.qa_table,
+            qa_pt=self.qa_pt,
+            geo_relevance_table=self.geo_relevance_table,
+            geo_min_users_percent_by_subreddit_l28=self.geo_min_users_percent_by_subreddit_l28,
+            geo_min_country_standardized_relevance=self.geo_min_country_standardized_relevance,
+            partition_dt=self.partition_dt,
+        )
+
+        info(f"Finding optimal k (#) of clusters...")
+
+        info(f"Assigning clusters based on optimal k")
+
+
 
 
 # Exclude these subs either as seeds or recommendations
@@ -238,6 +267,7 @@ def get_geo_relevant_subreddits_and_cluster_labels(
         geo.*
         , lbl.*
     FROM target_geo_subs AS geo
+        -- inner join so that we only have subs that are BOTH relevant & in model
         INNER JOIN cluster_labels AS lbl
             ON geo.subreddit_id = lbl.subreddit_id
     ;
