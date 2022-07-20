@@ -13,4 +13,4 @@ geo_min_users_percent_by_subreddit_l28: 0.14
 geo_min_country_standardized_relevance: 2.4
 
 qa_table: "reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags"
-qa_pt: "2022-07-17"
+qa_pt: "2022-07-19"
