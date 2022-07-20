@@ -145,6 +145,7 @@ class CreateFPRs:
     def create_fpr_(
             self,
             country_code,
+            optimal_k_search: iter = None,
             verbose: bool = False,
     ) -> dict:
         """
@@ -152,6 +153,9 @@ class CreateFPRs:
 
         Save outputs to a dict in case we want to analyze/pull data for a country
         """
+        if optimal_k_search is None:
+            optimal_k_search = np.arange(5, 11)
+
         d_fpr = {
             'df_labels_target': None,
         }
@@ -193,7 +197,7 @@ class CreateFPRs:
             col_new_cluster_name=self.col_new_cluster_name,
             col_new_cluster_prim_topic=self.col_new_cluster_prim_topic,
             col_new_cluster_topic_mix=self.col_new_cluster_topic_mix,
-            min_subs_in_cluster_list=np.arange(5, 11),
+            min_subs_in_cluster_list=optimal_k_search,
             verbose=False,
             return_optimal_min_subs_in_cluster=True,
         )
@@ -234,8 +238,8 @@ class CreateFPRs:
             df_labels_target_dynamic,
             verbose=False,
         )
-        mask_agg_orphan_subs = df_summary_cluster['orphan_subreddits']
-        n_agg_orphan_subs = df_summary_cluster[mask_agg_orphan_subs]['seed_subreddit_count'].sum()
+        mask_agg_orphan_subs = df_summary_cluster['orphan_clusters']
+        n_agg_orphan_subs = df_summary_cluster[mask_agg_orphan_subs]['recommend_subreddit_count'].sum()
         n_agg_seed_subs = df_summary_cluster[~mask_agg_orphan_subs]['seed_subreddit_count'].sum()
         n_agg_rec_subs = df_summary_cluster[~mask_agg_orphan_subs]['recommend_subreddit_count'].sum()
         info(f"  {n_agg_seed_subs:6,.0f} <- SEED subreddits")
@@ -259,6 +263,7 @@ def get_fpr_cluster_per_row_summary(
         prefix_private: str = 'private',
         suffix_col_count: str = 'subreddit_count',
         suffix_col_list_sub_names: str = 'subreddit_names_list',
+        suffix_col_list_sub_ids: str = 'subreddit_ids_list',
         l_sort_cols: str = None,
         verbose: bool = True,
 ) -> pd.DataFrame:
@@ -285,13 +290,12 @@ def get_fpr_cluster_per_row_summary(
         col_new_cluster_topic=col_new_cluster_topic,
         suffix_col_count=suffix_col_count,
         suffix_col_list_sub_names=suffix_col_list_sub_names,
-        agg_subreddit_ids=False,
+        suffix_col_list_sub_ids=suffix_col_list_sub_ids,
+        agg_subreddit_ids=True,
         verbose=False,
     )
     n_seed_subreddits = df_labels['subreddit_id'].nunique()
     df_cluster_per_row = df_seeds.copy()
-    mask_orphan_subs = df_cluster_per_row[f"{prefix_seed}_{suffix_col_count}"] <= 1
-    df_cluster_per_row['orphan_subreddits'] = mask_orphan_subs
 
     # Create agg for subreddits to RECOMMEND
     mask_private_subs = df_labels['type'] == 'private'
@@ -325,7 +329,8 @@ def get_fpr_cluster_per_row_summary(
                     col_new_cluster_topic=col_new_cluster_topic,
                     suffix_col_count=suffix_col_count,
                     suffix_col_list_sub_names=suffix_col_list_sub_names,
-                    agg_subreddit_ids=False,
+                    suffix_col_list_sub_ids=suffix_col_list_sub_ids,
+                    agg_subreddit_ids=True,
                     verbose=False,
                 ),
                 how='left',
@@ -339,6 +344,21 @@ def get_fpr_cluster_per_row_summary(
         df_cluster_per_row[f"{prefix_recommend}_{suffix_col_list_sub_names}"] = (
             df_cluster_per_row[f"{prefix_seed}_{suffix_col_list_sub_names}"]
         )
+        df_cluster_per_row[f"{prefix_recommend}_{suffix_col_list_sub_ids}"] = (
+            df_cluster_per_row[f"{prefix_seed}_{suffix_col_list_sub_ids}"]
+        )
+
+    # New orphan definition: clusters where we only have 1 subreddit to recommend
+    #  example: 2 seeds and 0 recommend:
+    #    if there are 2 subs in a cluster
+    #       - one has discovery=f
+    #       - the other is private
+    #    then we'd have 0 subs to recommend
+    mask_orphan_subs = (
+        (df_cluster_per_row[f"{prefix_seed}_{suffix_col_count}"] <= 1) |
+        (df_cluster_per_row[f"{prefix_recommend}_{suffix_col_count}"].fillna(0) <= 0)
+    )
+    df_cluster_per_row['orphan_clusters'] = mask_orphan_subs
 
     # create agg for DISCOVERY=f subreddits
     if n_adf_subs > 0:
@@ -358,10 +378,6 @@ def get_fpr_cluster_per_row_summary(
                     suffix_col_list_sub_names=suffix_col_list_sub_names,
                     agg_subreddit_ids=False,
                     verbose=False,
-                ).fillna(
-                    {
-                        f"{prefix_adf}_{suffix_col_count}": 0,
-                    }
                 ),
                 how='left',
                 on=l_groupby_cols,
@@ -389,10 +405,6 @@ def get_fpr_cluster_per_row_summary(
                     suffix_col_list_sub_names=suffix_col_list_sub_names,
                     agg_subreddit_ids=False,
                     verbose=False,
-                ).fillna(
-                    {
-                        f"{prefix_private}_{suffix_col_count}": 0,
-                    }
                 ),
                 how='left',
                 on=l_groupby_cols,
@@ -401,6 +413,15 @@ def get_fpr_cluster_per_row_summary(
     else:
         df_cluster_per_row[f"{prefix_private}_{suffix_col_count}"] = 0
         df_cluster_per_row[f"{prefix_private}_{suffix_col_list_sub_names}"] = np.nan
+
+    # fillna all count subs with zero & cast as int
+    for prefx_ in [prefix_recommend, prefix_adf, prefix_private]:
+        c_count_col_ = f"{prefx_}_{suffix_col_count}"
+        try:
+            df_cluster_per_row[c_count_col_] = df_cluster_per_row[c_count_col_].fillna(0)
+            df_cluster_per_row[c_count_col_] = df_cluster_per_row[c_count_col_].astype(int)
+        except Exception as e:
+            print(e)
 
     print(f"{df_cluster_per_row.shape}  <- df.shape full summary")
 
@@ -523,7 +544,7 @@ def get_geo_relevant_subreddits_and_cluster_labels(
     target_geo_subs AS (
         SELECT
             PARTITION_DT AS pt
-            , {qa_pt} as qa_pt
+            , "{qa_pt}" as qa_pt
             , geo.subreddit_id
             , ars.users_l7
             , geo.geo_country_code
