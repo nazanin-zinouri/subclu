@@ -272,7 +272,11 @@ def get_fpr_cluster_per_row_summary(
     1=row = 1 cluster
     """
     if l_groupby_cols is None:
-        l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_val_int, col_new_cluster_topic]
+        # add pt & qa_pt so that we can have a trail to debug diffs
+        l_groupby_cols = [
+            'pt', 'qa_pt',
+            col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int
+        ]
         l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
 
     if l_sort_cols is None:
@@ -520,6 +524,9 @@ def get_geo_relevant_subreddits_and_cluster_labels(
     - geo-relevant subs for target country
     - cluster labels (df_labels)
     """
+    if not partition_dt.startswith("(CURRENT_DATE("):
+        # Add quote marks in case we pass a string that needs to be converted to DATE
+        partition_dt = fr"'{partition_dt}'"
 
     sql_query = f"""
     -- Get country-relevant subreddits for FPRs + flags from CA QA
