@@ -154,7 +154,6 @@ class CreateFPRs:
         """
         d_fpr = {
             'df_labels_target': None,
-            'df_labels_target_dynamic_raw': None
         }
 
         info(f"Getting geo-relevant subreddits in model for {country_code}...")
@@ -168,7 +167,24 @@ class CreateFPRs:
             geo_min_country_standardized_relevance=self.geo_min_country_standardized_relevance,
             partition_dt=self.partition_dt,
         )
+        # Exclude these subs either as seeds or recommendations
+        _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
+            'covid',
+            'coronavirus',
+        ]
+        # subreddit-name matches
+        for word_ in _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_:
+            df_labels_target = (
+                df_labels_target[~df_labels_target['subreddit_name'].str.contains(word_, na=False)]
+            )
+        info(f"  {df_labels_target.shape} <- Shape AFTER dropping subreddits with covid in title")
+
         d_fpr['df_labels_target'] = df_labels_target
+        n_label_target_subs = len(df_labels_target)
+        if n_label_target_subs != df_labels_target['subreddit_id'].nunique():
+            raise Exception('subreddit_ID is NOT unique')
+        if n_label_target_subs != df_labels_target['subreddit_name'].nunique():
+            raise Exception('subreddit_NAME is NOT unique')
 
         info(f"Finding optimal k (#) of clusters...")
         df_optimal_min_check, n_min_subs_in_cluster_optimal = get_table_for_optimal_dynamic_cluster_params(
@@ -192,7 +208,7 @@ class CreateFPRs:
         # col_full_depth_mix_count = 'subreddit_full_topic_mix_count'
         # suffix_new_topic_mix = '_topic_mix_nested'
 
-        df_labels_target_dynamic_raw = create_dynamic_clusters(
+        df_labels_target_dynamic = create_dynamic_clusters(
             df_labels_target,
             agg_strategy='aggregate_small_clusters',
             min_subreddits_in_cluster=n_min_subs_in_cluster_optimal,
@@ -202,20 +218,30 @@ class CreateFPRs:
             col_new_cluster_prim_topic=self.col_new_cluster_prim_topic,
             n_mix_start=n_mix_start,
             col_new_cluster_topic_mix=self.col_new_cluster_topic_mix,
-            # col_subreddit_topic_mix=self.col_subreddit_topic_mix,
-            # col_full_depth_mix_count=self.col_full_depth_mix_count,
-            # suffix_new_topic_mix=self.suffix_new_topic_mix,
-            # l_ix=l_ix,
             verbose=False,
             tqdm_log_col_iterations=False,
         )
-        d_fpr['df_labels_target_dynamic_raw'] = df_labels_target_dynamic_raw
+        d_fpr['df_labels_target_dynamic'] = df_labels_target_dynamic
         if verbose:
             df_cluster_summary_ = get_dynamic_cluster_summary(
-                df_labels_target_dynamic_raw,
+                df_labels_target_dynamic,
                 return_dict=False,
             )
             info(f"\n{df_cluster_summary_}")
+
+        info(f"Getting cluster summary at cluster_level...")
+        df_summary_cluster = get_fpr_cluster_per_row_summary(
+            df_labels_target_dynamic,
+            verbose=False,
+        )
+        mask_agg_orphan_subs = df_summary_cluster['orphan_subreddits']
+        n_agg_orphan_subs = df_summary_cluster[mask_agg_orphan_subs]['seed_subreddit_count'].sum()
+        n_agg_seed_subs = df_summary_cluster[~mask_agg_orphan_subs]['seed_subreddit_count'].sum()
+        n_agg_rec_subs = df_summary_cluster[~mask_agg_orphan_subs]['recommend_subreddit_count'].sum()
+        info(f"  {n_agg_seed_subs:6,.0f} <- SEED subreddits")
+        info(f"  {n_agg_rec_subs:6,.0f} <- RECOMMEND subreddits")
+        info(f"  {n_agg_orphan_subs:6,.0f} <- ORPHAN subreddits")
+        d_fpr['df_summary_cluster'] = df_summary_cluster
 
         return d_fpr
 
@@ -227,50 +253,161 @@ def get_fpr_cluster_per_row_summary(
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_topic: str = 'cluster_topic_mix',
         l_groupby_cols: iter = None,
-        agg_subreddit_ids: bool = True,
+        prefix_seed: str = 'seed',
+        prefix_recommend: str = 'recommend',
+        prefix_adf: str = 'discoveryf',
+        prefix_private: str = 'private',
+        suffix_col_count: str = 'subreddit_count',
+        suffix_col_list_sub_names: str = 'subreddit_names_list',
         l_sort_cols: str = None,
+        verbose: bool = True,
 ) -> pd.DataFrame:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
     """
     if l_groupby_cols is None:
-        l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
+        l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_val_int, col_new_cluster_topic]
         l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
 
     if l_sort_cols is None:
         l_sort_cols = [col_new_cluster_val]
 
     # create counts for SEED subreddits
-    df_seeds = reshape_df_get_1_cluster_per_row(
+    df_seeds = reshape_df_1_cluster_per_row(
         df_labels,
-        prefix_list_and_name_cols='seed',
+        prefix_list_and_name_cols=prefix_seed,
         l_groupby_cols=l_groupby_cols,
         l_sort_cols=l_sort_cols,
         col_new_cluster_val=col_new_cluster_val,
         col_new_cluster_val_int=col_new_cluster_val_int,
         col_new_cluster_name=col_new_cluster_name,
         col_new_cluster_topic=col_new_cluster_topic,
-        agg_subreddit_ids=True,
+        suffix_col_count=suffix_col_count,
+        suffix_col_list_sub_names=suffix_col_list_sub_names,
+        agg_subreddit_ids=False,
+        verbose=False,
     )
+    n_seed_subreddits = df_labels['subreddit_id'].nunique()
+    df_cluster_per_row = df_seeds.copy()
+    mask_orphan_subs = df_cluster_per_row[f"{prefix_seed}_{suffix_col_count}"] <= 1
+    df_cluster_per_row['orphan_subreddits'] = mask_orphan_subs
 
-    # create agg for subreddits to RECOMMEND
-    #  exclude: private & allow_discovery='f'
+    # Create agg for subreddits to RECOMMEND
+    mask_private_subs = df_labels['type'] == 'private'
+    n_private_subs = mask_private_subs.sum()
 
+    mask_adf_subs = df_labels['allow_discovery'] == 'f'
+    n_adf_subs = mask_adf_subs.sum()
 
-    # create agg for PRIVATE subreddits
+    mask_recommend_subs = ~(mask_private_subs | mask_adf_subs)
+    n_recommend_subs = mask_recommend_subs.sum()
 
+    # Recommend by excluding: private & allow_discovery='f'
+    if verbose:
+        info(f"{n_seed_subreddits:6,.0f} <- {prefix_seed.upper()} subreddits")
+        info(f"{n_recommend_subs:6,.0f} <- {prefix_recommend.upper()} subs")
+        info(f"  {n_adf_subs:4,.0f} <- discover=f subs")
+        info(f"  {n_private_subs:4,.0f} <- private subs")
+
+    if n_recommend_subs != n_seed_subreddits:
+        df_cluster_per_row = (
+            df_cluster_per_row
+            .merge(
+                reshape_df_1_cluster_per_row(
+                    df_labels[mask_recommend_subs],
+                    prefix_list_and_name_cols=prefix_recommend,
+                    l_groupby_cols=l_groupby_cols,
+                    l_sort_cols=l_sort_cols,
+                    col_new_cluster_val=col_new_cluster_val,
+                    col_new_cluster_val_int=col_new_cluster_val_int,
+                    col_new_cluster_name=col_new_cluster_name,
+                    col_new_cluster_topic=col_new_cluster_topic,
+                    suffix_col_count=suffix_col_count,
+                    suffix_col_list_sub_names=suffix_col_list_sub_names,
+                    agg_subreddit_ids=False,
+                    verbose=False,
+                ),
+                how='left',
+                on=l_groupby_cols,
+            )
+        )
+    else:
+        df_cluster_per_row[f"{prefix_recommend}_{suffix_col_count}"] = (
+            df_cluster_per_row[f"{prefix_seed}_{suffix_col_count}"]
+        )
+        df_cluster_per_row[f"{prefix_recommend}_{suffix_col_list_sub_names}"] = (
+            df_cluster_per_row[f"{prefix_seed}_{suffix_col_list_sub_names}"]
+        )
 
     # create agg for DISCOVERY=f subreddits
+    if n_adf_subs > 0:
+        df_cluster_per_row = (
+            df_cluster_per_row
+            .merge(
+                reshape_df_1_cluster_per_row(
+                    df_labels[mask_adf_subs],
+                    prefix_list_and_name_cols=prefix_adf,
+                    l_groupby_cols=l_groupby_cols,
+                    l_sort_cols=l_sort_cols,
+                    col_new_cluster_val=col_new_cluster_val,
+                    col_new_cluster_val_int=col_new_cluster_val_int,
+                    col_new_cluster_name=col_new_cluster_name,
+                    col_new_cluster_topic=col_new_cluster_topic,
+                    suffix_col_count=suffix_col_count,
+                    suffix_col_list_sub_names=suffix_col_list_sub_names,
+                    agg_subreddit_ids=False,
+                    verbose=False,
+                ).fillna(
+                    {
+                        f"{prefix_adf}_{suffix_col_count}": 0,
+                    }
+                ),
+                how='left',
+                on=l_groupby_cols,
+            )
+        )
+    else:
+        df_cluster_per_row[f"{prefix_adf}_{suffix_col_count}"] = 0
+        df_cluster_per_row[f"{prefix_adf}_{suffix_col_list_sub_names}"] = np.nan
 
+    # create agg for PRIVATE subreddits
+    if n_private_subs > 0:
+        df_cluster_per_row = (
+            df_cluster_per_row
+            .merge(
+                reshape_df_1_cluster_per_row(
+                    df_labels[mask_private_subs],
+                    prefix_list_and_name_cols=prefix_private,
+                    l_groupby_cols=l_groupby_cols,
+                    l_sort_cols=l_sort_cols,
+                    col_new_cluster_val=col_new_cluster_val,
+                    col_new_cluster_val_int=col_new_cluster_val_int,
+                    col_new_cluster_name=col_new_cluster_name,
+                    col_new_cluster_topic=col_new_cluster_topic,
+                    suffix_col_count=suffix_col_count,
+                    suffix_col_list_sub_names=suffix_col_list_sub_names,
+                    agg_subreddit_ids=False,
+                    verbose=False,
+                ).fillna(
+                    {
+                        f"{prefix_private}_{suffix_col_count}": 0,
+                    }
+                ),
+                how='left',
+                on=l_groupby_cols,
+            )
+        )
+    else:
+        df_cluster_per_row[f"{prefix_private}_{suffix_col_count}"] = 0
+        df_cluster_per_row[f"{prefix_private}_{suffix_col_list_sub_names}"] = np.nan
 
-    df_cluster_per_row = df_seeds
-    print(f"{df_cluster_per_row.shape}  <- df.shape")
+    print(f"{df_cluster_per_row.shape}  <- df.shape full summary")
 
     return df_cluster_per_row
 
 
-def reshape_df_get_1_cluster_per_row(
+def reshape_df_1_cluster_per_row(
         df_labels: pd.DataFrame,
         prefix_list_and_name_cols: str = None,
         suffix_col_count: str = 'subreddit_count',
@@ -283,13 +420,18 @@ def reshape_df_get_1_cluster_per_row(
         l_groupby_cols: iter = None,
         agg_subreddit_ids: bool = True,
         l_sort_cols: str = None,
+        verbose: bool = False,
 ) -> pd.DataFrame:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
     """
     if l_groupby_cols is None:
-        l_groupby_cols = [col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int]
+        # add pt & qa_pt so that we can have a trail to debug diffs
+        l_groupby_cols = [
+            'pt', 'qa_pt',
+            col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int
+        ]
         l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
 
     if l_sort_cols is None:
@@ -320,7 +462,8 @@ def reshape_df_get_1_cluster_per_row(
         .sort_values(by=l_sort_cols, ascending=True)
         .reset_index()
     )
-    print(f"  {df_cluster_per_row.shape}  <- df.shape")
+    if verbose:
+        info(f"  {df_cluster_per_row.shape}  <- df.shape, {prefix_list_and_name_cols}")
 
     # when converting to JSON for gspread, it's better to convert the list into a string
     # and to remove the brackets
@@ -338,13 +481,6 @@ def reshape_df_get_1_cluster_per_row(
             pass
 
     return df_cluster_per_row
-
-
-# Exclude these subs either as seeds or recommendations
-_L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
-    'covid',
-    'coronavirus',
-]
 
 
 def get_geo_relevant_subreddits_and_cluster_labels(
@@ -386,7 +522,9 @@ def get_geo_relevant_subreddits_and_cluster_labels(
     WITH
     target_geo_subs AS (
         SELECT
-            geo.subreddit_id
+            PARTITION_DT AS pt
+            , {qa_pt} as qa_pt
+            , geo.subreddit_id
             , ars.users_l7
             , geo.geo_country_code
             , geo.country_name
@@ -401,6 +539,7 @@ def get_geo_relevant_subreddits_and_cluster_labels(
             , qa.predicted_topic
             , slo.allow_discovery
             , slo.over_18
+            , slo.type
             , qa.combined_filter_detail
             , qa.combined_filter
             , qa.combined_filter_reason
