@@ -617,13 +617,18 @@ def get_geo_relevant_subreddits_and_cluster_labels(
                 OR relevance_combined_score >= 0.175
             )
     
-            -- Exclude subs we should recommend
+            -- Only include subs we can use as seeds OR subs we should recommend
             AND (
                 qa.combined_filter = 'recommend'
                 -- We can still use allow_discover=f for seeds
                 OR (
                     qa.combined_filter = 'remove'
                     AND qa.combined_filter_reason = 'allow_discovery_f'
+                )
+                -- We can use subs with missing topic as seeds
+                OR (
+                    qa.combined_filter = 'review'
+                    AND qa.combined_filter_reason = 'missing_topic'
                 )
             )
             AND qa.subreddit_name != 'profile'
@@ -798,72 +803,7 @@ def get_dynamic_cluster_summary(
 # ==================
 # Functions to clean up subs after QA (and get FPR outputs)
 # ===
-def print_subreddit_name_qa_checks(
-        df_qa: pd.DataFrame,
-        additional_qa_keywords: List[str] = None,
-) -> None:
-    """Print subreddit_names that may contain sensitive keywords"""
-    l_keywords_for_qa_ = [
-        'coro', 'cov', 'vacc', 'vax',
-        'lockdown', 'skeptic', 'fakenews', 'anon',
-        '1200', '1500', 'diet', 'binge',
-        'gore',
-        'nsfw', 'xxx', 'onlyfans', 'fap', 'teen', 'thots',
-        'anxi', 'depress', 'adhd', 'pill',
-        'adh',
-    ]
-    if additional_qa_keywords is not None:
-        l_keywords_for_qa_ = l_keywords_for_qa_ + additional_qa_keywords
 
-    for k_ in l_keywords_for_qa_:
-        list_ = df_qa[df_qa['subreddit_name'].str.contains(k_, na=False)]['subreddit_name'].to_list()
-        if len(list_) > 0:
-            print(f"  {list_}")
-    print('')
-
-
-def apply_qa_filters_for_fpr(
-        df: pd.DataFrame,
-        col_rating_latest: str = 'rating_short',
-        col_over_18_latest: str = 'over_18',
-        col_allow_discovery_latest: str = 'allow_discovery',
-        print_qa_check: bool = True,
-        additional_qa_keywords: List[str] = None,
-) -> pd.DataFrame:
-    """Apply expected filters to df
-    NOTE: this does NOT check primary topics.
-    We assume that primary topics have already been checked in upstream SQL, otherwise
-    it's a pain to keep the sensitive primary topic list synced everywhere.
-
-    For v0.5.0 we're not removing allow-discovery=false here. We want to keep them
-    as SEEDS, but we'll continue NOT recommending them (as expected).
-    """
-    mask_rated_e = df[col_rating_latest] == 'E'
-    mask_not_over_18 = df[col_over_18_latest] != 't'
-    mask_allows_discovery = df[col_allow_discovery_latest] != 'f'
-
-    mask_clean_for_fpr = (
-            mask_rated_e &
-            mask_not_over_18
-    )
-
-    df_clean = df[mask_clean_for_fpr].copy()
-
-    if print_qa_check:
-        print(f"\nQA keyword subreddit checks:")
-        print_subreddit_name_qa_checks(
-            df_qa=df_clean,
-            additional_qa_keywords=additional_qa_keywords,
-        )
-
-    print(f"{len(df):,.0f} <- Initial subreddit count")
-    print(f"{mask_clean_for_fpr.sum():,.0f} <- Clean subreddits to use")
-    print(f"{df_clean.shape} <- df subreddits to use for FPR")
-
-    print(f"Subs to only use as seeds (discovery=f)")
-    print(f"  {df[mask_allows_discovery]['subreddit_name']}")
-
-    return df_clean
 
 
 
