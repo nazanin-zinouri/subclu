@@ -321,24 +321,49 @@ class CreateFPRs:
         so this serves to check them both
         (it's unlikely both of them screw up in the same way).
         """
+        info(f"** Checking FPR output with expected QA output... **")
         set_seeds = set(d_fpr_output.keys())
         set_seeds_expected = set(d_fpr_qa['seed_subreddit_ids'])
         info(f"{len(set_seeds):5,.0f} SEED subreddits in output")
         info(f"{len(set_seeds_expected):5,.0f} SEED subreddits expected")
 
         if set_seeds == set_seeds_expected:
-            info(f"Seed subreddit IDS match expected output")
+            info(f"SEED subreddit IDS match expected output")
+            seed_error = False
         else:
-            logging.error(f"Seed subreddit IDS DO NOT match expected output")
+            seed_error = True
+            logging.error(f"SEED subreddit IDS DO NOT match expected output")
             seeds_unexpected = set_seeds - set_seeds_expected
             seeds_missing = set_seeds_expected - set_seeds
             if len(seeds_unexpected) > 0:
                 logging.error(f"  {len(seeds_unexpected):5,.0f} UNEXPECTED seeds in output:\n  {seeds_unexpected}")
             if len(seeds_missing) > 0:
                 logging.error(f"  {len(seeds_missing):5,.0f} Seeds MISSING in output:\n  {seeds_missing}")
-            # raise Exception(f"Seed subreddit IDS DO NOT match expected output")
 
-        # TODO(djb): check the recommended subreddits
+        l_recs = list()
+        for _, l_ in d_fpr_output.items():
+            for i_ in l_:
+                l_recs.append(i_)
+        set_recs = set(l_recs)
+        set_recs_expected = set(d_fpr_qa['recommend_subreddit_ids'])
+        info(f"{len(set_recs):5,.0f} RECOMMEND subreddits in output")
+        info(f"{len(set_recs_expected):5,.0f} RECOMMEND subreddits expected")
+
+        if set_recs == set_recs_expected:
+            rec_error = False
+            info(f"RECOMMEND subreddit IDS match expected output")
+        else:
+            rec_error = True
+            logging.error(f"** Recommend subreddit IDS DO NOT match expected output **")
+            recs_unexpected = set_recs - set_recs_expected
+            recs_missing = set_recs_expected - set_recs
+            if len(recs_unexpected) > 0:
+                logging.error(f"  {len(recs_unexpected):5,.0f} UNEXPECTED recs in output:\n  {recs_unexpected}")
+            if len(recs_missing) > 0:
+                logging.error(f"  {len(recs_missing):5,.0f} recs MISSING in output:\n  {recs_missing}")
+
+        if any([seed_error, rec_error]):
+            raise Exception(f"FPR QA failed")
 
 
 def get_fpr_cluster_per_row_summary(
