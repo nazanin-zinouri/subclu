@@ -710,9 +710,12 @@ def get_fpr_df_and_dict(
     #  This also gets rid of orphan subreddits/clusters
     df_ab = df_ab[
         df_ab[col_sub_id_a] != df_ab[col_sub_id_b]
-        ]
+    ]
+    # Remove subs that were orphan & had no recommendations from the start
+    df_ab = df_ab.dropna(subset=[col_sub_id_b])
+
     if verbose:
-        info(f"  {df_ab.shape} <- df_ab.shape after removing matches to self")
+        info(f"  {df_ab.shape} <- df_ab.shape after removing orphans & matches to self")
 
     # Create groupby cols that include input seeds & col_sort_by
     # NOTE that pandas will drop any rows that have nulls in a groupby column!
@@ -744,15 +747,15 @@ def get_fpr_df_and_dict(
         .sort_values(by=[col_sort_by, ], ascending=True)
     )
 
-    # TODO(djb): Convert to FPR format! desired output:
+    # Convert to FPR format! desired output:
     #  {"DE": {subreddit_seed: [list_of_subreddits], subreddit_seed: [list_of_subreddits]}}
-    #  We'll covert it to dict here because we want to check the dict against
+    # We'll covert it to dict here because we want to check the dict against
     #  the aggregate summary. Then we'll conver the dict to JSON when we save it
-    # if we want to output as JSON(string):
+    # If we want to output as JSON(string):
     #   - set seed_id as index column (key)
     #   - select only the list of subreddit ids (series)
     #   - orient='index'
-    # if we want to output dict: orient='dict'
+    # If we want to output dict: orient='dict'
     #  - set seed_id as index column (key)
     #  - orient='dict'
     #  - select the list of subreddits from the output dict
