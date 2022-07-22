@@ -146,6 +146,7 @@ class CreateFPRs:
             self,
             country_code,
             optimal_k_search: iter = None,
+            convert_lists_to_str: bool = True,
             verbose: bool = False,
             fpr_verbose: bool = False,
     ) -> dict:
@@ -172,6 +173,9 @@ class CreateFPRs:
             geo_min_country_standardized_relevance=self.geo_min_country_standardized_relevance,
             partition_dt=self.partition_dt,
         )
+        # add run_id col so we can identify outputs of this run
+        df_labels_target['run_id'] = self.run_id
+
         # Exclude these subs either as seeds or recommendations
         _L_COVID_TITLE_KEYWORDS_TO_EXCLUDE_FROM_FPRS_ = [
             'covid',
@@ -182,7 +186,7 @@ class CreateFPRs:
             df_labels_target = (
                 df_labels_target[~df_labels_target['subreddit_name'].str.contains(word_, na=False)]
             )
-        info(f"  {df_labels_target.shape} <- Shape AFTER dropping subreddits with covid in title")
+        info(f" {df_labels_target.shape} <- Shape AFTER dropping subreddits with covid in title")
 
         d_df_fpr['df_labels_target'] = df_labels_target
         n_label_target_subs = len(df_labels_target)
@@ -229,16 +233,18 @@ class CreateFPRs:
             )
             info(f"\n{df_cluster_summary_}")
 
-        info(f"Getting cluster summary at cluster_level...")
+        info(f"Getting QA and summary at cluster_level...")
         df_summary_cluster, d_fpr_qa = get_fpr_cluster_per_row_summary(
             df_labels_target_dynamic,
+            convert_lists_to_str=convert_lists_to_str,
             verbose=fpr_verbose,
         )
         d_df_fpr['df_summary_cluster'] = df_summary_cluster
         d_df_fpr['d_fpr_qa'] = d_fpr_qa
 
-        _ = self.get_top_level_stats_from_cluster_summary_(df_summary_cluster)
-        # TODO(djb): create FPR output
+        if verbose:
+            self.get_top_level_stats_from_cluster_summary_(df_summary_cluster)
+        info(f"Creating FPR output...")
         df_fpr, dict_fpr = get_fpr_df_and_dict(
             df_labels_target_dynamic,
             target_country_code=country_code,
@@ -247,9 +253,6 @@ class CreateFPRs:
         d_df_fpr['df_fpr'] = df_fpr
         d_df_fpr['dict_fpr'] = dict_fpr
 
-        # TODO(djb): compare summary v. FPR output
-        #  - same sub_ids in seeds
-        #  - same sub_ids in recommendations
         self.check_fpr_with_expected_output_(
             dict_fpr[country_code],
             d_fpr_qa
@@ -777,6 +780,7 @@ def get_fpr_df_and_dict(
     """
     if l_cols_for_seeds is None:
         l_cols_for_seeds = [
+            'pt', 'qa_pt', 'run_id', 'geo_country_code', 'country_name',
             'subreddit_id', 'subreddit_name',
             col_new_cluster_val, col_new_cluster_name,
             col_new_cluster_val_int,
