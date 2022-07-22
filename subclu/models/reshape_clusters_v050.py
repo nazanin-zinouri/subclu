@@ -18,7 +18,7 @@ from datetime import datetime
 import gc
 import logging
 from logging import info
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Dict
 
 # import hydra
 from tqdm import tqdm
@@ -207,12 +207,7 @@ class CreateFPRs:
             info(f"\n{df_optimal_min_check}")
 
         info(f"Assigning clusters based on optimal k...")
-        n_mix_start = 2  # how soon to start showing topic mix
-        # l_ix = ['subreddit_id', 'subreddit_name']
-        # col_subreddit_topic_mix = 'subreddit_full_topic_mix'
-        # col_full_depth_mix_count = 'subreddit_full_topic_mix_count'
-        # suffix_new_topic_mix = '_topic_mix_nested'
-
+        n_mix_start = 2  # how soon to start showing nested topic mix
         df_labels_target_dynamic = create_dynamic_clusters(
             df_labels_target,
             agg_strategy='aggregate_small_clusters',
@@ -235,13 +230,14 @@ class CreateFPRs:
             info(f"\n{df_cluster_summary_}")
 
         info(f"Getting cluster summary at cluster_level...")
-        df_summary_cluster = get_fpr_cluster_per_row_summary(
+        df_summary_cluster, d_fpr_qa = get_fpr_cluster_per_row_summary(
             df_labels_target_dynamic,
             verbose=fpr_verbose,
         )
         d_df_fpr['df_summary_cluster'] = df_summary_cluster
+        d_df_fpr['d_fpr_qa'] = d_fpr_qa
 
-        d_fpr_summary = self.get_top_level_stats_from_cluster_summary_(df_summary_cluster)
+        _ = self.get_top_level_stats_from_cluster_summary_(df_summary_cluster)
         # TODO(djb): create FPR output
         df_fpr, dict_fpr = get_fpr_df_and_dict(
             df_labels_target_dynamic,
@@ -254,6 +250,10 @@ class CreateFPRs:
         # TODO(djb): compare summary v. FPR output
         #  - same sub_ids in seeds
         #  - same sub_ids in recommendations
+        self.check_fpr_with_expected_output_(
+            dict_fpr[country_code],
+            d_fpr_qa
+        )
 
         # TODO(djb): save JSON output
 
@@ -309,6 +309,36 @@ class CreateFPRs:
                 info(f"  {v} <- {k}")
 
         return d_fpr_summary
+
+    @staticmethod
+    def check_fpr_with_expected_output_(
+            d_fpr_output: Dict[str, str],
+            d_fpr_qa: Dict[str, str],
+    ) -> None:
+        """Check the actual outputs w/ expected outputs
+        and raise error if they don't match.
+        We use 2 different methods to calculate the actual output v. the QA output
+        so this serves to check them both
+        (it's unlikely both of them screw up in the same way).
+        """
+        set_seeds = set(d_fpr_output.keys())
+        set_seeds_expected = set(d_fpr_qa['seed_subreddit_ids'])
+        info(f"{len(set_seeds):5,.0f} SEED subreddits in output")
+        info(f"{len(set_seeds_expected):5,.0f} SEED subreddits expected")
+
+        if set_seeds == set_seeds_expected:
+            info(f"Seed subreddit IDS match expected output")
+        else:
+            logging.error(f"Seed subreddit IDS DO NOT match expected output")
+            seeds_unexpected = set_seeds - set_seeds_expected
+            seeds_missing = set_seeds_expected - set_seeds
+            if len(seeds_unexpected) > 0:
+                logging.error(f"  {len(seeds_unexpected):5,.0f} UNEXPECTED seeds in output:\n  {seeds_unexpected}")
+            if len(seeds_missing) > 0:
+                logging.error(f"  {len(seeds_missing):5,.0f} Seeds MISSING in output:\n  {seeds_missing}")
+            # raise Exception(f"Seed subreddit IDS DO NOT match expected output")
+
+        # TODO(djb): check the recommended subreddits
 
 
 def get_fpr_cluster_per_row_summary(
@@ -440,11 +470,38 @@ def get_fpr_cluster_per_row_summary(
     )
     df_cluster_per_row['exclude_recs_from_seeds'] = mask_exclude_recs_from_seeds_
 
-    # Create summary dict that we can use to compare expected seeds & recs:
-    # d_fpr_qa = dict()
-    # d_fpr_qa['seed_ids'] = (
-    #
-    # )
+    # Create summary dict that we can use to compare expected v output (seeds & recs)
+    d_fpr_qa = dict()
+    l_seeds_ = list()
+    l_recs_to_exclude_from_seeds = list()
+    l_recs_ = list()
+
+    for l_ in (
+        df_cluster_per_row[(~mask_orphan_subs)]
+        [f"{prefix_seed}_{suffix_col_list_sub_ids}"]
+        .to_list()
+    ):
+        for i_ in l_:
+            l_seeds_.append(i_)
+
+    for l_ in (
+        df_cluster_per_row[mask_exclude_recs_from_seeds_]
+        [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
+        .to_list()
+    ):
+        for i_ in l_:
+            l_recs_to_exclude_from_seeds.append(i_)
+
+    d_fpr_qa['seed_subreddit_ids'] = list(set(l_seeds_) - set(l_recs_to_exclude_from_seeds))
+
+    for l_ in (
+        df_cluster_per_row[~mask_orphan_subs]
+        [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
+        .to_list()
+    ):
+        for i_ in l_:
+            l_recs_.append(i_)
+    d_fpr_qa['recommend_subreddit_ids'] = l_recs_
 
     # subs with review-missing topic will be the largest reason for missing so add them first
     if n_review_missing_topic > 0:
@@ -538,7 +595,7 @@ def get_fpr_cluster_per_row_summary(
 
     info(f"{df_cluster_per_row.shape}  <- df.shape full summary")
 
-    return df_cluster_per_row
+    return df_cluster_per_row, d_fpr_qa
 
 
 def reshape_df_1_cluster_per_row(
@@ -620,13 +677,14 @@ def reshape_df_1_cluster_per_row(
 def get_fpr_df_and_dict(
         df: pd.DataFrame,
         target_country_code: str = None,
-        col_counterpart_count: str = 'subs_in_cluster_count',
+        col_counterpart_count: str = 'subs_to_rec_in_cluster_count',
         col_list_cluster_names: str = 'list_cluster_subreddit_names',
         col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
         l_cols_for_seeds: List[str] = None,
         l_cols_for_clusters: List[str] = None,
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
+        col_new_cluster_val_int: str = 'cluster_label_int',
         col_sort_by: str = None,
         verbose: bool = True,
 ) -> Tuple[pd.DataFrame, dict]:
@@ -651,7 +709,15 @@ def get_fpr_df_and_dict(
             columns we need as outputs for FPR. Only need subreddit_id.
             Add subreddit_name for human qa/visual check
         col_new_cluster_val:
+            The UNIQUE nested value for a nested cluster.
+            Example: "0012-0014"
         col_new_cluster_name:
+            The column name for k-value (number of clusters) used for dynamic clustering.
+            Example: "k_0060_label"
+        col_new_cluster_val_int:
+            The integer value for the cluster in `col_new_cluster_name` for the
+            right-most (deepest) cluster:
+            Example: if cluster_val="0012-0014" -> 14
         col_sort_by:
         verbose:
 
@@ -662,6 +728,7 @@ def get_fpr_df_and_dict(
         l_cols_for_seeds = [
             'subreddit_id', 'subreddit_name',
             col_new_cluster_val, col_new_cluster_name,
+            col_new_cluster_val_int,
         ]
     # make sure cols are in input df
     l_cols_for_seeds = [c for c in l_cols_for_seeds if c in df.columns]
@@ -1015,6 +1082,7 @@ def get_table_for_optimal_dynamic_cluster_params(
             col_new_cluster_val=col_new_cluster_val,
             col_new_cluster_name=col_new_cluster_name,
             col_new_cluster_prim_topic=col_new_cluster_prim_topic,
+            col_new_cluster_topic_mix=col_new_cluster_topic_mix,
             verbose=verbose,
             tqdm_log_col_iterations=tqdm_log_col_iterations,
         )
@@ -1025,7 +1093,6 @@ def get_table_for_optimal_dynamic_cluster_params(
                     col_new_cluster_val=col_new_cluster_val,
                     col_new_cluster_name=col_new_cluster_name,
                     col_new_cluster_prim_topic=col_new_cluster_prim_topic,
-                    col_new_cluster_topic_mix=col_new_cluster_topic_mix,
                     col_num_orph_subs=col_num_orph_subs,
                     col_num_subs_mean=col_num_subs_mean,
                     col_num_subs_median=col_num_subs_median,
@@ -1054,7 +1121,6 @@ def get_dynamic_cluster_summary(
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
         col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
-        col_new_cluster_topic_mix: str = 'cluster_topic_mix',
         col_num_orph_subs: str = 'num_orphan_subreddits',
         col_num_subs_mean: str = 'num_subreddits_per_cluster_mean',
         col_num_subs_median: str = 'num_subreddits_per_cluster_median',
