@@ -683,18 +683,19 @@ def reshape_df_1_cluster_per_row(
 
     # When converting to JSON for gspread, it's better to convert the list into a string
     # and to remove the brackets
-    # for col_list_ in [col_list_sub_names, col_list_sub_ids]:
-    #     try:
-    #         # Treating as a string is faster than .apply() to process each item in list
-    #         #    .apply(lambda x: ', '.join(x))
-    #         df_cluster_per_row[col_list_] = (
-    #             df_cluster_per_row[col_list_]
-    #             .astype(str)
-    #             .str[1:-1]
-    #             .str.replace("'", "")
-    #         )
-    #     except KeyError:
-    #         pass
+    if convert_lists_to_str:
+        for col_list_ in [col_list_sub_names, col_list_sub_ids]:
+            try:
+                # Treating as a string is faster than .apply() to process each item in list
+                #    .apply(lambda x: ', '.join(x))
+                df_cluster_per_row[col_list_] = (
+                    df_cluster_per_row[col_list_]
+                    .astype(str)
+                    .str[1:-1]
+                    .str.replace("'", "")
+                )
+            except KeyError:
+                pass
 
     return df_cluster_per_row
 
