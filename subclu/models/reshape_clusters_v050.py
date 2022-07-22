@@ -328,7 +328,7 @@ def get_fpr_cluster_per_row_summary(
         suffix_col_list_sub_ids: str = 'subreddit_ids_list',
         l_sort_cols: str = None,
         verbose: bool = True,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, dict]:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
@@ -430,6 +430,21 @@ def get_fpr_cluster_per_row_summary(
         (df_cluster_per_row[f"{prefix_recommend}_{suffix_col_count}"].fillna(0) <= 0)
     )
     df_cluster_per_row['orphan_clusters'] = mask_orphan_subs
+
+    # In some clusters there are multiple seeds (e.g., allow_discover=f),
+    #  but only 1 sub to recommend. In these cases, we need to remove the single
+    #  "sub to recommend" from the list of seeds because it can't recommend itself
+    mask_exclude_recs_from_seeds_ = (
+        (df_cluster_per_row[f"{prefix_seed}_{suffix_col_count}"] >= 2) &
+        (df_cluster_per_row[f"{prefix_recommend}_{suffix_col_count}"].fillna(0) == 1)
+    )
+    df_cluster_per_row['exclude_recs_from_seeds'] = mask_exclude_recs_from_seeds_
+
+    # Create summary dict that we can use to compare expected seeds & recs:
+    # d_fpr_qa = dict()
+    # d_fpr_qa['seed_ids'] = (
+    #
+    # )
 
     # subs with review-missing topic will be the largest reason for missing so add them first
     if n_review_missing_topic > 0:
@@ -584,20 +599,20 @@ def reshape_df_1_cluster_per_row(
     if verbose:
         info(f"  {df_cluster_per_row.shape}  <- df.shape, {prefix_list_and_name_cols}")
 
-    # when converting to JSON for gspread, it's better to convert the list into a string
+    # When converting to JSON for gspread, it's better to convert the list into a string
     # and to remove the brackets
-    for col_list_ in [col_list_sub_names, col_list_sub_ids]:
-        try:
-            # Treating as a string is faster than .apply() to process each item in list
-            #    .apply(lambda x: ', '.join(x))
-            df_cluster_per_row[col_list_] = (
-                df_cluster_per_row[col_list_]
-                .astype(str)
-                .str[1:-1]
-                .str.replace("'", "")
-            )
-        except KeyError:
-            pass
+    # for col_list_ in [col_list_sub_names, col_list_sub_ids]:
+    #     try:
+    #         # Treating as a string is faster than .apply() to process each item in list
+    #         #    .apply(lambda x: ', '.join(x))
+    #         df_cluster_per_row[col_list_] = (
+    #             df_cluster_per_row[col_list_]
+    #             .astype(str)
+    #             .str[1:-1]
+    #             .str.replace("'", "")
+    #         )
+    #     except KeyError:
+    #         pass
 
     return df_cluster_per_row
 
