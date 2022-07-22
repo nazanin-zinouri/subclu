@@ -242,8 +242,14 @@ class CreateFPRs:
         d_df_fpr['df_summary_cluster'] = df_summary_cluster
 
         d_fpr_summary = self.get_top_level_stats_from_cluster_summary_(df_summary_cluster)
-
         # TODO(djb): create FPR output
+        df_fpr, dict_fpr = get_fpr_df_and_dict(
+            df_labels_target_dynamic,
+            target_country_code=country_code,
+            verbose=fpr_verbose,
+        )
+        d_df_fpr['df_fpr'] = df_fpr
+        d_df_fpr['dict_fpr'] = dict_fpr
 
         # TODO(djb): compare summary v. FPR output
         #  - same sub_ids in seeds
@@ -267,13 +273,18 @@ class CreateFPRs:
 
         This specific dict won't be saved b/c we can reconstruct it later.
         """
-        # Add summary stats to dict so we can save it & reference it later
         mask_agg_orphan_subs = df_summary_cluster['orphan_clusters']
+
+        # Add summary stats to dict so we can save it & reference it later
+        n_agg_seed_subs_total = df_summary_cluster['seed_subreddit_count'].sum()
+        n_agg_seed_subs_rec = df_summary_cluster[~mask_agg_orphan_subs]['seed_subreddit_count'].sum()
+
+        n_agg_rec_subs_total = df_summary_cluster['recommend_subreddit_count'].sum()
+        n_agg_rec_subs_rec = df_summary_cluster[~mask_agg_orphan_subs]['recommend_subreddit_count'].sum()
+
+        n_agg_subs_missing_topic = df_summary_cluster['missingTopic_subreddit_count'].sum()
         n_agg_orphan_seed_subs = df_summary_cluster[mask_agg_orphan_subs]['seed_subreddit_count'].sum()
         n_agg_orphan_rec_subs = df_summary_cluster[mask_agg_orphan_subs]['recommend_subreddit_count'].sum()
-        n_agg_seed_subs = df_summary_cluster['seed_subreddit_count'].sum()
-        n_agg_rec_subs = df_summary_cluster[~mask_agg_orphan_subs]['recommend_subreddit_count'].sum()
-        n_agg_subs_missing_topic = df_summary_cluster['missingTopic_subreddit_count'].sum()
 
         n_total_clusters = df_summary_cluster['cluster_label'].nunique()
         n_clusters_wo_orphans = df_summary_cluster[~mask_agg_orphan_subs]['cluster_label'].nunique()
@@ -282,8 +293,11 @@ class CreateFPRs:
         d_fpr_summary['clusters_total'] = n_total_clusters
         d_fpr_summary['clusters_wo_orphans'] = n_clusters_wo_orphans
 
-        d_fpr_summary['seed_subreddits'] = n_agg_seed_subs
-        d_fpr_summary['recommend_subreddits'] = n_agg_rec_subs
+        d_fpr_summary['seed_subreddits_total'] = n_agg_seed_subs_total
+        d_fpr_summary['seed_subreddits_wo_orphans'] = n_agg_seed_subs_rec
+        d_fpr_summary['recommend_subreddits'] = n_agg_rec_subs_total
+        d_fpr_summary['recommend_subreddits_wo_orphans'] = n_agg_rec_subs_rec
+
         d_fpr_summary['missingTopic_subreddits'] = n_agg_subs_missing_topic
         d_fpr_summary['orphan_seed_subreddits'] = n_agg_orphan_seed_subs
         d_fpr_summary['orphan_recommend_subreddits'] = n_agg_orphan_rec_subs
@@ -295,7 +309,6 @@ class CreateFPRs:
                 info(f"  {v} <- {k}")
 
         return d_fpr_summary
-
 
 
 def get_fpr_cluster_per_row_summary(
@@ -591,18 +604,16 @@ def reshape_df_1_cluster_per_row(
 
 def get_fpr_df_and_dict(
         df: pd.DataFrame,
-        col_counterpart_count: str = 'subs_in_cluster_cont',
+        target_country_code: str = None,
+        col_counterpart_count: str = 'subs_in_cluster_count',
         col_list_cluster_names: str = 'list_cluster_subreddit_names',
         col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
         l_cols_for_seeds: List[str] = None,
         l_cols_for_clusters: List[str] = None,
         col_new_cluster_val: str = 'cluster_label',
         col_new_cluster_name: str = 'cluster_label_k',
-        col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
-        # col_model_sort_order: str = 'model_sort_order',
-        col_primary_topic: str = 'primary_topic',
         col_sort_by: str = None,
-        verbose: bool = False,
+        verbose: bool = True,
 ) -> Tuple[pd.DataFrame, dict]:
     """
     Take a df with cluster labels and create 2 things:
@@ -611,6 +622,8 @@ def get_fpr_df_and_dict(
 
     Args:
         df:
+        target_country_code:
+            country code to append to dict (JSON) output for FPR
         col_counterpart_count:
             col with count of subs to recommend for a seed
         col_list_cluster_names:
@@ -624,8 +637,6 @@ def get_fpr_df_and_dict(
             Add subreddit_name for human qa/visual check
         col_new_cluster_val:
         col_new_cluster_name:
-        col_new_cluster_prim_topic:
-        col_primary_topic:
         col_sort_by:
         verbose:
 
@@ -634,10 +645,8 @@ def get_fpr_df_and_dict(
     """
     if l_cols_for_seeds is None:
         l_cols_for_seeds = [
-            'pt', 'qa_pt',
             'subreddit_id', 'subreddit_name',
-            col_primary_topic,
-            col_new_cluster_val, col_new_cluster_name, col_new_cluster_prim_topic,
+            col_new_cluster_val, col_new_cluster_name,
         ]
     # make sure cols are in input df
     l_cols_for_seeds = [c for c in l_cols_for_seeds if c in df.columns]
@@ -655,8 +664,8 @@ def get_fpr_df_and_dict(
         l_cols_for_seeds.append(col_sort_by)
 
     if verbose:
-        info(l_cols_for_seeds)
-        info(l_cols_for_clusters)
+        info(f"  Cols for seeds:\n  {l_cols_for_seeds}")
+        info(f"  Cols for clusters:\n  {l_cols_for_clusters}")
 
     # Check that all subs are rated="E" & NOT over_18
     #  this should've been done upstream, but good to check again
@@ -671,24 +680,26 @@ def get_fpr_df_and_dict(
 
     # Create mask for subreddits to RECOMMEND
     mask_private_subs = df_clean['type'] == 'private'
-    n_private_subs = mask_private_subs.sum()
+    # n_private_subs = mask_private_subs.sum()
     mask_adf_subs = df_clean['allow_discovery'] == 'f'
-    n_adf_subs = mask_adf_subs.sum()
-    mask_recommend_subs = ~(mask_private_subs | mask_adf_subs)
-    n_recommend_subs = mask_recommend_subs.sum()
+    # n_adf_subs = mask_adf_subs.sum()
+    mask_remove_or_review = df_clean['combined_filter'] != 'recommend'
 
-    suffix_rec = '_recommend'
+    mask_recommend_subs = ~(mask_private_subs | mask_adf_subs | mask_remove_or_review)
+    # n_recommend_subs = mask_recommend_subs.sum()
+
+    suffix_rec = 'recommend'
     df_ab = (
         df[l_cols_for_seeds].copy()
         .merge(
             df[mask_recommend_subs][l_cols_for_clusters],
             how='left',
             on=[col_new_cluster_val],
-            suffixes=('_seed', suffix_rec)
+            suffixes=('_seed', f"_{suffix_rec}")
         )
     )
     if verbose:
-        print(f"  {df_ab.shape} <- df_ab.shape raw")
+        info(f"  {df_ab.shape} <- df_ab.shape raw")
 
     # Set name of columns to be used for aggregation
     col_sub_name_a = 'subreddit_name_seed'
@@ -696,12 +707,15 @@ def get_fpr_df_and_dict(
     col_sub_name_b = f'subreddit_name_{suffix_rec}'
     col_sub_id_b = f'subreddit_id_{suffix_rec}'
     # Remove matches to self b/c that makes no sense as a recommendation
+    #  This also gets rid of orphan subreddits/clusters
     df_ab = df_ab[
         df_ab[col_sub_id_a] != df_ab[col_sub_id_b]
         ]
-    print(f"  {df_ab.shape} <- df_ab.shape after removing matches to self")
+    if verbose:
+        info(f"  {df_ab.shape} <- df_ab.shape after removing matches to self")
 
-    # update default groupby cols with input seeds & col_sort_by
+    # Create groupby cols that include input seeds & col_sort_by
+    # NOTE that pandas will drop any rows that have nulls in a groupby column!
     l_groupby_cols = [
         col_sub_id_a, col_sub_name_a,
         col_new_cluster_val, col_new_cluster_name
@@ -714,7 +728,7 @@ def get_fpr_df_and_dict(
     if col_sort_by not in l_groupby_cols:
         l_groupby_cols.append(col_sort_by)
     if verbose:
-        print(f"  Groupby cols:\n    {l_groupby_cols}")
+        info(f"  Groupby cols:\n    {l_groupby_cols}")
 
     df_a_to_b_list = (
         df_ab
@@ -727,13 +741,32 @@ def get_fpr_df_and_dict(
             }
         )
         .reset_index()
-        # .rename(columns={'subreddit_name_a': 'subreddit_name_de',
-        #                  'subreddit_id_a': 'subreddit_id_de'})
         .sort_values(by=[col_sort_by, ], ascending=True)
     )
 
     # TODO(djb): Convert to FPR format! desired output:
-    #  [{subreddit_seed: [list_of_subreddits], subreddit_seed: [list_of_subreddits]}]
+    #  {"DE": {subreddit_seed: [list_of_subreddits], subreddit_seed: [list_of_subreddits]}}
+    #  We'll covert it to dict here because we want to check the dict against
+    #  the aggregate summary. Then we'll conver the dict to JSON when we save it
+    # if we want to output as JSON(string):
+    #   - set seed_id as index column (key)
+    #   - select only the list of subreddit ids (series)
+    #   - orient='index'
+    # if we want to output dict: orient='dict'
+    #  - set seed_id as index column (key)
+    #  - orient='dict'
+    #  - select the list of subreddits from the output dict
+    d_fpr_raw = (
+        df_a_to_b_list[['subreddit_id_seed', col_list_cluster_ids]]
+        .set_index('subreddit_id_seed')
+        .to_dict(orient='dict')
+    )
+    d_fpr = dict()
+    if target_country_code is not None:
+        # append the country code so it's easier to add to FPR file
+        d_fpr[target_country_code] = d_fpr_raw[col_list_cluster_ids].copy()
+    else:
+        d_fpr['GEO_SIMS'] = d_fpr_raw[col_list_cluster_ids].copy()
 
     # when converting to JSON for gspread it's better to convert the list into a string
     # and to remove the brackets. Otherwise we can get errors.
@@ -744,8 +777,8 @@ def get_fpr_df_and_dict(
             .str[1:-1]
             .str.replace("'", "")
         )
-    print(f"  {df_a_to_b_list.shape} <- df_a_to_b.shape")
-    return df_a_to_b_list
+    info(f"  {df_a_to_b_list.shape} <- df_fpr.shape")
+    return df_a_to_b_list, d_fpr
 
 
 def get_geo_relevant_subreddits_and_cluster_labels(
