@@ -357,17 +357,21 @@ def get_fpr_cluster_per_row_summary(
         suffix_col_list_sub_names: str = 'subreddit_names_list',
         suffix_col_list_sub_ids: str = 'subreddit_ids_list',
         l_sort_cols: str = None,
+        convert_lists_to_str: bool = True,
         verbose: bool = True,
 ) -> Tuple[pd.DataFrame, dict]:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
     1=row = 1 cluster
+
+    Note: even if convert_lists_to_str is true for seeds & recs, wait to do it
+    at the end, otherwise it messes with logic to extract seeds & recs for QA
     """
     if l_groupby_cols is None:
         # add pt & qa_pt so that we can have a trail to debug diffs
         l_groupby_cols = [
-            'pt', 'qa_pt', 'geo_country_code', 'country_name',
-            col_new_cluster_val, col_new_cluster_name, col_new_cluster_topic, col_new_cluster_val_int
+            'pt', 'qa_pt', 'run_id', 'geo_country_code', 'country_name',
+            col_new_cluster_val, col_new_cluster_name, col_new_cluster_val_int, col_new_cluster_topic,
         ]
         l_groupby_cols = [c for c in l_groupby_cols if c in df_labels]
 
@@ -388,6 +392,7 @@ def get_fpr_cluster_per_row_summary(
         suffix_col_list_sub_names=suffix_col_list_sub_names,
         suffix_col_list_sub_ids=suffix_col_list_sub_ids,
         agg_subreddit_ids=True,
+        convert_lists_to_str=False,
         verbose=False,
     )
     n_seed_subreddits = df_labels['subreddit_id'].nunique()
@@ -433,6 +438,7 @@ def get_fpr_cluster_per_row_summary(
                     suffix_col_list_sub_ids=suffix_col_list_sub_ids,
                     agg_subreddit_ids=True,
                     verbose=False,
+                    convert_lists_to_str=False,
                 ),
                 how='left',
                 on=l_groupby_cols,
@@ -593,6 +599,24 @@ def get_fpr_cluster_per_row_summary(
         except Exception as e:
             print(e)
 
+    if convert_lists_to_str:
+        for col_list_ in [
+            f"{prefix_recommend}_{suffix_col_list_sub_names}", f"{prefix_recommend}_{suffix_col_list_sub_ids}",
+            f"{prefix_seed}_{suffix_col_list_sub_names}", f"{prefix_seed}_{suffix_col_list_sub_ids}",
+        ]:
+            try:
+                # Treating as a string is faster than .apply() to process each item in list
+                #    .apply(lambda x: ', '.join(x))
+                mask_nulls_ = df_cluster_per_row[col_list_].isnull()
+                df_cluster_per_row.loc[~mask_nulls_, col_list_] = (
+                    df_cluster_per_row.loc[~mask_nulls_, col_list_]
+                    .astype(str)
+                    .str[1:-1]
+                    .str.replace("'", "")
+                )
+            except KeyError:
+                pass
+
     info(f"{df_cluster_per_row.shape}  <- df.shape full summary")
 
     return df_cluster_per_row, d_fpr_qa
@@ -612,6 +636,7 @@ def reshape_df_1_cluster_per_row(
         agg_subreddit_ids: bool = True,
         l_sort_cols: str = None,
         verbose: bool = False,
+        convert_lists_to_str: bool = True
 ) -> pd.DataFrame:
     """Take a df with clusters and reshape it so it's easier to review
     by taking a long df (1 row=1 subredddit) and reshaping so that
