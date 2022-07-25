@@ -216,7 +216,7 @@ class CreateFPRs:
         info(f" {df_labels_target.shape} <- Shape AFTER dropping subreddits with covid in title")
 
         d_df_fpr['df_labels_target'] = df_labels_target
-        self.check_df_labels_target_(df_labels_target)
+        df_top_level_summary = self.check_df_labels_target_(df_labels_target)
 
         info(f"Finding optimal N (target # of subs per cluster)...")
         df_optimal_min_check, n_min_subs_in_cluster_optimal = get_table_for_optimal_dynamic_cluster_params(
@@ -265,6 +265,17 @@ class CreateFPRs:
         d_df_fpr['df_summary_cluster'] = df_summary_cluster
         d_df_fpr['d_fpr_qa'] = d_fpr_qa
 
+        info(f"Adding metadata to df_top_level_summary...")
+        for k_, v_ in d_fpr_qa.items():
+            try:
+                df_top_level_summary[k_] = v_
+            except ValueError:
+                df_top_level_summary[k_] = np.nan
+                df_top_level_summary[k_] = df_top_level_summary[k_].astype('object')
+                df_top_level_summary.at[0, k_] = v_
+
+        d_df_fpr['df_top_level_summary'] = df_top_level_summary
+
         if verbose:
             self.get_top_level_stats_from_cluster_summary_(df_summary_cluster)
         info(f"Creating FPR output...")
@@ -281,8 +292,7 @@ class CreateFPRs:
             d_fpr_qa
         )
 
-        # TODO(djb): save JSON output
-        #  Save each file individually and also save batch as single file at the end
+        #  Save each file (country) individually
         save_fpr_json(
             fpr_dict=dict_fpr,
             file_name=f"{country_code}_{self.run_id}.json",
@@ -296,15 +306,12 @@ class CreateFPRs:
             country_code=country_code
         )
 
-        # TODO(djb): save core columns from df_labels_target_dynamic
-        #  e.g., we don't need the k-cluster IDs or primary topic labels
-
         return d_df_fpr
 
     @staticmethod
     def check_df_labels_target_(
             df_labels_target
-    ) -> None:
+    ) -> pd.DataFrame:
         """Do sanity checks on input labels df"""
         n_label_target_subs = len(df_labels_target)
         if n_label_target_subs != df_labels_target['subreddit_id'].nunique():
@@ -337,6 +344,24 @@ class CreateFPRs:
         )
         if len(subs_over_18) > 0:
             raise Exception(f"{len(subs_over_18)} subreddits flagged over_18=t:\n  {subs_over_18}")
+
+        l_cols_top_level_summary = [
+            'pt',
+            'geo_relevance_table',
+            'qa_pt',
+            'qa_table',
+            'run_id',
+
+            'geo_country_code',
+            'country_name',
+        ]
+        return (
+            df_labels_target
+            .groupby(l_cols_top_level_summary, as_index=False)
+            .agg(
+                **{'relevant_subreddit_id_count': ('subreddit_id', 'count')}
+            )
+        )
 
     @staticmethod
     def get_top_level_stats_from_cluster_summary_(
@@ -450,7 +475,7 @@ class CreateFPRs:
         """
         d_map_outputs_to_df_names = {
             self.gcs_output_path_df_fpr: d_df_fpr['df_fpr'],
-            self.gcs_output_path_df_fpr_qa_summary: None,  # need to create new df
+            self.gcs_output_path_df_fpr_qa_summary: d_df_fpr['df_top_level_summary'],
             self.gcs_output_path_df_fpr_cluster_summary: d_df_fpr['df_summary_cluster'],
             self.gcs_output_path_df_dynamic_clusters: d_df_fpr['df_labels_target_dynamic'],
         }
@@ -673,7 +698,7 @@ def get_fpr_cluster_per_row_summary(
             l_recs_to_exclude_from_seeds.append(i_)
 
     d_fpr_qa['seed_subreddit_ids'] = list(set(l_seeds_) - set(l_recs_to_exclude_from_seeds))
-
+    d_fpr_qa['seed_subreddit_ids_count'] = len(d_fpr_qa['seed_subreddit_ids'])
     for l_ in (
         df_cluster_per_row[~mask_orphan_subs]
         [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
@@ -682,6 +707,7 @@ def get_fpr_cluster_per_row_summary(
         for i_ in l_:
             l_recs_.append(i_)
     d_fpr_qa['recommend_subreddit_ids'] = l_recs_
+    d_fpr_qa['recommend_subreddit_ids_count'] = len(d_fpr_qa['recommend_subreddit_ids'])
 
     # subs with review-missing topic will be the largest reason for missing so add them first
     if n_review_missing_topic > 0:
