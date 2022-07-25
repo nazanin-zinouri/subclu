@@ -137,12 +137,37 @@ class CreateFPRs:
         self.gcs_output_path_this_run = (
             f"{self.gcs_output_path}/{self.run_id}"
         )
+        self.gcs_output_path_fpr_json = posixpath.join(
+            self.gcs_output_path_this_run,
+            'fpr_json'
+        )
+        self.gcs_output_path_df_fpr = posixpath.join(
+            self.gcs_output_path_this_run,
+            'df_fpr'
+        )
+        # TODO(djb): create this new df based on d_fpr_qa
+        self.gcs_output_path_df_fpr_qa_summary = posixpath.join(
+            self.gcs_output_path_this_run,
+            'df_fpr_qa_summary'
+        )
+        self.gcs_output_path_df_fpr_cluster_summary = posixpath.join(
+            self.gcs_output_path_this_run,
+            'df_fpr_cluster_summary'
+        )
+        self.gcs_output_path_df_dynamic_clusters = posixpath.join(
+            self.gcs_output_path_this_run,
+            'df_dynamic_clusters'
+        )
 
     def create_fprs(self) -> None:
         """High level method to generate FPRs for all input countries"""
         for country_code_ in tqdm(self.target_countries):
             info(f"== Country: {country_code_} ==")
             self.create_fpr_(country_code_)
+
+        # TODO(djb): save combined JSON output for all countries
+        #  This will make it easier for an engineer to replace all countries at once
+        #  w/o having to open 10+ separate files
 
     def create_fpr_(
             self,
@@ -257,14 +282,19 @@ class CreateFPRs:
         )
 
         # TODO(djb): save JSON output
+        #  Save each file individually and also save batch as single file at the end
         save_fpr_json(
             fpr_dict=dict_fpr,
             file_name=f"{country_code}_{self.run_id}.json",
             bucket_name=self.output_bucket,
-            gcs_output_path=self.gcs_output_path,
+            gcs_output_path=self.gcs_output_path_fpr_json,
         )
 
         # TODO(djb): save df cluster summary
+        self.save_fpr_dfs_(
+            d_df_fpr,
+            country_code=country_code
+        )
 
         # TODO(djb): save core columns from df_labels_target_dynamic
         #  e.g., we don't need the k-cluster IDs or primary topic labels
@@ -408,6 +438,56 @@ class CreateFPRs:
 
         if any([seed_error, rec_error]):
             raise Exception(f"FPR QA failed")
+
+    def save_fpr_dfs_(
+            self,
+            d_df_fpr: Dict[str, pd.DataFrame],
+            country_code: str,
+            verbose: bool = False,
+    ) -> None:
+        """Get the outputs for each country in a dict, and save selected dfs for
+        downstream analysis
+        """
+        d_map_outputs_to_df_names = {
+            self.gcs_output_path_df_fpr: d_df_fpr['df_fpr'],
+            self.gcs_output_path_df_fpr_qa_summary: None,  # need to create new df
+            self.gcs_output_path_df_fpr_cluster_summary: d_df_fpr['df_summary_cluster'],
+            self.gcs_output_path_df_dynamic_clusters: d_df_fpr['df_labels_target_dynamic'],
+        }
+        for k_, df_ in d_map_outputs_to_df_names.items():
+            info(f"Saving to: \n  {k_}")
+            df_name = k_.split('/')[-1]
+            try:
+                l_cols_labels_drop = [c for c in df_.columns if all([c.startswith('k_'), c.endswith('_label')])]
+                l_cols_topic_drop = [c for c in df_.columns if all([c.startswith('k_'), c.endswith('_primary_topic')])]
+                l_cols_nested_drop = [c for c in df_.columns if all([c.startswith('k_'), c.endswith('_nested')])]
+                n_label_cols = len(l_cols_labels_drop)
+                n_topic_cols = len(l_cols_topic_drop)
+                n_nested_cols = len(l_cols_nested_drop)
+                if verbose:
+                    info(f"Label cols to drop: {n_label_cols}")
+                    info(f"Topic cols to drop: {n_topic_cols}")
+                    info(f"Topic cols to drop: {n_nested_cols}")
+                    if n_label_cols > 0:
+                        info(f"  Label cols sample: {l_cols_labels_drop[:5]}")
+                    if n_topic_cols > 0:
+                        info(f"  Topic cols sample: {l_cols_topic_drop[:5]}")
+                    if n_nested_cols > 0:
+                        info(f"  Nested cols sample: {l_cols_nested_drop[:5]}")
+                l_all_cols_to_drop = l_cols_labels_drop + l_cols_topic_drop + l_cols_nested_drop
+
+                if len(l_all_cols_to_drop) > 0:
+                    df_.drop(l_all_cols_to_drop, axis=1).to_parquet(
+                        f"gs://{self.output_bucket}/{k_}/{df_name}-{country_code}.parquet",
+                        index=False
+                    )
+                else:
+                    df_.to_parquet(
+                        f"gs://{self.output_bucket}/{k_}/{df_name}-{country_code}.parquet",
+                        index=False
+                    )
+            except Exception as e:
+                logging.error(e)
 
 
 def save_fpr_json(
@@ -847,6 +927,7 @@ def get_fpr_df_and_dict(
     if l_cols_for_seeds is None:
         l_cols_for_seeds = [
             'pt', 'qa_pt', 'run_id', 'geo_country_code', 'country_name',
+            'qa_table', 'geo_relevance_table',
             'subreddit_id', 'subreddit_name',
             col_new_cluster_val, col_new_cluster_name,
             col_new_cluster_val_int,
@@ -1032,6 +1113,8 @@ def get_geo_relevant_subreddits_and_cluster_labels(
         SELECT
             PARTITION_DT AS pt
             , "{qa_pt}" as qa_pt
+            , "{qa_table}" AS qa_table
+            , "{geo_relevance_table}" AS geo_relevance_table
             , geo.subreddit_id
             , ars.users_l7
             , geo.geo_country_code
