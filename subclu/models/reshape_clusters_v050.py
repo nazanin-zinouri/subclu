@@ -16,8 +16,10 @@ The fastest way to get the queries from BQ into a pandas dataframe is using cola
 """
 from datetime import datetime
 import gc
+import json
 import logging
 from logging import info
+import posixpath
 from typing import Union, Tuple, List, Dict
 
 # import hydra
@@ -26,7 +28,7 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-from google.cloud import bigquery
+from google.cloud import bigquery, storage
 
 from .clustering_utils import (
     create_dynamic_clusters
@@ -255,6 +257,12 @@ class CreateFPRs:
         )
 
         # TODO(djb): save JSON output
+        save_fpr_json(
+            fpr_dict=dict_fpr,
+            file_name=f"{country_code}_{self.run_id}.json",
+            bucket_name=self.output_bucket,
+            gcs_output_path=self.gcs_output_path,
+        )
 
         # TODO(djb): save df cluster summary
 
@@ -400,6 +408,31 @@ class CreateFPRs:
 
         if any([seed_error, rec_error]):
             raise Exception(f"FPR QA failed")
+
+
+def save_fpr_json(
+        fpr_dict: dict,
+        file_name: str,
+        bucket_name: str,
+        gcs_output_path: str,
+) -> None:
+    """Take a dict & save it to GCS"""
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(bucket_name)
+
+    # create blob & upload from string
+    gcs_path = posixpath.join(gcs_output_path, file_name)
+    info(f"Saving FRP file to:\n  {gcs_path}")
+
+    (
+        bucket
+        .blob(gcs_path)
+        .upload_from_string(
+            data=json.dumps(fpr_dict, indent=4),
+            content_type='application/json'
+        )
+    )
+    info(f"Upload complete!")
 
 
 def get_fpr_cluster_per_row_summary(
