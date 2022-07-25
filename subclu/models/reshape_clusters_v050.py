@@ -189,13 +189,9 @@ class CreateFPRs:
         info(f" {df_labels_target.shape} <- Shape AFTER dropping subreddits with covid in title")
 
         d_df_fpr['df_labels_target'] = df_labels_target
-        n_label_target_subs = len(df_labels_target)
-        if n_label_target_subs != df_labels_target['subreddit_id'].nunique():
-            raise Exception('subreddit_ID is NOT unique')
-        if n_label_target_subs != df_labels_target['subreddit_name'].nunique():
-            raise Exception('subreddit_NAME is NOT unique')
+        self.check_df_labels_target_(df_labels_target)
 
-        info(f"Finding optimal k (#) of clusters...")
+        info(f"Finding optimal N (target # of subs per cluster)...")
         df_optimal_min_check, n_min_subs_in_cluster_optimal = get_table_for_optimal_dynamic_cluster_params(
             df_labels_target=df_labels_target,
             col_new_cluster_val=self.col_new_cluster_val,
@@ -206,11 +202,11 @@ class CreateFPRs:
             verbose=False,
             return_optimal_min_subs_in_cluster=True,
         )
-        info(f"  {n_min_subs_in_cluster_optimal} <-- Optimal k")
+        info(f"  {n_min_subs_in_cluster_optimal} <-- Optimal N")
         if verbose:
             info(f"\n{df_optimal_min_check}")
 
-        info(f"Assigning clusters based on optimal k...")
+        info(f"Assigning clusters based on optimal N...")
         n_mix_start = 2  # how soon to start showing nested topic mix
         df_labels_target_dynamic = create_dynamic_clusters(
             df_labels_target,
@@ -266,6 +262,43 @@ class CreateFPRs:
         #  e.g., we don't need the k-cluster IDs or primary topic labels
 
         return d_df_fpr
+
+    @staticmethod
+    def check_df_labels_target_(
+            df_labels_target
+    ) -> None:
+        """Do sanity checks on input labels df"""
+        n_label_target_subs = len(df_labels_target)
+        if n_label_target_subs != df_labels_target['subreddit_id'].nunique():
+            raise Exception('subreddit_ID is NOT unique')
+        if n_label_target_subs != df_labels_target['subreddit_name'].nunique():
+            raise Exception('subreddit_NAME is NOT unique')
+
+        country_codes = df_labels_target['geo_country_code'].unique()
+        if len(country_codes) > 1:
+            raise Exception(f"geo_country_code is NOT unique:\n{country_codes}")
+
+        country_names = df_labels_target['country_name'].unique()
+        if len(country_names) > 1:
+            raise Exception(f"country_name is NOT unique:\n{country_names}")
+
+        subreddits_not_rated_e = (
+            df_labels_target
+            [df_labels_target['rating_short'] != 'E']
+            ['subreddit_name']
+            .to_list()
+        )
+        if len(subreddits_not_rated_e) > 0:
+            raise Exception(f"{len(subreddits_not_rated_e)} subreddits NOT rated E:\n  {subreddits_not_rated_e}")
+
+        subs_over_18 = (
+            df_labels_target
+            [df_labels_target['over_18'] == 't']
+            ['subreddit_name']
+            .to_list()
+        )
+        if len(subs_over_18) > 0:
+            raise Exception(f"{len(subs_over_18)} subreddits flagged over_18=t:\n  {subs_over_18}")
 
     @staticmethod
     def get_top_level_stats_from_cluster_summary_(
@@ -953,7 +986,8 @@ def get_geo_relevant_subreddits_and_cluster_labels(
     DECLARE SENSITIVE_TOPICS DEFAULT [
         'Addiction Support'
         , 'Activism'
-        , 'Culture, Race, and Ethnicity', 'Fitness and Nutrition'
+        # , 'Culture, Race, and Ethnicity'
+        , 'Fitness and Nutrition'
         , 'Gender', 'Mature Themes and Adult Content', 'Medical and Mental Health'
         , 'Military'
         , "Men's Health", 'Politics', 'Sexual Orientation'
@@ -1033,6 +1067,7 @@ def get_geo_relevant_subreddits_and_cluster_labels(
             -- Only include subs we can use as seeds OR subs we should recommend
             AND (
                 qa.combined_filter = 'recommend'
+                
                 -- We can still use allow_discover=f for seeds
                 OR (
                     qa.combined_filter = 'remove'
@@ -1042,6 +1077,14 @@ def get_geo_relevant_subreddits_and_cluster_labels(
                 OR (
                     qa.combined_filter = 'review'
                     AND qa.combined_filter_reason = 'missing_topic'
+                )
+                -- Some subs are flagged as culture, race, & ethnicity
+                --   that are about a place. e.g., r/mexico, r/india, r/argentina
+                -- We should still be able to use them as seeds
+                OR (
+                    qa.primary_topic = 'Culture, Race, and Ethnicity'
+                    AND qa.combined_filter = 'review'
+                    AND COALESCE(qa.combined_filter_reason, '') = 'review_topic'
                 )
             )
             AND qa.subreddit_name != 'profile'
@@ -1073,7 +1116,7 @@ def get_geo_relevant_subreddits_and_cluster_labels(
     
     SELECT
         geo.*
-        , lbl.*
+        , lbl.* EXCEPT(subreddit_id)
     FROM target_geo_subs AS geo
         -- inner join so that we only have subs that are BOTH relevant & in model
         INNER JOIN cluster_labels AS lbl
