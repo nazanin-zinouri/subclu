@@ -1,6 +1,6 @@
 -- UPDATE query to apply QA to filter out subreddits for FPRs (add latest partition date)
 
-DECLARE PARTITION_DATE DATE DEFAULT (CURRENT_DATE() - 2);
+DECLARE PARTITION_DATE DATE DEFAULT (CURRENT_DATE() - 1);
 
 -- Define sensitive topics (actual & predicted) to filter out
 -- NOTE: we can't DECLARE variables this in a VIEW ;_; so we should create a table, otherwise we'd have to copy & paste
@@ -21,7 +21,15 @@ DECLARE TARGET_COUNTRIES DEFAULT [
     , 'IE'
 ];
 
+-- Delete data from partition, if it exists
+DELETE
+    `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags`
+WHERE
+    pt = PARTITION_DATE
+;
 
+
+-- Insert latest data
 INSERT INTO `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags`
 (
 
@@ -245,6 +253,15 @@ subs_geo_custom_agg AS (
                     WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail IS NULL) THEN 'recommend-predictions_missing'
 
                     -- Apply some overrides
+                    -- Subs like r/india & r/mexico get a "cuture" topic, flag them for review so we can at least
+                    --  use them as seeds
+                    WHEN (
+                        (taxonomy_filter_detail = 'remove-topic')
+                        AND (primary_topic IN ('Culture, Race, and Ethnicity'))
+                        AND (rating_short = 'E')
+                        AND (COALESCE(predictions_filter_detail, 'recommend') = 'recommend')
+                    ) THEN 'review-review_topic'
+
                     -- Gaming & History subs sometimes get an "M" rating (incorrectly)
                     WHEN (
                         (taxonomy_filter_detail = 'recommend')
@@ -300,9 +317,9 @@ subs_geo_custom_agg AS (
                     WHEN (taxonomy_filter_detail = 'remove-topic') THEN 'remove-topic'
 
                     -- Remove by predicted-rating, for now apply general remove to be safe, might break it down if need to dig into details
+                    WHEN (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove'
                     WHEN (predictions_filter_detail = 'remove-rating') THEN 'remove'
                     WHEN (predictions_filter_detail = 'remove-topic') THEN 'remove'
-                    WHEN (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove'
 
                     ELSE NULL
                 END AS combined_filter_detail

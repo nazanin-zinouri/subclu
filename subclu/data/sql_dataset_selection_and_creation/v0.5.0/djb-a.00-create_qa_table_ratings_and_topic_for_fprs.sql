@@ -246,6 +246,15 @@ subs_geo_custom_agg AS (
                     WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail IS NULL) THEN 'recommend-predictions_missing'
 
                     -- Apply some overrides
+                    -- Subs like r/india & r/mexico get a "cuture" topic, flag them for review so we can at least
+                    --  use them as seeds
+                    WHEN (
+                        (taxonomy_filter_detail = 'remove-topic')
+                        AND (primary_topic IN ('Culture, Race, and Ethnicity'))
+                        AND (rating_short = 'E')
+                        AND (COALESCE(predictions_filter_detail, 'recommend') = 'recommend')
+                    ) THEN 'review-review_topic'
+
                     -- Gaming & History subs sometimes get an "M" rating (incorrectly)
                     WHEN (
                         (taxonomy_filter_detail = 'recommend')
