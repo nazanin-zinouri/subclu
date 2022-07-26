@@ -1282,6 +1282,11 @@ def get_geo_relevant_subreddits_and_cluster_labels(
                     AND qa.combined_filter = 'review'
                     AND COALESCE(qa.combined_filter_reason, '') = 'review_topic'
                 )
+                -- Include subreddits that are need to be model-reviewed
+                OR (
+                    COALESCE(nt.rating_short, '') = 'E'
+                    AND qa.combined_filter = 'review_model'
+                )
             )
             AND qa.subreddit_name != 'profile'
             AND COALESCE(slo.type, '') IN ('private', 'public', 'restricted')
