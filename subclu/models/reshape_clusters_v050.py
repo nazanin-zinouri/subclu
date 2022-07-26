@@ -680,6 +680,12 @@ def get_fpr_cluster_per_row_summary(
     l_seeds_ = list()
     l_recs_to_exclude_from_seeds = list()
     l_recs_ = list()
+    l_orphan_seeds = list()
+    l_orphan_recs = list()
+    # TODO(djb): create new list of subs exclude_recs_from_seeds
+    #  These subs have a cluster but we can't use them for recs because all
+    #  the other subs in the cluster are not meant to be recommended
+    l_orphan_or_exclude_seeds = list()
 
     for l_ in (
         df_cluster_per_row[(~mask_orphan_subs)]
@@ -708,6 +714,28 @@ def get_fpr_cluster_per_row_summary(
             l_recs_.append(i_)
     d_fpr_qa['recommend_subreddit_ids'] = l_recs_
     d_fpr_qa['recommend_subreddit_ids_count'] = len(d_fpr_qa['recommend_subreddit_ids'])
+
+    for l_ in (
+        df_cluster_per_row[mask_orphan_subs]
+        [f"{prefix_seed}_{suffix_col_list_sub_ids}"]
+        .to_list()
+    ):
+        for i_ in l_:
+            l_orphan_seeds.append(i_)
+    d_fpr_qa['orphan_seed_subreddit_ids'] = l_orphan_seeds
+    d_fpr_qa['orphan_seed_subreddit_ids_count'] = len(d_fpr_qa['orphan_seed_subreddit_ids'])
+
+    for l_ in (
+        df_cluster_per_row[mask_orphan_subs]
+        [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
+        .to_list()
+    ):
+        for i_ in l_:
+            l_orphan_recs.append(i_)
+    d_fpr_qa['orphan_recommend_subreddit_ids'] = l_orphan_recs
+    d_fpr_qa['orphan_recommend_subreddit_ids_count'] = len(d_fpr_qa['orphan_recommend_subreddit_ids'])
+
+    # TODO(djb): create new list of subs exclude_recs_from_seeds & save to summary dict
 
     # subs with review-missing topic will be the largest reason for missing so add them first
     if n_review_missing_topic > 0:
