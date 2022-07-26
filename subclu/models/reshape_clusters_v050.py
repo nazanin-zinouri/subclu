@@ -173,8 +173,9 @@ class CreateFPRs:
             self,
             country_code,
             optimal_k_search: iter = None,
-            convert_lists_to_str: bool = True,
+            convert_lists_to_str: bool = False,
             verbose: bool = False,
+            verbose_summary: bool = False,
             fpr_verbose: bool = False,
     ) -> dict:
         """
@@ -183,7 +184,7 @@ class CreateFPRs:
         Save outputs to a dict in case we want to analyze/pull data for a country
         """
         if optimal_k_search is None:
-            optimal_k_search = np.arange(5, 11)
+            optimal_k_search = np.arange(5, 10)
 
         d_df_fpr = {
             'df_labels_target': None,
@@ -260,7 +261,7 @@ class CreateFPRs:
         df_summary_cluster, d_fpr_qa = get_fpr_cluster_per_row_summary(
             df_labels_target_dynamic,
             convert_lists_to_str=convert_lists_to_str,
-            verbose=fpr_verbose,
+            verbose=verbose_summary,
         )
         d_df_fpr['df_summary_cluster'] = df_summary_cluster
         d_df_fpr['d_fpr_qa'] = d_fpr_qa
@@ -613,7 +614,7 @@ def get_fpr_cluster_per_row_summary(
 
     # Recommend by excluding: private & allow_discovery='f'
     if verbose:
-        info(f"{n_seed_subreddits:6,.0f} <- {prefix_seed.upper()} subreddits")
+        info(f"{n_seed_subreddits:6,.0f} <- {prefix_seed.upper()} subreddits (including orphans)")
         info(f"{n_recommend_subs:6,.0f} <- {prefix_recommend.upper()} subs (includes orphans)")
         info(f"{n_review_missing_topic:6,.0f} <- {prefix_review_topic} subreddits")
         info(f"  {n_adf_subs:4,.0f} <- discover=f subs")
@@ -682,10 +683,6 @@ def get_fpr_cluster_per_row_summary(
     l_recs_ = list()
     l_orphan_seeds = list()
     l_orphan_recs = list()
-    # TODO(djb): create new list of subs exclude_recs_from_seeds
-    #  These subs have a cluster but we can't use them for recs because all
-    #  the other subs in the cluster are not meant to be recommended
-    l_orphan_or_exclude_seeds = list()
 
     for l_ in (
         df_cluster_per_row[(~mask_orphan_subs)]
@@ -695,13 +692,14 @@ def get_fpr_cluster_per_row_summary(
         for i_ in l_:
             l_seeds_.append(i_)
 
-    for l_ in (
-        df_cluster_per_row[mask_exclude_recs_from_seeds_]
-        [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
-        .to_list()
-    ):
-        for i_ in l_:
-            l_recs_to_exclude_from_seeds.append(i_)
+    if mask_exclude_recs_from_seeds_.sum() > 0:
+        for l_ in (
+            df_cluster_per_row[mask_exclude_recs_from_seeds_]
+            [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
+            .to_list()
+        ):
+            for i_ in l_:
+                l_recs_to_exclude_from_seeds.append(i_)
 
     d_fpr_qa['seed_subreddit_ids'] = list(set(l_seeds_) - set(l_recs_to_exclude_from_seeds))
     d_fpr_qa['seed_subreddit_ids_count'] = len(d_fpr_qa['seed_subreddit_ids'])
@@ -715,27 +713,49 @@ def get_fpr_cluster_per_row_summary(
     d_fpr_qa['recommend_subreddit_ids'] = l_recs_
     d_fpr_qa['recommend_subreddit_ids_count'] = len(d_fpr_qa['recommend_subreddit_ids'])
 
-    for l_ in (
-        df_cluster_per_row[mask_orphan_subs]
-        [f"{prefix_seed}_{suffix_col_list_sub_ids}"]
-        .to_list()
-    ):
-        for i_ in l_:
-            l_orphan_seeds.append(i_)
+    if mask_orphan_subs.sum() > 0:
+        # We need try/except in case there are nulls in one of the rows
+        for l_ in (
+            df_cluster_per_row[mask_orphan_subs]
+            [f"{prefix_seed}_{suffix_col_list_sub_ids}"]
+            .to_list()
+        ):
+            try:
+                for i_ in l_:
+                    l_orphan_seeds.append(i_)
+            except (TypeError, ValueError):
+                pass
+
+        for l_ in (
+            df_cluster_per_row[mask_orphan_subs]
+            [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
+            .to_list()
+        ):
+            try:
+                for i_ in l_:
+                    l_orphan_recs.append(i_)
+            except (TypeError, ValueError):
+                pass
+    d_fpr_qa['orphan_or_exclude_seed_subreddit_ids'] = list(
+        set(l_recs_to_exclude_from_seeds) | set(l_orphan_seeds)
+    )
+    d_fpr_qa['orphan_or_exclude_seed_subreddit_ids_count'] = len(d_fpr_qa['orphan_or_exclude_seed_subreddit_ids'])
+
     d_fpr_qa['orphan_seed_subreddit_ids'] = l_orphan_seeds
     d_fpr_qa['orphan_seed_subreddit_ids_count'] = len(d_fpr_qa['orphan_seed_subreddit_ids'])
 
-    for l_ in (
-        df_cluster_per_row[mask_orphan_subs]
-        [f"{prefix_recommend}_{suffix_col_list_sub_ids}"]
-        .to_list()
-    ):
-        for i_ in l_:
-            l_orphan_recs.append(i_)
     d_fpr_qa['orphan_recommend_subreddit_ids'] = l_orphan_recs
     d_fpr_qa['orphan_recommend_subreddit_ids_count'] = len(d_fpr_qa['orphan_recommend_subreddit_ids'])
 
-    # TODO(djb): create new list of subs exclude_recs_from_seeds & save to summary dict
+    # Add total clusters & clusters w/o orphans
+    d_fpr_qa['clusters_total'] = len(df_cluster_per_row)
+    d_fpr_qa['clusters_with_recommendations'] = (~mask_orphan_subs).sum()
+    if verbose:
+        for k_, v_ in d_fpr_qa.items():
+            try:
+                info(f"  {v_:4,.0f} <- {k_}")
+            except (ValueError, TypeError):
+                pass
 
     # subs with review-missing topic will be the largest reason for missing so add them first
     if n_review_missing_topic > 0:
@@ -827,11 +847,10 @@ def get_fpr_cluster_per_row_summary(
         except Exception as e:
             print(e)
 
+    l_list_cols = [c for c in df_cluster_per_row.columns if any([c.endswith(suffix_col_list_sub_ids),
+                                                                 c.endswith(suffix_col_list_sub_names)])]
     if convert_lists_to_str:
-        for col_list_ in [
-            f"{prefix_recommend}_{suffix_col_list_sub_names}", f"{prefix_recommend}_{suffix_col_list_sub_ids}",
-            f"{prefix_seed}_{suffix_col_list_sub_names}", f"{prefix_seed}_{suffix_col_list_sub_ids}",
-        ]:
+        for col_list_ in l_list_cols:
             try:
                 # Treating as a string is faster than .apply() to process each item in list
                 #    .apply(lambda x: ', '.join(x))
@@ -842,8 +861,15 @@ def get_fpr_cluster_per_row_summary(
                     .str[1:-1]
                     .str.replace("'", "")
                 )
-            except KeyError:
+            except (ValueError, TypeError, KeyError):
                 pass
+    # for all the "list" columns, make sure that they are of "object" type, even if they're empty lists
+    #  we need them al to be the same type when we we convert to bq
+    for col_list_ in l_list_cols:
+        try:
+            df_cluster_per_row[col_list_] = df_cluster_per_row[col_list_].astype('object')
+        except (ValueError, TypeError, KeyError) as e:
+            logging.error(f"ERROR with col: {col_list_}\n  {e}")
 
     info(f"{df_cluster_per_row.shape}  <- df.shape full summary")
 
