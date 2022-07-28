@@ -17,7 +17,7 @@ DECLARE SENSITIVE_TOPICS DEFAULT [
 DECLARE TARGET_COUNTRIES DEFAULT [
     'AU', 'CA', 'GB', 'IN', 'FR', 'DE', 'IT', 'MX', 'BR'
     , 'ES', 'SE', 'RO', 'NL', 'TR', 'PH'
-    , 'GR', 'AU', 'AR', 'CO', 'BE', 'CH', 'PO', 'SA', 'CR', 'PA'
+    , 'GR', 'AU', 'AR', 'CO', 'BE', 'CH', 'PL', 'SA', 'CR', 'PA'
     , 'IR', 'IE'
 ];
 
