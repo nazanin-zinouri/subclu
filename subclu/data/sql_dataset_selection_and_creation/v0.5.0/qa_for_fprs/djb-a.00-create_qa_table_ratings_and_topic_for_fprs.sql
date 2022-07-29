@@ -28,7 +28,6 @@ DECLARE TARGET_COUNTRIES DEFAULT [
     , 'SE', 'RO', 'NL', 'GR', 'BE', 'PL'
     , 'TR', 'SA', 'PH'
     -- Other countries with larger number of relevant subreddits
-    , 'GT', 'CL'
     , 'FI'
 ];
 
@@ -112,6 +111,11 @@ subs_geo_custom_agg AS (
             , vr.predicted_rating
             , vt.predicted_topic
             , asr.users_l7
+            , s.verdict
+            , s.is_spam
+            , s.is_deleted
+            , s.deleted
+            , s.quarantine
 
             -- Flag based on NSFW clusters
             , IF(m.k_1000_label_recommend = 'no', 'remove', NULL) sensitive_cluster_filter
@@ -191,12 +195,12 @@ subs_geo_custom_agg AS (
 
         WHERE 1=1
             -- OPTIONAL: Exclude spam, removed, & sketchy subs
-            AND COALESCE(s.verdict, '') != 'admin-removed'
-            AND COALESCE(s.is_spam, FALSE) = FALSE
-            AND COALESCE(s.is_deleted, FALSE) = FALSE
-            AND s.deleted IS NULL
             AND COALESCE(s.type, '') IN ('public', 'private', 'restricted')
-            AND COALESCE(s.quarantine, FALSE) = FALSE
+            -- AND COALESCE(s.verdict, '') != 'admin-removed'
+            -- AND COALESCE(s.is_spam, FALSE) = FALSE
+            -- AND COALESCE(s.is_deleted, FALSE) = FALSE
+            -- AND s.deleted IS NULL
+            -- AND COALESCE(s.quarantine, FALSE) = FALSE
     )
 )
 , combined_filters AS (
@@ -222,6 +226,7 @@ subs_geo_custom_agg AS (
                 , 'missing_pred_topic'
                 , 'missing_pred_rating'
                 , 'manual_override'
+                , 'spam_banned_or_deleted'
             ) THEN NULL
             ELSE combined_filter_reason
         END AS taxonomy_action
@@ -263,6 +268,15 @@ subs_geo_custom_agg AS (
                 -- NOTE that order of filters can make a big difference.
                 --   Remove over_18 & sensitive clusters first
                 , CASE
+                    -- Exclude subs that have been marked as spam or removed
+                    WHEN (
+                        COALESCE(verdict, '') = 'admin-removed'
+                        OR COALESCE(is_spam, FALSE) != FALSE
+                        OR COALESCE(is_deleted, FALSE) != FALSE
+                        OR deleted IS NOT NULL
+                        OR COALESCE(quarantine, FALSE) != FALSE
+                    ) THEN 'remove-spam_banned_or_deleted'
+
                     WHEN (over_18 = 't') THEN 'remove-over_18'
                     WHEN (sensitive_cluster_filter = 'remove') THEN 'remove-sensitive_cluster'
 
@@ -361,7 +375,11 @@ subs_geo_custom_agg AS (
     ORDER BY k_1000_label DESC, combined_filter_detail
 )
 
-SELECT * FROM combined_filters
+SELECT
+    * EXCEPT(
+        verdict, is_spam, is_deleted, deleted, quarantine
+    )
+FROM combined_filters
 );  -- close INSERT or CREATE table parens
 
 

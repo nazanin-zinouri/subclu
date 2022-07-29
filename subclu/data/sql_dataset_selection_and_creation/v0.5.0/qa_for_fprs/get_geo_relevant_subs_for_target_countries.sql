@@ -1,5 +1,7 @@
 -- Create query to filter out subreddits for FPRs
 
+DECLARE QA_PT_DATE DATE DEFAULT '2022-07-28';
+
 -- Define sensitive topics (actualy & predicted) to filter out
 DECLARE SENSITIVE_TOPICS DEFAULT [
     'Addiction Support'
@@ -11,10 +13,21 @@ DECLARE SENSITIVE_TOPICS DEFAULT [
     , 'Trauma Support', "Women's Health"
 ];
 DECLARE TARGET_COUNTRIES DEFAULT [
-    'AU', 'CA', 'GB', 'IN', 'FR', 'DE', 'IT', 'MX', 'BR'
-    , 'ES', 'SE', 'RO', 'NL', 'TR', 'PH'
-    , 'GR', 'AU', 'AR', 'CO', 'BE', 'CH', 'PO', 'SA', 'CR', 'PA'
-    , 'IR', 'IE'
+    -- primarily English-speaking countries
+    'AU', 'CA', 'GB'
+    -- English, but smaller
+    , 'IN', 'IE'
+    -- DACH - Germany, Austria, & Switzerland
+    , 'DE', 'AT', 'CH'
+    -- LATAM & EUROPE
+    , 'PT', 'BR'
+    , 'FR', 'IT'
+    , 'MX', 'ES', 'AR', 'CO', 'CR', 'PA'
+    , 'SE', 'RO', 'NL', 'GR', 'BE', 'PL'
+    , 'TR', 'SA', 'PH'
+    -- Other countries with larger number of relevant subreddits
+    , 'FI'
+    --, 'GT', 'CL' -- 70%+ NSFW
 ];
 
 WITH
@@ -40,7 +53,7 @@ subs_geo_target AS (
             ON geo.subreddit_id = qa.subreddit_id
 
     WHERE 1=1
-        AND qa.pt = "2022-07-12"
+        AND qa.pt = QA_PT_DATE
         -- Assume that all subs in model meet activity thresholds
 
         -- Pick subreddits that qualify under at least one metric/threshold
