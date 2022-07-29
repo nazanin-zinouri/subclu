@@ -66,8 +66,8 @@ ORDER BY subreddit_name
 -- We can ommit the target_language declaration:
 
 -- What "thing" do you want to check?
---  'posts', 'comments', 'posts_and_comments'
-DECLARE THING_TYPE_TO_COUNT STRING DEFAULT 'posts_and_comments';
+--  'post', 'comment', 'posts_and_comments'
+DECLARE THING_TYPE_TO_COUNT STRING DEFAULT 'comment';
 
 WITH
 sub_primary_language AS (
@@ -99,18 +99,31 @@ sub_primary_language AS (
 
 -- Use a self-join to get primary & secondary languages in the same column
 SELECT
-    l1.* EXCEPT(thing_type)
-    , l2.* EXCEPT(subreddit_id)
+    l1.subreddit_id
+    , l1.subreddit_name
+
+    , l1. primary_language
+    -- , l1.primary_language_pct
+    , ROUND(l1.primary_language_pct, 3) AS primary_language_pct
+
+    , l2.secondary_language
+    -- , l2.secondary_language_pct
+    , ROUND(l2.secondary_language_pct, 3) AS secondary_language_pct
+
     , l1.thing_type
+    , primary_language_count, secondary_language_count
 
 FROM sub_primary_language AS l1
     LEFT JOIN sub_2nd_language AS l2
         ON l1.subreddit_id = l2.subreddit_id
 
 WHERE 1=1
-    AND subreddit_name IN (
-        'antiwork', 'de'
-    )
+    AND subreddit_name LIKE "ask%"
+    -- AND subreddit_name IN (
+    --     'antiwork', 'de', 'france', 'askreddit', 'india'
+    --     , 'mexico', 'spain'
+    --     , 'brazil', 'brasil'
+    -- )
 
 ORDER BY subreddit_name
 ;
