@@ -145,7 +145,6 @@ class CreateFPRs:
             self.gcs_output_path_this_run,
             'df_fpr'
         )
-        # TODO(djb): create this new df based on d_fpr_qa
         self.gcs_output_path_df_fpr_qa_summary = posixpath.join(
             self.gcs_output_path_this_run,
             'df_fpr_qa_summary'
@@ -163,10 +162,14 @@ class CreateFPRs:
         """High level method to generate FPRs for all input countries"""
         for country_code_ in tqdm(self.target_countries):
             info(f"== Country: {country_code_} ==")
-            self.create_fpr_(country_code_)
+            try:
+                self.create_fpr_(country_code_)
+            except Exception as e:
+                logging.error(f"**+++!! ERROR processing country: {country_code_} **+++!!")
+                logging.error(f"**+++!!\n\n {e} \n\n **+++!!", exc_info=True)
 
         # TODO(djb): save combined JSON output for all countries
-        #  This will make it easier for an engineer to replace all countries at once
+        #  This might make it easier for an engineer to replace all countries at once
         #  w/o having to open 10+ separate files
 
     def create_fpr_(
@@ -268,12 +271,23 @@ class CreateFPRs:
 
         info(f"Adding metadata to df_top_level_summary...")
         for k_, v_ in d_fpr_qa.items():
-            try:
-                df_top_level_summary[k_] = v_
-            except ValueError:
+            if k_.endswith('_list'):
+                # For some reason, the list items can be messed up when len=0 or len=1
+                #  need to do some type checking to make sure file types are
+                #  the same when merging them into a single BQ table
                 df_top_level_summary[k_] = np.nan
                 df_top_level_summary[k_] = df_top_level_summary[k_].astype('object')
-                df_top_level_summary.at[0, k_] = v_
+                if isinstance(v_, str):
+                    df_top_level_summary.at[0, k_] = list(v_)
+                else:
+                    df_top_level_summary.at[0, k_] = v_
+            else:
+                try:
+                    df_top_level_summary[k_] = v_
+                except ValueError:
+                    df_top_level_summary[k_] = np.nan
+                    df_top_level_summary[k_] = df_top_level_summary[k_].astype('object')
+                    df_top_level_summary.at[0, k_] = v_
 
         d_df_fpr['df_top_level_summary'] = df_top_level_summary
 
@@ -309,8 +323,8 @@ class CreateFPRs:
 
         return d_df_fpr
 
-    @staticmethod
     def check_df_labels_target_(
+            self,
             df_labels_target
     ) -> pd.DataFrame:
         """Do sanity checks on input labels df"""
@@ -356,13 +370,23 @@ class CreateFPRs:
             'geo_country_code',
             'country_name',
         ]
-        return (
+        df_summary = (
             df_labels_target
             .groupby(l_cols_top_level_summary, as_index=False)
             .agg(
                 **{'relevant_subreddit_id_count': ('subreddit_id', 'count')}
             )
+            .assign(
+                **{
+                    'bucket': self.output_bucket,
+                    'path_fpr_json': self.gcs_output_path_fpr_json,
+                    'path_df_fpr': self.gcs_output_path_df_fpr,
+                    'path_df_fpr_qa_summary': self.gcs_output_path_df_fpr_qa_summary,
+                    'path_df_fpr_cluster_summary': self.gcs_output_path_df_fpr_cluster_summary,
+                }
+            )
         )
+        return df_summary
 
     @staticmethod
     def get_top_level_stats_from_cluster_summary_(
@@ -424,8 +448,8 @@ class CreateFPRs:
         info(f"** Checking FPR output with expected QA output... **")
         set_seeds = set(d_fpr_output.keys())
         set_seeds_expected = set(d_fpr_qa['seed_subreddit_ids'])
-        info(f"{len(set_seeds):5,.0f} SEED subreddits in output")
-        info(f"{len(set_seeds_expected):5,.0f} SEED subreddits expected")
+        info(f"{  len(set_seeds):6,.0f} SEED subreddits in output")
+        info(f"{  len(set_seeds_expected):6,.0f} SEED subreddits expected")
 
         if set_seeds == set_seeds_expected:
             info(f"SEED subreddit IDS match expected output")
@@ -436,9 +460,9 @@ class CreateFPRs:
             seeds_unexpected = set_seeds - set_seeds_expected
             seeds_missing = set_seeds_expected - set_seeds
             if len(seeds_unexpected) > 0:
-                logging.error(f"  {len(seeds_unexpected):5,.0f} UNEXPECTED seeds in output:\n  {seeds_unexpected}")
+                logging.error(f"    {len(seeds_unexpected):6,.0f} UNEXPECTED seeds in output:\n  {seeds_unexpected}")
             if len(seeds_missing) > 0:
-                logging.error(f"  {len(seeds_missing):5,.0f} Seeds MISSING in output:\n  {seeds_missing}")
+                logging.error(f"    {len(seeds_missing):6,.0f} Seeds MISSING in output:\n  {seeds_missing}")
 
         l_recs = list()
         for _, l_ in d_fpr_output.items():
@@ -446,8 +470,8 @@ class CreateFPRs:
                 l_recs.append(i_)
         set_recs = set(l_recs)
         set_recs_expected = set(d_fpr_qa['recommend_subreddit_ids'])
-        info(f"{len(set_recs):5,.0f} RECOMMEND subreddits in output")
-        info(f"{len(set_recs_expected):5,.0f} RECOMMEND subreddits expected")
+        info(f"{  len(set_recs):6,.0f} RECOMMEND subreddits in output")
+        info(f"{  len(set_recs_expected):6,.0f} RECOMMEND subreddits expected")
 
         if set_recs == set_recs_expected:
             rec_error = False
@@ -458,9 +482,9 @@ class CreateFPRs:
             recs_unexpected = set_recs - set_recs_expected
             recs_missing = set_recs_expected - set_recs
             if len(recs_unexpected) > 0:
-                logging.error(f"  {len(recs_unexpected):5,.0f} UNEXPECTED recs in output:\n  {recs_unexpected}")
+                logging.error(f"    {len(recs_unexpected):6,.0f} UNEXPECTED recs in output:\n  {recs_unexpected}")
             if len(recs_missing) > 0:
-                logging.error(f"  {len(recs_missing):5,.0f} recs MISSING in output:\n  {recs_missing}")
+                logging.error(f"    {len(recs_missing):6,.0f} recs MISSING in output:\n  {recs_missing}")
 
         if any([seed_error, rec_error]):
             raise Exception(f"FPR QA failed")
@@ -528,7 +552,7 @@ def save_fpr_json(
 
     # create blob & upload from string
     gcs_path = posixpath.join(gcs_output_path, file_name)
-    info(f"Saving FRP file to:\n  {gcs_path}")
+    info(f"Saving FPR file to:\n  {gcs_path}")
 
     (
         bucket
@@ -736,16 +760,24 @@ def get_fpr_cluster_per_row_summary(
                     l_orphan_recs.append(i_)
             except (TypeError, ValueError):
                 pass
-    d_fpr_qa['orphan_or_exclude_seed_subreddit_ids'] = list(
+
+    d_fpr_qa[f'orphan_or_exclude_seed_{suffix_col_list_sub_ids}'] = list(
         set(l_recs_to_exclude_from_seeds) | set(l_orphan_seeds)
     )
-    d_fpr_qa['orphan_or_exclude_seed_subreddit_ids_count'] = len(d_fpr_qa['orphan_or_exclude_seed_subreddit_ids'])
+    d_fpr_qa['orphan_or_exclude_seed_subreddit_ids_count'] = len(
+        d_fpr_qa[f'orphan_or_exclude_seed_{suffix_col_list_sub_ids}']
+    )
 
-    d_fpr_qa['orphan_seed_subreddit_ids'] = l_orphan_seeds
-    d_fpr_qa['orphan_seed_subreddit_ids_count'] = len(d_fpr_qa['orphan_seed_subreddit_ids'])
+    d_fpr_qa[f"orphan_seed_{suffix_col_list_sub_ids}"] = l_orphan_seeds
+    d_fpr_qa['orphan_seed_subreddit_ids_count'] = len(
+        d_fpr_qa[f"orphan_seed_{suffix_col_list_sub_ids}"]
+    )
 
-    d_fpr_qa['orphan_recommend_subreddit_ids'] = l_orphan_recs
-    d_fpr_qa['orphan_recommend_subreddit_ids_count'] = len(d_fpr_qa['orphan_recommend_subreddit_ids'])
+    # fka orphan_recommend_subreddit_ids
+    d_fpr_qa[f'orphan_recommend_{suffix_col_list_sub_ids}'] = l_orphan_recs
+    d_fpr_qa['orphan_recommend_subreddit_ids_count'] = len(
+        d_fpr_qa[f'orphan_recommend_{suffix_col_list_sub_ids}']
+    )
 
     # Add total clusters & clusters w/o orphans
     d_fpr_qa['clusters_total'] = len(df_cluster_per_row)
@@ -1294,9 +1326,9 @@ def get_geo_relevant_subreddits_and_cluster_labels(
             AND qa.subreddit_name != 'profile'
             AND COALESCE(slo.type, '') IN ('private', 'public', 'restricted')
             AND COALESCE(slo.verdict, 'f') != 'admin-removed'
-            AND COALESCE(is_spam, FALSE) = FALSE
+            AND COALESCE(slo.is_spam, FALSE) = FALSE
             AND COALESCE(slo.over_18, 'f') = 'f'
-            AND COALESCE(quarantine, FALSE) = FALSE
+            AND COALESCE(slo.quarantine, FALSE) = FALSE
             AND COALESCE(nt.rating_short, '') = "E"
             AND COALESCE(nt.primary_topic, '') NOT IN UNNEST(SENSITIVE_TOPICS)
     
