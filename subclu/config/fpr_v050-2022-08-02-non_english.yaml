@@ -12,6 +12,8 @@ geo_relevance_table: "reddit-employee-datasets.david_bermejo.subclu_subreddit_re
 geo_min_users_percent_by_subreddit_l28: 0.14
 geo_min_country_standardized_relevance: 2.4
 
+# Already done: IT, ES
+# NOTE: `NO` gets turned into False, so we need to quote it
 target_countries:
   - IN
   - IE
@@ -21,9 +23,7 @@ target_countries:
   - PT
   - BR
   - FR
-  - IT
   - MX
-  - ES
   - AR
   - CO
   - CR
@@ -36,9 +36,8 @@ target_countries:
   - TR
   - SA
   - PH
-  - GT
   - CL
   - SE
-  - NO
+  - "NO"
   - DK
   - FI
