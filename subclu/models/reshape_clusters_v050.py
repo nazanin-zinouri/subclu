@@ -294,27 +294,10 @@ class CreateFPRs:
         d_df_fpr['d_fpr_qa'] = d_fpr_qa
 
         info(f"Adding metadata to df_top_level_summary...")
-        for k_, v_ in d_fpr_qa.items():
-            if k_.endswith('_list'):
-                # For some reason, the list items can be messed up when len=0 or len=1
-                #  need to do some type checking to make sure file types are
-                #  the same when merging them into a single BQ table
-                # if len(v_) == 1, then we might assign 1st item in list (string)
-                #  so we need to set the column to 'object' dtype BEFORE assigning val
-                df_top_level_summary[k_] = np.nan
-                df_top_level_summary[k_] = df_top_level_summary[k_].astype('object')
-                if isinstance(v_, str):
-                    df_top_level_summary.at[0, k_] = list(v_)
-                else:
-                    df_top_level_summary.at[0, k_] = v_
-            else:
-                try:
-                    df_top_level_summary[k_] = v_
-                except ValueError:
-                    df_top_level_summary[k_] = np.nan
-                    df_top_level_summary[k_] = df_top_level_summary[k_].astype('object')
-                    df_top_level_summary.at[0, k_] = v_
-
+        df_top_level_summary = self.add_meta_to_df_top_level_summary_(
+            d_fpr_qa,
+            df_top_level_summary
+        )
         d_df_fpr['df_top_level_summary'] = df_top_level_summary
 
         if verbose:
@@ -333,7 +316,7 @@ class CreateFPRs:
             d_fpr_qa
         )
 
-        #  Save each file (country) individually
+        #  Save each JSON file (country) individually
         save_fpr_json(
             fpr_dict=dict_fpr,
             file_name=f"{country_code}_{self.run_id}.json",
@@ -341,7 +324,6 @@ class CreateFPRs:
             gcs_output_path=self.gcs_output_path_fpr_json,
         )
 
-        # TODO(djb): save df cluster summary
         self.save_fpr_dfs_(
             d_df_fpr,
             country_code=country_code
@@ -520,6 +502,35 @@ class CreateFPRs:
 
         if any([seed_error, rec_error]):
             raise Exception(f"FPR QA failed")
+
+    @staticmethod
+    def add_meta_to_df_top_level_summary_(
+            d_fpr_qa: dict,
+            df_top_level_summary: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """Append some metadata to the top-level summary"""
+        df_summary_new = df_top_level_summary.copy()
+        for k_, v_ in d_fpr_qa.items():
+            if k_.endswith('_list'):
+                # For some reason, the list items can be messed up when len=0 or len=1
+                #  need to do some type checking to make sure file types are
+                #  the same when merging them into a single BQ table
+                # if len(v_) == 1, then we might assign 1st item in list (string)
+                #  so we need to set the column to 'object' dtype BEFORE assigning val
+                df_summary_new[k_] = np.nan
+                df_summary_new[k_] = df_summary_new[k_].astype('object')
+                if isinstance(v_, str):
+                    df_summary_new.at[0, k_] = list(v_)
+                else:
+                    df_summary_new.at[0, k_] = v_
+            else:
+                try:
+                    df_summary_new[k_] = v_
+                except ValueError:
+                    df_summary_new[k_] = np.nan
+                    df_summary_new[k_] = df_summary_new[k_].astype('object')
+                    df_summary_new.at[0, k_] = v_
+        return df_summary_new
 
     def save_fpr_dfs_(
             self,
