@@ -33,9 +33,11 @@ from google.cloud import bigquery, storage
 from .clustering_utils import (
     create_dynamic_clusters
 )
-# from ..utils.eda import (
-#     reorder_array,
-# )
+from .fpr_schemas import fpr_qa_summary_schema
+
+from ..utils.eda import (
+    reorder_array,
+)
 
 
 # TODO(djb): use hydra to set default parameter values & run from CLI
