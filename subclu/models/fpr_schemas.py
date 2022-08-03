@@ -58,15 +58,33 @@ def fpr_full_schema(
         ),
         bigquery.SchemaField(
             name="cluster_subreddit_names_list",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of subreddit names to recommend if user subscribes to seed subreddit",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
         bigquery.SchemaField(
             name="cluster_subreddit_ids_list",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of subreddit IDs to recommend if user subscribes to seed subreddit",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
 
         bigquery.SchemaField(
