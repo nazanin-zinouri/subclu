@@ -28,7 +28,6 @@ target_countries:
   - CO
   - CR
   - PA
-  - SE
   - RO
   - NL
   - GR
@@ -39,4 +38,7 @@ target_countries:
   - PH
   - GT
   - CL
+  - SE
+  - NO
+  - DK
   - FI

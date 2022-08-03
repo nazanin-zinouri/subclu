@@ -25,10 +25,10 @@ DECLARE TARGET_COUNTRIES DEFAULT [
     , 'PT', 'BR'
     , 'FR', 'IT'
     , 'MX', 'ES', 'AR', 'CO', 'CR', 'PA'
-    , 'SE', 'RO', 'NL', 'GR', 'BE', 'PL'
+    , 'RO', 'NL', 'GR', 'BE', 'PL'
     , 'TR', 'SA', 'PH'
-    -- Other countries with larger number of relevant subreddits
-    , 'FI'
+    -- Nordic countries
+    , 'SE', 'FI', 'NO', 'DK'
 ];
 
 -- Delete data from partition, if it exists

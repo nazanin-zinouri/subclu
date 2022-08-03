@@ -11,7 +11,7 @@ qa_pt: "2022-08-02"
 
 geo_relevance_table: "reddit-employee-datasets.david_bermejo.subclu_subreddit_relevance_beta_20220725"
 geo_min_users_percent_by_subreddit_l28: 0.14
-geo_min_country_standardized_relevance: 2.9
+geo_min_country_standardized_relevance: 2.6
 
 target_countries:
   - CA
