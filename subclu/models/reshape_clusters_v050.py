@@ -159,20 +159,44 @@ class CreateFPRs:
             self.gcs_output_path_this_run,
             'df_dynamic_clusters'
         )
+        self.fpr_outputs = dict()
+        # define schemas for df outputs. We can use these for
+        #  Saving parquet files consistently
+        #  Creating BQ tables based on the parquet files
+        self.schemas = {
+            self.gcs_output_path_df_fpr: {
+                'pyarrow': None,
+                'bigquery': None,
+            },
+            self.gcs_output_path_df_fpr_qa_summary: {
+                'pyarrow': fpr_qa_summary_schema('pyarrow'),
+                'bigquery': fpr_qa_summary_schema('bigquery'),
+            },
+            self.gcs_output_path_df_fpr_cluster_summary: {
+                'pyarrow': None,
+                'bigquery': None,
+            },
+            self.gcs_output_path_df_dynamic_clusters: {
+                'pyarrow': None,
+                'bigquery': None,
+            },
+        }
 
     def create_fprs(self) -> None:
         """High level method to generate FPRs for all input countries"""
         for country_code_ in tqdm(self.target_countries):
             info(f"== Country: {country_code_} ==")
             try:
-                self.create_fpr_(country_code_)
+                self.fpr_outputs[country_code_] = self.create_fpr_(country_code_)
             except Exception as e:
                 logging.error(f"**+++!! ERROR processing country: {country_code_} **+++!!")
                 logging.error(f"**+++!!\n\n {e} \n\n **+++!!", exc_info=True)
 
-        # TODO(djb): save combined JSON output for all countries
-        #  This might make it easier for an engineer to replace all countries at once
-        #  w/o having to open 10+ separate files
+        # TODO(djb): upload df outputs to a bigquery table
+        #  Looks like the path to automation is to create a BQ table
+        #  Then this BQ table will get converted to a Redis Table that can be
+        #  read in production.
+        logging.warning(f"TODO: add outputs to BQ table")
 
     def create_fpr_(
             self,
@@ -191,9 +215,8 @@ class CreateFPRs:
         if optimal_k_search is None:
             optimal_k_search = np.arange(5, 10)
 
-        d_df_fpr = {
-            'df_labels_target': None,
-        }
+        # We create a single dict per country & aggregate at the end
+        d_df_fpr = dict()
 
         info(f"Getting geo-relevant subreddits in model for {country_code}...")
         df_labels_target = get_geo_relevant_subreddits_and_cluster_labels(
@@ -221,7 +244,6 @@ class CreateFPRs:
             )
         info(f" {df_labels_target.shape} <- Shape AFTER dropping subreddits with covid in title")
 
-        d_df_fpr['df_labels_target'] = df_labels_target
         df_top_level_summary = self.check_df_labels_target_(df_labels_target)
 
         info(f"Finding optimal N (target # of subs per cluster)...")
@@ -277,6 +299,8 @@ class CreateFPRs:
                 # For some reason, the list items can be messed up when len=0 or len=1
                 #  need to do some type checking to make sure file types are
                 #  the same when merging them into a single BQ table
+                # if len(v_) == 1, then we might assign 1st item in list (string)
+                #  so we need to set the column to 'object' dtype BEFORE assigning val
                 df_top_level_summary[k_] = np.nan
                 df_top_level_summary[k_] = df_top_level_summary[k_].astype('object')
                 if isinstance(v_, str):
@@ -388,6 +412,12 @@ class CreateFPRs:
                 }
             )
         )
+        # convert date cols to date
+        for c_ in ['pt', 'qa_pt']:
+            try:
+                df_summary[c_] = pd.to_datetime(df_summary[c_]).dt.date
+            except (KeyError, ValueError, TypeError) as e:
+                logging.error(e, exc_info=True)
         return df_summary
 
     @staticmethod
@@ -510,6 +540,7 @@ class CreateFPRs:
             info(f"Saving to: \n  {k_}")
             df_name = k_.split('/')[-1]
             try:
+                # Get list of redundant cols to drop, these mostly apply to df_labels_target_dynamic
                 l_cols_labels_drop = [c for c in df_.columns if all([c.startswith('k_'), c.endswith('_label')])]
                 l_cols_topic_drop = [c for c in df_.columns if all([c.startswith('k_'), c.endswith('_primary_topic')])]
                 l_cols_nested_drop = [c for c in df_.columns if all([c.startswith('k_'), c.endswith('_nested')])]
@@ -529,17 +560,26 @@ class CreateFPRs:
                 l_all_cols_to_drop = l_cols_labels_drop + l_cols_topic_drop + l_cols_nested_drop
 
                 if len(l_all_cols_to_drop) > 0:
+                    # This *should* only apply to df_labels_target_dynamic
                     df_.drop(l_all_cols_to_drop, axis=1).to_parquet(
                         f"gs://{self.output_bucket}/{k_}/{df_name}-{country_code}.parquet",
-                        index=False
+                        index=False,
+                        engine='pyarrow',
+                        schema=self.schemas[k_]['pyarrow'],
                     )
                 else:
                     df_.to_parquet(
                         f"gs://{self.output_bucket}/{k_}/{df_name}-{country_code}.parquet",
-                        index=False
+                        index=False,
+                        engine='pyarrow',
+                        schema=self.schemas[k_]['pyarrow'],
                     )
             except Exception as e:
-                logging.error(e)
+                logging.error(e, exc_info=True)
+                df_.to_parquet(
+                    f"gs://{self.output_bucket}/{k_}/{df_name}-{country_code}.parquet",
+                    index=False,
+                )
 
 
 def save_fpr_json(
