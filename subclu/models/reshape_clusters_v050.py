@@ -33,7 +33,7 @@ from google.cloud import bigquery, storage
 from .clustering_utils import (
     create_dynamic_clusters
 )
-from .fpr_schemas import fpr_qa_summary_schema
+from .fpr_schemas import fpr_qa_summary_schema, fpr_full_schema
 
 from ..utils.eda import (
     reorder_array,
@@ -165,8 +165,8 @@ class CreateFPRs:
         #  Creating BQ tables based on the parquet files
         self.schemas = {
             self.gcs_output_path_df_fpr: {
-                'pyarrow': None,
-                'bigquery': None,
+                'pyarrow': fpr_full_schema('pyarrow'),
+                'bigquery': fpr_full_schema('bigquery'),
             },
             self.gcs_output_path_df_fpr_qa_summary: {
                 'pyarrow': fpr_qa_summary_schema('pyarrow'),
@@ -412,7 +412,7 @@ class CreateFPRs:
                 }
             )
         )
-        # convert date cols to date
+        # Convert date cols to date (might be string)
         for c_ in ['pt', 'qa_pt']:
             try:
                 df_summary[c_] = pd.to_datetime(df_summary[c_]).dt.date
@@ -1238,6 +1238,14 @@ def get_fpr_df_and_dict(
         col_list_cluster_names, col_list_cluster_ids
     ]
     df_a_to_b_list = df_a_to_b_list[reorder_array(l_c_to_front_, df_a_to_b_list.columns)]
+
+    # Convert date cols to date (might be string)
+    for c_ in ['pt', 'qa_pt']:
+        try:
+            df_a_to_b_list[c_] = pd.to_datetime(df_a_to_b_list[c_]).dt.date
+        except (KeyError, ValueError, TypeError) as e:
+            logging.error(e, exc_info=True)
+
     info(f"  {df_a_to_b_list.shape} <- df_fpr.shape")
     return df_a_to_b_list, d_fpr
 
