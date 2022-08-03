@@ -68,6 +68,7 @@ class CreateFPRs:
             col_new_cluster_prim_topic: str = 'cluster_majority_primary_topic',
             col_new_cluster_topic_mix: str = 'cluster_topic_mix',
             verbose: bool = False,
+            add_outputs_to_bq: bool = False,
             **kwargs
     ) -> None:
         """
@@ -129,6 +130,7 @@ class CreateFPRs:
         self.col_new_cluster_topic_mix = col_new_cluster_topic_mix
 
         self.verbose = verbose
+        self.add_outputs_to_bq = add_outputs_to_bq
 
         # set start time so we can use timestamp when saving outputs
         self.run_id = f"{datetime.utcnow().strftime('%Y-%m-%d_%H%M%S')}"
@@ -167,10 +169,12 @@ class CreateFPRs:
             self.gcs_output_path_df_fpr: {
                 'pyarrow': fpr_full_schema('pyarrow'),
                 'bigquery': fpr_full_schema('bigquery'),
+                'bq_table': 'reddit-employee-datasets.david_bermejo.subclu_v0050_fpr_outputs',
             },
             self.gcs_output_path_df_fpr_qa_summary: {
                 'pyarrow': fpr_qa_summary_schema('pyarrow'),
                 'bigquery': fpr_qa_summary_schema('bigquery'),
+                'bq_table': 'reddit-employee-datasets.david_bermejo.subclu_v0050_fpr_summary',
             },
             self.gcs_output_path_df_fpr_cluster_summary: {
                 'pyarrow': None,
@@ -197,6 +201,8 @@ class CreateFPRs:
         #  Then this BQ table will get converted to a Redis Table that can be
         #  read in production.
         logging.warning(f"TODO: add outputs to BQ table")
+        if self.add_outputs_to_bq:
+            self.add_outputs_to_bq_tables_()
 
     def create_fpr_(
             self,
@@ -590,6 +596,51 @@ class CreateFPRs:
                 df_.to_parquet(
                     f"gs://{self.output_bucket}/{k_}/{df_name}-{country_code}.parquet",
                     index=False,
+                )
+
+    def add_outputs_to_bq_tables_(
+            self
+    ) -> None:
+        """Add parquet outputs of this run to target BQ tables"""
+        client = bigquery.Client()
+        for path_, d_ in self.schemas.items():
+            bq_schema = d_.get('bigquery')
+            # table ID to create or append to:
+            bq_table = d_.get('bq_table')
+            if (bq_schema is not None) & (bq_table is not None):
+                info(f"Loading data to table:\n  {bq_table}")
+                uri = (
+                    f"gs://{self.output_bucket}/"
+                    f"{path_}/*.parquet"
+                )
+                try:
+                    destination_table = client.get_table(bq_table)
+                    info(
+                        f"  {destination_table.num_rows:,.0f} rows in table BEFORE addig data"
+                    )
+                except Exception as e:
+                    info(f"Error reading table.\n  {e}")
+
+                # WRITE_TRUNCATE -> replace
+                # WRITE_APPEND -> append data
+                job_config = bigquery.LoadJobConfig(
+                    schema=bq_schema,
+                    source_format=bigquery.SourceFormat.PARQUET,
+                    write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+                )
+
+                # Make an API request to load data
+                load_job = client.load_table_from_uri(
+                    uri,
+                    bq_table,
+                    location="US",  # Must match the destination dataset location.
+                    job_config=job_config,
+                )
+
+                load_job.result()  # Waits for the job to complete.
+                destination_table = client.get_table(bq_table)
+                info(
+                    f"  {destination_table.num_rows:,.0f} rows in table AFTER addig data"
                 )
 
 
