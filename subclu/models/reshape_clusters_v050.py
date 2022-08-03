@@ -1034,9 +1034,9 @@ def reshape_df_1_cluster_per_row(
 def get_fpr_df_and_dict(
         df: pd.DataFrame,
         target_country_code: str = None,
-        col_counterpart_count: str = 'subs_to_rec_in_cluster_count',
-        col_list_cluster_names: str = 'list_cluster_subreddit_names',
-        col_list_cluster_ids: str = 'list_cluster_subreddit_ids',
+        col_counterpart_count: str = 'subreddits_to_rec_count',
+        col_list_cluster_names: str = 'cluster_subreddit_names_list',
+        col_list_cluster_ids: str = 'cluster_subreddit_ids_list',
         l_cols_for_seeds: List[str] = None,
         l_cols_for_clusters: List[str] = None,
         col_new_cluster_val: str = 'cluster_label',
@@ -1044,6 +1044,7 @@ def get_fpr_df_and_dict(
         col_new_cluster_val_int: str = 'cluster_label_int',
         col_sort_by: str = None,
         verbose: bool = True,
+        convert_lists_to_str: bool = False,
 ) -> Tuple[pd.DataFrame, dict]:
     """
     Take a df with cluster labels and create 2 things:
@@ -1075,6 +1076,10 @@ def get_fpr_df_and_dict(
             The integer value for the cluster in `col_new_cluster_name` for the
             right-most (deepest) cluster:
             Example: if cluster_val="0012-0014" -> 14
+
+        convert_lists_to_str:
+            If True, convert nested (list) columns to string. We want it to be
+            False for BigQuery because we want to return a nested list!
         col_sort_by:
         verbose:
 
@@ -1083,11 +1088,12 @@ def get_fpr_df_and_dict(
     """
     if l_cols_for_seeds is None:
         l_cols_for_seeds = [
-            'pt', 'qa_pt', 'run_id', 'geo_country_code', 'country_name',
-            'qa_table', 'geo_relevance_table',
+            'run_id', 'geo_country_code', 'country_name',
             'subreddit_id', 'subreddit_name',
+            'pt', 'qa_pt',
             col_new_cluster_val, col_new_cluster_name,
             col_new_cluster_val_int,
+            'qa_table', 'geo_relevance_table',
         ]
     # make sure cols are in input df
     l_cols_for_seeds = [c for c in l_cols_for_seeds if c in df.columns]
@@ -1212,15 +1218,26 @@ def get_fpr_df_and_dict(
     else:
         d_fpr['GEO_SIMS'] = d_fpr_raw[col_list_cluster_ids].copy()
 
-    # when converting to JSON for gspread it's better to convert the list into a string
-    # and to remove the brackets. Otherwise we can get errors.
-    for c_ in [col_list_cluster_names, col_list_cluster_ids]:
-        df_a_to_b_list[c_] = (
-            df_a_to_b_list[c_]
-            .astype(str)
-            .str[1:-1]
-            .str.replace("'", "")
-        )
+    # When converting to JSON for gspread it's better to convert the list into a string
+    #  and to remove the brackets. Otherwise we can get errors.
+    # If we're using parquet to store as nested values we can keep it as i
+    #  but need to make sure we have the right dtypes for parquet (list_) & BQ (mode=repeated)
+    if convert_lists_to_str:
+        for c_ in [col_list_cluster_names, col_list_cluster_ids]:
+            df_a_to_b_list[c_] = (
+                df_a_to_b_list[c_]
+                .astype(str)
+                .str[1:-1]
+                .str.replace("'", "")
+            )
+    # Move some columns to front of df so it's easier for humans to read
+    l_c_to_front_ = [
+        'run_id', 'geo_country_code', 'country_name',
+        'subreddit_id_seed', 'subreddit_name_seed',
+        col_counterpart_count,
+        col_list_cluster_names, col_list_cluster_ids
+    ]
+    df_a_to_b_list = df_a_to_b_list[reorder_array(l_c_to_front_, df_a_to_b_list.columns)]
     info(f"  {df_a_to_b_list.shape} <- df_fpr.shape")
     return df_a_to_b_list, d_fpr
 
