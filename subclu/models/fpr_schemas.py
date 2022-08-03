@@ -219,9 +219,18 @@ def fpr_qa_summary_schema(
 
         bigquery.SchemaField(
             name="seed_subreddit_ids",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of seed IDs. If user subscribes to a SEED we will rec posts from 'recommend list'",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
         bigquery.SchemaField(
             name="seed_subreddit_ids_count",
@@ -231,9 +240,18 @@ def fpr_qa_summary_schema(
 
         bigquery.SchemaField(
             name="recommend_subreddit_ids",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of subreddit IDs to recommend in country FPR",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
         bigquery.SchemaField(
             name="recommend_subreddit_ids_count",
@@ -243,9 +261,18 @@ def fpr_qa_summary_schema(
 
         bigquery.SchemaField(
             name="orphan_or_exclude_seed_subreddit_ids_list",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of orphan or excluded SEED subreddit IDs",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
         bigquery.SchemaField(
             name="orphan_or_exclude_seed_subreddit_ids_count",
@@ -255,9 +282,18 @@ def fpr_qa_summary_schema(
 
         bigquery.SchemaField(
             name="orphan_seed_subreddit_ids_list",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of subreddits that are by themselves or can't be recommended to something else",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
         bigquery.SchemaField(
             name="orphan_seed_subreddit_ids_count",
@@ -267,9 +303,18 @@ def fpr_qa_summary_schema(
 
         bigquery.SchemaField(
             name="orphan_recommend_subreddit_ids_list",
-            field_type="STRING",
-            mode="REPEATED",
+            field_type="RECORD",
             description="List of subreddits that can be recommended, but are orphaned",
+            fields=[
+                bigquery.SchemaField(
+                    name='list',
+                    field_type='RECORD',
+                    mode='REPEATED',
+                    fields=[
+                        bigquery.SchemaField(name='item', field_type="STRING")
+                    ]
+                ),
+            ],
         ),
         bigquery.SchemaField(
             name="orphan_recommend_subreddit_ids_count",
@@ -322,7 +367,7 @@ def bq_to_pa_dtype(
         'DATE': pa.date32(),
         'INTEGER': pa.int64(),
     }
-    return d_bq_to_pa[bq_type]
+    return d_bq_to_pa.get(bq_type)
 
 
 #
