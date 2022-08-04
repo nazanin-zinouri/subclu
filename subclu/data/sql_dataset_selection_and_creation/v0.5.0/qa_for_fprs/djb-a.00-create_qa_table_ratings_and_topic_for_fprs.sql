@@ -26,7 +26,7 @@ DECLARE TARGET_COUNTRIES DEFAULT [
     , 'FR', 'IT'
     , 'MX', 'ES', 'AR', 'CO', 'CR', 'PA'
     , 'RO', 'NL', 'GR', 'BE', 'PL'
-    , 'TR', 'SA', 'PH'
+    , 'TR', 'ZA', 'PH'
     -- Nordic countries
     , 'SE', 'FI', 'NO', 'DK'
 ];
