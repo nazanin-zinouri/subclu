@@ -268,6 +268,9 @@ subs_geo_custom_agg AS (
                 -- NOTE that order of filters can make a big difference.
                 --   Remove over_18 & sensitive clusters first
                 , CASE
+                    WHEN (over_18 = 't') THEN 'remove-over_18'
+                    WHEN (sensitive_cluster_filter = 'remove') THEN 'remove-sensitive_cluster'
+
                     -- Exclude subs that have been marked as spam or removed
                     WHEN (
                         COALESCE(verdict, '') = 'admin-removed'
@@ -276,9 +279,6 @@ subs_geo_custom_agg AS (
                         OR deleted IS NOT NULL
                         OR COALESCE(quarantine, FALSE) != FALSE
                     ) THEN 'remove-spam_banned_or_deleted'
-
-                    WHEN (over_18 = 't') THEN 'remove-over_18'
-                    WHEN (sensitive_cluster_filter = 'remove') THEN 'remove-sensitive_cluster'
 
                     -- Exclude geo-subreddits that don't want to be discovered
                     --  NOTE: We can use them as seeds, but we can't use them as recommendations so we don't need to rate them
@@ -375,11 +375,7 @@ subs_geo_custom_agg AS (
     ORDER BY k_1000_label DESC, combined_filter_detail
 )
 
-SELECT
-    * EXCEPT(
-        verdict, is_spam, is_deleted, deleted, quarantine
-    )
-FROM combined_filters
+SELECT * FROM combined_filters
 );  -- close INSERT or CREATE table parens
 
 
