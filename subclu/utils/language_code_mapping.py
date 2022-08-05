@@ -22,6 +22,8 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     # manually added from JSON file:
     "tl": "Tagalog",
     "he": "Hebrew",
+    "az": "Azerbaijani",
+    "be": "Belarusian",
 
     # From Google's github page:
     # 'Output Code': 'Language Name'
@@ -210,7 +212,7 @@ L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
 
     'vi',  # Vietnamese
     'ru',  # Russian
-    'ru-Latn', # Russian
+    'ru-Latn',  # Russian
 
     'ja',  # Japanese
     'ja-Latn',
@@ -228,16 +230,28 @@ L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
     'te',  # 'Telugu'
     'ml',  # 'Malayalam'
 
-    # 'la',  # latin -- exclude this b/c it's prob mis-classification of Romance languages
-    # 'fy',  # Western Frisian is prob mis-classification of Dutch or Germanic languages
+    'la',  # latin -- it's prob mis-classification of Romance languages
+    'fy',  # Western Frisian is prob mis-classification of Germanic languages
     'hu',  # Hungarian
-    # 'lb',  # Luxemburgish -- also prob a misclassification of German/French/Dutch
+    'lb',  # Luxemburgish -- also prob a misclassification of German/French/Dutch
     'sq',  # Albanian
 
     'el',  # Greek
     'el-Latn',
 
-    # Languages from this analysis
+    # Other top detected languages 2022-08-04
+    'mg',   # Malagasy
+    'mt',   # Maltese
+    'haw',  # Hawaiian - Seems common with abbreviations
+    'jv',   # Javanese
+    'fil',  # Filipino
+    'sn',   # Shona
+    'ig',   # Igbo
+    'zu',   # Zulu
+    'gl',   # Galician
+
+
+    # Other languages from this analysis
     # https://towardsdatascience.com/the-most-popular-languages-on-reddit-analyzed-with-snowflake-and-a-java-udtf-4e58c8ba473c
     'bs',  # Bosnian
     'sr',  # Serbian
@@ -282,6 +296,9 @@ DF_LANGUAGE_MAPPING = DF_LANGUAGE_MAPPING.sort_values(
     by=['language_name'], ascending=True
 )
 
+# TODO(djb) add language family mapping(?)
+#  i.e., Germanic & Romance languages b/c individual language can be noisy?
+#  Potential sources:
 
 #
 # ~ fin
