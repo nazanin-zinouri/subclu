@@ -145,6 +145,119 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
     'zu': 'Zulu',
 }
 
+# The BigQuery table is broken, so we need to map some numeric IDs to text codes
+#  data-prod-165221.language_detection.language_code_reference
+MAP_CLD3_IDS_TO_LANGUAGE_CODES = {
+    'af': 1,  # (a)f
+    'am': 2,  # (a)m
+    'ar': 3,  # (a)r
+    'bg': 4,  # (b)g
+    'bg-Latn': 5,  # (b)g-Latn
+    'bn': 6,  # (b)n
+    'bs': 7,  # (b)s
+    'ca': 8,  # (c)a
+    'ceb': 9,  # (c)eb
+        'co': 10,
+    'cs': 11,
+    'cy': 12,
+    'da': 13,
+    'de': 14,
+    'el': 15,
+    'el-Latn': 16,
+    'en': 17,
+    'eo': 18,
+    'es': 19,
+    'et': 20,
+    'eu': 21,
+    'fa': 22,
+    'fi': 23,
+    'fil': 24,
+    'fr': 25,
+    'fy': 26,
+    'ga': 27,
+    'gd': 28,
+    'gl': 29,
+    'gu': 30,
+    'ha': 31,
+    'haw': 32,
+    'hi': 33,
+    'hi-Latn': 34,
+    'hmn': 35,
+    'hr': 36,
+    'ht': 37,
+    'hu': 38,
+    'hy': 39,
+    'id': 40,
+    'ig': 41,
+    'is': 42,
+    'it': 43,
+    'iw': 44,
+    'ja': 45,
+    'ja-Latn': 46,
+    'jv': 47,
+    'ka': 48,
+    'kk': 49,
+    'km': 50,
+    'kn': 51,
+    'ko': 52,
+    'ku': 53,
+    'ky': 54,
+    'la': 55,
+    'lb': 56,
+    'lo': 57,
+    'lt': 58,
+    'lv': 59,
+    'mg': 60,
+    'mi': 61,
+    'mk': 62,
+    'ml': 63,
+    'mn': 64,
+    'mr': 65,
+    'ms': 66,
+    'mt': 67,
+    'my': 68,
+    'ne': 69,
+    'nl': 70,
+    'no': 71,
+    'ny': 72,
+    'pa': 73,
+    'pl': 74,
+    'ps': 75,
+    'pt': 76,
+    'ro': 77,
+    'ru': 78,
+    'ru-Latn': 79,
+    'sd': 80,
+    'si': 81,
+    'sk': 82,
+    'sl': 83,
+    'sm': 84,
+    'sn': 85,
+    'so': 86,
+    'sq': 87,
+    'sr': 88,
+    'st': 89,
+    'su': 90,
+    'sv': 91,
+    'sw': 92,
+    'ta': 93,
+    'te': 94,
+    'tg': 95,
+    'th': 96,
+    'tr': 97,
+    'uk': 98,
+    'ur': 99,
+    'uz': 100,
+    'vi': 101,
+    'xh': 102,
+    'yi': 103,
+    'yo': 104,
+    'zh': 105,
+    'zh-Latn': 106,
+    'zu': 107,
+}
+
+
 L_USE_MULTILINGUAL_LANGUAGE_NAMES = [
     'Arabic',
     # USE-multilingual differentiates simplified & traditional Chinese
@@ -178,6 +291,25 @@ for lang_code, lang_name in D_CLD3_CODE_TO_LANGUAGE_NAME.items():
 # These codes were extracted from top subreddit POSTS extract from:
 #  top_subreddits_2021-07_16.yaml
 # Languages with * next to them are high priority for i18n
+
+# New approach:
+# It's easier to flag the languages to group as "other language"
+#   than the "top" language
+L_CLD3_CODES_FOR_LANGUAGE_NAMES_TO_GROUP_AS_OTHER = [
+    'lo',
+    'km',
+    'gu',
+    'my',
+    'kn',
+    'am',
+    'si',
+    'hy',
+    'yi',
+    'ps',
+    'ka',
+    'bn',
+]
+
 L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
     'en',  # English
     'de',  # * German *
@@ -197,7 +329,7 @@ L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT = [
     'da',  # Danish - English/Germanic language mix ups
     'cy',  # Welsh - not sure how this is so high
     'ca',  # Catalan - Spanish & Portuguese gets misclassified as this
-    'ro',  # Romanian - Latin mix? (Spanish, Portuguese, Italian?)
+    'ro',  # Romanian - Latin mix (Spanish, Portuguese, Italian?)
 
     'sv',  # Swedish
     'tr',  # Turkish
@@ -271,34 +403,59 @@ L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL = list(
     set(L_CLD3_CODES_FOR_TOP_LANGUAGES_USED_AT_REDDIT)
 )
 
-# Create a dataframe with language information
-# we can then use this df to create a table in bigQuery
-DF_LANGUAGE_MAPPING = (
-    pd.DataFrame(
-        [D_CLD3_CODE_TO_LANGUAGE_NAME]
-    ).T
-    .reset_index()
-    .rename(columns={'index': 'language_code',
-                     0: 'language_name'})
-)
 
-DF_LANGUAGE_MAPPING['language_name_top_only'] = np.where(
-    DF_LANGUAGE_MAPPING['language_code'].isin(['UNKNOWN'] + L_CLD3_CODES_FOR_TOP_LANGUAGES_AND_USE_MULTILINGUAL),
-    DF_LANGUAGE_MAPPING['language_name'],
-    'Other_language'
-)
-DF_LANGUAGE_MAPPING['language_in_use_multilingual'] = np.where(
-    DF_LANGUAGE_MAPPING['language_name'].isin(L_USE_MULTILINGUAL_LANGUAGE_NAMES),
-    True,
-    False
-)
-DF_LANGUAGE_MAPPING = DF_LANGUAGE_MAPPING.sort_values(
-    by=['language_name'], ascending=True
-)
+def get_df_language_mapping(
+) -> pd.DataFrame:
+    """
+    Use the dicts & lists above to create a dataframe with language information
+    we can then use this df to create a table in bigQuery.
+    TODO(djb): Dislike using local global vars, but we'll fix it later
+    """
+    df_language_mapping = (
+        pd.DataFrame(
+            [D_CLD3_CODE_TO_LANGUAGE_NAME]
+        ).T
+            .reset_index()
+            .rename(columns={'index': 'language_code',
+                             0: 'language_name'})
+    )
+
+    df_language_mapping['language_name_top_only'] = np.where(
+        df_language_mapping['language_code'].isin(L_CLD3_CODES_FOR_LANGUAGE_NAMES_TO_GROUP_AS_OTHER),
+        'Other_language',
+        df_language_mapping['language_name']
+    )
+    df_language_mapping['language_in_use_multilingual'] = np.where(
+        df_language_mapping['language_name'].isin(L_USE_MULTILINGUAL_LANGUAGE_NAMES),
+        True,
+        False
+    )
+
+    mask_langcode_has_id = df_language_mapping['language_code'].isin(MAP_CLD3_IDS_TO_LANGUAGE_CODES.keys())
+    df_language_mapping['language_id'] = np.where(
+        mask_langcode_has_id,
+        df_language_mapping['language_code'].replace(MAP_CLD3_IDS_TO_LANGUAGE_CODES),
+        -1,
+    )
+    df_language_mapping['language_id'] = df_language_mapping['language_id'].astype(int)
+
+    df_language_mapping = df_language_mapping.sort_values(
+        by=['language_name'], ascending=True
+    )
+    return df_language_mapping
+
+
+DF_LANGUAGE_MAPPING = get_df_language_mapping()
+
 
 # TODO(djb) add language family mapping(?)
 #  i.e., Germanic & Romance languages b/c individual language can be noisy?
 #  Potential sources:
+#  https://en.wikipedia.org/wiki/ISO_639
+#  https://opentext.wsu.edu/introtohumangeography/chapter/5-3-classification-and-distribution-of-languages/
+#  https://www.theguardian.com/education/gallery/2015/jan/23/a-language-family-tree-in-pictures
+#  https://ielanguages.com/classification-languages.html
+
 
 #
 # ~ fin
