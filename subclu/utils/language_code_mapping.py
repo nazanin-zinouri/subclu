@@ -148,6 +148,7 @@ D_CLD3_CODE_TO_LANGUAGE_NAME = {
 # The BigQuery table is broken, so we need to map some numeric IDs to text codes
 #  data-prod-165221.language_detection.language_code_reference
 MAP_CLD3_IDS_TO_LANGUAGE_CODES = {
+    "UNKNOWN": 0,
     'af': 1,  # (a)f
     'am': 2,  # (a)m
     'ar': 3,  # (a)r
@@ -157,7 +158,8 @@ MAP_CLD3_IDS_TO_LANGUAGE_CODES = {
     'bs': 7,  # (b)s
     'ca': 8,  # (c)a
     'ceb': 9,  # (c)eb
-        'co': 10,
+
+    'co': 10,
     'cs': 11,
     'cy': 12,
     'da': 13,
