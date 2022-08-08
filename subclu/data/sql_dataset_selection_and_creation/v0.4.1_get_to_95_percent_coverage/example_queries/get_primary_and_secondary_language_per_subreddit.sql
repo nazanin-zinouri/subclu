@@ -65,6 +65,8 @@ ORDER BY subreddit_name
 -- If we want to get all subreddits or filter by subreddits instead of language
 -- We can ommit the target_language declaration:
 
+-- Get primary & secondary languages for all subreddits
+
 -- What "thing" do you want to check?
 --  'post', 'comment', 'posts_and_comments'
 DECLARE THING_TYPE_TO_COUNT STRING DEFAULT 'comment';
@@ -97,7 +99,7 @@ sub_primary_language AS (
         AND language_rank = 2
 )
 
--- Use a self-join to get primary & secondary languages in the same column
+-- Use a self-join to get wide format (primary & secondary languages as columns instead of rows)
 SELECT
     l1.subreddit_id
     , l1.subreddit_name

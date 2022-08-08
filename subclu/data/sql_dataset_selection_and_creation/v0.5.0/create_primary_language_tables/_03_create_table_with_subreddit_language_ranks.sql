@@ -87,7 +87,7 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
             COALESCE(pl.subreddit_id, cl.subreddit_id)          AS subreddit_id
             , COALESCE(pl.subreddit_name, cl.subreddit_name)    AS subreddit_name
             , COALESCE(pl.language_name, cl.language_name)      AS language_name
-            , 'post_and_comment' AS thing_type
+            , 'posts_and_comments' AS thing_type
             , COALESCE(cl.language_codes, pl.language_codes) AS language_codes
 
             , SUM(COALESCE(pl.total_count, 0) + COALESCE(cl.total_count, 0)) AS total_count
