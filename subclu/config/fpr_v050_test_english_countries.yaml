@@ -1,0 +1,17 @@
+description: "Base config to test FPR creation"
+target_countries:
+  - AU
+  - GB
+  - CA
+output_bucket: 'i18n-subreddit-clustering'
+gcs_output_path: 'i18n_topic_model_batch/fpr/runs_test'
+
+cluster_labels_table: "reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_full"
+partition_dt: "(CURRENT_DATE() - 2)"
+
+geo_relevance_table: "reddit-employee-datasets.david_bermejo.subclu_subreddit_relevance_beta_20220725"
+geo_min_users_percent_by_subreddit_l28: 0.15
+geo_min_country_standardized_relevance: 3.0
+
+qa_table: "reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags"
+qa_pt: "2022-07-24"

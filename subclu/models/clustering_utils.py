@@ -44,6 +44,7 @@ def create_dynamic_clusters(
         col_full_depth_mix_count: str = 'subreddit_full_topic_mix_count',
         l_cols_primary_topics: list = None,
         log_n_clusters_below_threshold: bool = False,
+        tqdm_log_col_iterations: bool = True,
         # redo_orphans: bool = True,
         # orphan_increase: int = 2,
 ) -> pd.DataFrame:
@@ -77,6 +78,9 @@ def create_dynamic_clusters(
         col_full_depth_mix_count:
         l_cols_primary_topics:
         log_n_clusters_below_threshold:
+        tqdm_log_col_iterations:
+            Whether to use tqdm to show column checks. Set to true to match previous behavior
+            but set to false for v0.5.0 to prevent a wall of tqdm progress bars
 
     Returns:
         dataframe with new dynamic columns & nested label & topic columns
@@ -135,6 +139,7 @@ def create_dynamic_clusters(
         col_full_depth_mix_count=col_full_depth_mix_count,
         l_ix=l_ix,
         verbose=verbose,
+        tqdm_log_col_iterations=tqdm_log_col_iterations,
     )
     # use reset_index() "trick" so that we can keep the same index when using masks
     # to copy data between df_new_labels & df_labels
@@ -164,9 +169,13 @@ def create_dynamic_clusters(
         ]
         df_new_labels[col_new_cluster_topic_mix] = df_new_labels[l_cols_new_topic_mix[-1]]
 
+        iter_cols = sorted(l_cols_labels_new[:-1], reverse=True)
+        if tqdm_log_col_iterations:
+            # only use TQDM if verbose=True, otherwise we can get a long list of tqdm progress bars
+            iter_cols = tqdm(iter_cols)
         if verbose:
             logging.info(f"  Looping to roll-up clusters from smallest to largest...")
-        for c_ in tqdm(sorted(l_cols_labels_new[:-1], reverse=True)):
+        for c_ in iter_cols:
             if log_n_clusters_below_threshold:
                 print(c_)
             c_name_new = c_.replace('_nested', '')
@@ -380,6 +389,12 @@ def create_dynamic_clusters_clean(
         col_new_cluster_name,
         col_new_cluster_prim_topic,
     ]
+    # Add other cols at the end if they're not explicitly added
+    cols_to_check = [c for c in df_dynamic_raw.columns if not c.startswith('k_')]
+    l_cols_clean_final_for_qa = (
+            l_cols_clean_final_for_qa +
+            [c for c in cols_to_check if c not in l_cols_clean_final_for_qa]
+    )
 
     # copy existing columns from raw +
     l_cols_clean_existing = [c for c in l_cols_clean_final_for_qa if c in df_dynamic_raw.columns]
@@ -430,6 +445,7 @@ def get_primary_topic_mix_cols(
         col_full_depth_mix_count: str = 'subreddit_full_topic_mix_count',
         l_ix: list = None,
         verbose: bool = False,
+        tqdm_log_col_iterations: bool = True,
 ) -> pd.DataFrame:
     """For a given depth of the list of primary topic columns, return them
     in a single column as a string that combines all the nested topics without repeats
@@ -534,9 +550,14 @@ def get_primary_topic_mix_cols(
     #  calculate values for those that have multiple values... but for now
     #  just iterate through all of them
     # had to mess with +/- 1 here so that we don't calculate the same col twice
+
+    iter_cols = list(np.arange(n_mix_start + 1, ix_max_ - 1))[::-1]
+    if tqdm_log_col_iterations:
+        # only use TQDM if verbose=True, otherwise we can get a long list of tqdm progress bars
+        iter_cols = tqdm(iter_cols)
     if verbose:
         logging.info(f"  Iterating through additional subs with multiple topics...")
-    for ix_col_ in tqdm(list(np.arange(n_mix_start + 1, ix_max_ - 1))[::-1]):
+    for ix_col_ in iter_cols:
         ix_slice_end_ = ix_col_ + 1
         col_topic_mix_iter_ = l_cols_new_topic_mix[ix_col_]
 

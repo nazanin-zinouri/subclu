@@ -49,7 +49,7 @@ FROM `reddit-employee-datasets.david_bermejo.subclu_v0041_subreddit_clusters_c_a
     ) AS ars
       ON t.subreddit_name = LOWER(ars.subreddit_name)
 WHERE 1=1
-    AND COALESCE(verdict, 'f') <> 'admin_removed'
+    AND COALESCE(verdict, 'f') <> 'admin-removed'
     AND COALESCE(is_spam, FALSE) = FALSE
     -- AND COALESCE(over_18, 'f') = 'f'
     AND COALESCE(is_deleted, FALSE) = FALSE

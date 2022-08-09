@@ -438,8 +438,8 @@ class VectorizeText:
                 info(f"Saving log file...")
                 (
                     bucket
-                        .blob(posixpath.join(self.gcs_output_path_this_run, f_log_name))
-                        .upload_from_filename(self.f_log_file)
+                    .blob(posixpath.join(self.gcs_output_path_this_run, f_log_name))
+                    .upload_from_filename(self.f_log_file)
                 )
 
 
