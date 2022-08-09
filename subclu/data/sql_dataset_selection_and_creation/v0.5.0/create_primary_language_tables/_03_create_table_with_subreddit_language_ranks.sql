@@ -1,4 +1,4 @@
--- For this view, exclude removed posts & comments
+-- For this table exclude removed posts & comments
 --  Sometimes they're removed because they're spam (language pred might be bad)
 --  Sometimes posts are removed because they're in an unexpected language
 --  So keeping removed posts might bias our primary language in a bad way
@@ -43,6 +43,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
                 PARTITION BY subreddit_id
                 ORDER BY language_percent DESC, language_name
             ) AS language_rank
+            , (SELECT MIN(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_start
+            , (SELECT MAX(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_end
         FROM subreddit_lang_comments
     ),
     posts_lang AS (
@@ -79,6 +81,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
                 PARTITION BY subreddit_id
                 ORDER BY language_percent DESC, language_name
             ) AS language_rank
+            , (SELECT MIN(dt) FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`) AS dt_start
+            , (SELECT MAX(dt) FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`) AS dt_end
         FROM subreddit_lang_posts
     ),
     -- Create new table that gets percent and rank for BOTH posts and comments
@@ -91,6 +95,9 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
             , COALESCE(cl.language_codes, pl.language_codes) AS language_codes
 
             , SUM(COALESCE(pl.total_count, 0) + COALESCE(cl.total_count, 0)) AS total_count
+            -- We shouldn't use GROUP BY b/c it'll mess with totals for languages that only happen
+            --  in a posts or only in comments
+            , (COALESCE(DISTINCT(pl.total_count), 0) + COALESCE(DISTINCT(cl.total_count), 0)) AS total_count
             , SUM(COALESCE(pl.language_count, 0) + COALESCE(cl.language_count, 0)) AS language_count
         FROM subreddit_lang_posts AS pl
             FULL OUTER JOIN subreddit_lang_comments AS cl
@@ -102,11 +109,15 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
     subreddit_lang_things_rank AS (
         SELECT
             *
-            , ((0.0 + language_count) / total_count) as language_percent
+            , ((0.0 + COALESCE(language_count, 0)) / total_count) as language_percent
             , ROW_NUMBER() OVER (
                 PARTITION BY subreddit_id
                 ORDER BY language_count DESC, language_name
             ) AS language_rank
+            -- get dt_start & dt_end
+            , (SELECT MIN(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_start
+            , (SELECT MAX(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_end
+
         FROM subreddit_lang_things
     )
 
