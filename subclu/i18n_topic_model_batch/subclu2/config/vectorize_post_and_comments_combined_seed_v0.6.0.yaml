@@ -1,0 +1,71 @@
+config_description: "Test data loaders & vectorizing classes on subreddit descriptions"
+defaults:
+  - data_text_and_metadata: v0.6.0_model.yaml
+
+# Paths to cache & upload
+local_cache_path: "/home/jupyter/subreddit_clustering_i18n/data/local_cache/"
+# Note: this model path is used ONLY if we run model OUTSIDE of hydra
+local_model_path: "/home/jupyter/subreddit_clustering_i18n/data/models/embeddings"
+
+output_bucket: 'i18n-subreddit-clustering'
+
+
+# Values for data loader
+# GCS_path is the key we'll use from the data_text config
+#  get full value hydra call instead of having to write it twice.
+# We'll also use this key to write embeddings in a subfolder of text file
+#  to make data lineage easier (until we use mlflow).
+gcs_path_text_key: folder_post_and_comment_text_and_meta
+
+data_loader_name: 'LoadSubredditsGCS'
+data_loader_kwargs:
+  columns:
+    - subreddit_id
+    - subreddit_name
+    - post_id
+    - post_and_comment_text_clean
+  df_format: 'pandas'
+  unique_check: false
+  verbose: true
+
+# These sampling values should also get passed to the data loader
+n_sample_files: null
+n_files_slice_start: null
+n_files_slice_end: null
+process_individual_files: true
+
+# Values for vectorizing methods/functions
+# If you want to concat text, do it at SQL stage
+#  concat text on the fly no longer supported b/c it's hard to save & replicate
+col_text_for_embeddings: post_and_comment_text_clean
+
+model_name: use_multilingual_3
+# At batches of 1500 we were getting too many OOM errors, try 1350
+batch_inference_rows: 1350
+limit_first_n_chars: 2000
+limit_first_n_chars_retry: 1000
+get_embeddings_verbose: false
+cols_index:
+  - subreddit_id
+  - subreddit_name
+  - post_id
+
+
+# Change n_jobs(parallel jobs) & logging for hydra itself
+hydra:
+  # launcher:
+    # # override the number of jobs for joblib. For vectirizing use a single job
+    # n_jobs: 11
+  job_logging:
+    formatters:
+      simple:
+        # format: '`%(asctime)s` | `%(name)s` | `%(levelname)s` | `%(message)s`'
+        format: '`%(asctime)s` | `%(levelname)s` | `%(message)s`'
+  # Change location of logging - by default it might try to create logs in
+  #  home/david.bermejo instead of home/jupyter
+  #  https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: /home/jupyter/subreddit_clustering_i18n/hydra_runs/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: /home/jupyter/subreddit_clustering_i18n/hydra_runs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
