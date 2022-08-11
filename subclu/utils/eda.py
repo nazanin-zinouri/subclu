@@ -442,7 +442,7 @@ def value_counts_and_pcts(
     df_out = df_out.head(top_n)
 
     if sort_index & (index_group_cols is None):
-        df_out = df_out.sort_index()
+        df_out = df_out.sort_index(ascending=sort_index_ascending)
     elif sort_index & (index_group_cols is not None):
         df_out = sort_by_grouped_cols(
             df=df_out.reset_index(),
@@ -811,7 +811,7 @@ def counts_describe(
 ) -> Union[Styler, pd.DataFrame]:
     """Describe for counts, uniques, and null values
     Prefer to use it over .describe() because it doesn't show most common values
-    or ranges, which could leak PHI.
+    or ranges, which could leak info.
     Also helpful to see null values (which describe doesn't explicitly show)
     """
     if verbose:
