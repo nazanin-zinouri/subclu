@@ -203,7 +203,7 @@ We need to set as active "deployment" VM so that whenever we write and save code
 In the VM we'll actually install and sync our module under your personal user (e.g., `david.bermejo`). So we also need to synchronize our code here. 
 
 
-### Remove old code
+### Remove old code (delete old code)
 - Start (or continue) a terminal session in jupyterlab.
 - First, we'll need to assume a new user (`david.bermejo`)
 - Then we remove all the old code -- it's easier/better to start from scratch because we don't have a good way to sync the code for this user (this remote directory is NOT a github repo, but it is synced to our laptop).
