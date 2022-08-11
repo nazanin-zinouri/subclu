@@ -246,7 +246,7 @@ _NOTE_: See more detailed instructions on `editable mode` in the [gcp_environmen
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[cpu_eda]" --use-deprecated=legacy-resolver
 
 
-# Default VM for inference on data-prod
+# Default VM for text inference (text vectorization) on data-prod
 pip install -e "/home/david.bermejo/repos/subreddit_clustering_i18n/[tensorflow_233]" --use-deprecated=legacy-resolver
 
 
