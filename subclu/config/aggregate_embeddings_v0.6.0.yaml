@@ -1,0 +1,15 @@
+# Use this config to get aggregate embeddings
+defaults:
+  - data_text_and_metadata:  v0.6.0_model
+  - data_embeddings_to_aggregate: v0.6.0_2022-08-15_muse_lower_case_false
+  - aggregate_params: v0.6.0_agg
+
+bucket_output: 'i18n-subreddit-clustering'
+mlflow_tracking_uri: 'sqlite'
+# 'v0.4.0_use_multi_aggregates'  'v0.3.2_use_multi_aggregates_test'
+mlflow_experiment: 'v0.6.0_mUSE_aggregates'
+n_sample_subreddits: null
+n_sample_posts_files: null
+n_sample_comments_files: null
+
+agg_style: 'dask_delayed'

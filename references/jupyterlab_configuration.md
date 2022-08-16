@@ -89,3 +89,23 @@ I don't use it much, but definitely want to have code folding enabled
     }
 }
 ```
+
+# Document manager
+Set this to auto save
+```
+{
+    // Document Manager
+    // @jupyterlab/docmanager-extension:plugin
+    // Document Manager settings.
+    // ***************************************
+
+    // Autosave Documents
+    // Whether to autosave documents
+    "autosave": true,
+    
+    // Autosave Interval
+    // Length of save interval in seconds
+    "autosaveInterval": 60
+
+}
+```
