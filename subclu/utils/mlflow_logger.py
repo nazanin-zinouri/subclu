@@ -131,6 +131,13 @@ class MlflowLogger:
             'v0.5.0_nearest_neighbors_test',
             'v0.5.0_nearest_neighbors',
 
+            # v0.6.0 (still manual refresh, but over 300k subreddits)
+            'v0.6.0_mUSE_aggregates_test',
+            'v0.6.0_mUSE_aggregates',
+            'v0.6.0_mUSE_clustering_test',
+            'v0.6.0_mUSE_clustering',
+            'v0.6.0_nearest_neighbors',
+
         ]
         for i, exp in enumerate(l_experiments):
             try:
