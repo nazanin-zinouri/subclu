@@ -71,8 +71,8 @@ def vectorize_text(
     data_loader_kwargs_ = {
         **cfg['data_loader_kwargs'],
         **{
-            'bucket_name': cfg['data_text']['bucket_name'],
-            'gcs_path': cfg['data_text'][key_for_gcs_path],
+            'bucket_name': cfg['data_text_and_metadata']['bucket_name'],
+            'gcs_path': cfg['data_text_and_metadata'][key_for_gcs_path],
             'local_cache_path': cfg['local_cache_path'],
 
             'n_sample_files': cfg.get('n_sample_files'),
@@ -88,7 +88,7 @@ def vectorize_text(
     vect = VectorizeText(
         data_loader_kwargs=data_loader_kwargs_,
         **{k: v for k, v in cfg.items() if k not in ['data_test', 'data_loader_kwargs']},
-        **{'gcs_output_path': cfg['data_text'][key_for_gcs_path]}
+        **{'gcs_output_path': cfg['data_text_and_metadata'][key_for_gcs_path]}
     )
 
     vect.get_embeddings()
