@@ -300,8 +300,6 @@ class MlflowLogger:
             logging.error(f"Error logging RAM info\n {e}")
             return None
 
-
-
     @staticmethod
     def reset_sqlalchemy_logging() -> None:
         """
