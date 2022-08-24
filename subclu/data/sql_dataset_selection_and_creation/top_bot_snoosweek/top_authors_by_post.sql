@@ -1,29 +1,30 @@
--- Get top contributors per subreddit over L7 days or L28 days
+-- Get top contributors per subreddit POSTS over L7 days and L28 days
 DECLARE DT_END DATE DEFAULT CURRENT_DATE() - 2;
 DECLARE DT_START_WEEK DATE DEFAULT DT_END - 6;
 DECLARE DT_START_MONTH DATE DEFAULT DT_END - 27;
 
-DECLARE TOP_N_USERS_WEEK NUMERIC DEFAULT 50;
-DECLARE TOP_N_USERS_MONTH NUMERIC DEFAULT 50;
+DECLARE TOP_N_USERS_WEEK NUMERIC DEFAULT 500;
+DECLARE TOP_N_USERS_MONTH NUMERIC DEFAULT 1500;
 
 -- ==================
 -- Only need to create the first time we run it
 -- ===
-CREATE TABLE IF NOT EXISTS `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
-PARTITION BY pt AS (
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
+-- CREATE TABLE IF NOT EXISTS `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
+-- PARTITION BY pt AS (
 
 -- ==================
 -- After table is created, we can delete a partition & update it
 -- ===
--- DELETE
---     `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
--- WHERE
---     pt = DT_END
--- ;
+DELETE
+    `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
+WHERE
+    pt = DT_END
+;
 
--- -- Insert latest data
--- INSERT INTO `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
--- (
+-- Insert latest data
+INSERT INTO `reddit-employee-datasets.david_bermejo.top_bot_author_posts`
+(
 
 WITH
 authors_posts_week AS (
@@ -31,7 +32,9 @@ authors_posts_week AS (
         DT_END AS pt
         , "week" AS time_frame
         , *
-        , ROW_NUMBER() OVER(partition by subreddit_id ORDER BY post_karma DESC) author_post_rank
+        , ROW_NUMBER() OVER(
+          partition by subreddit_id ORDER BY post_karma DESC, user_id
+        ) author_post_rank
     FROM (
         SELECT
             sp.subreddit_id
@@ -131,7 +134,9 @@ authors_posts_week AS (
         DT_END AS pt
         , "month" AS time_frame
         , *
-        , ROW_NUMBER() OVER(partition by subreddit_id ORDER BY post_karma DESC) author_post_rank
+        , ROW_NUMBER() OVER(
+          partition by subreddit_id ORDER BY post_karma DESC, user_id
+        ) author_post_rank
     FROM (
         SELECT
             sp.subreddit_id
