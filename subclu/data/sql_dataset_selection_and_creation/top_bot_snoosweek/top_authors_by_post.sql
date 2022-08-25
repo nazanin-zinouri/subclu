@@ -3,8 +3,8 @@ DECLARE DT_END DATE DEFAULT CURRENT_DATE() - 2;
 DECLARE DT_START_WEEK DATE DEFAULT DT_END - 6;
 DECLARE DT_START_MONTH DATE DEFAULT DT_END - 27;
 
-DECLARE TOP_N_USERS_WEEK NUMERIC DEFAULT 500;
-DECLARE TOP_N_USERS_MONTH NUMERIC DEFAULT 1500;
+DECLARE TOP_N_USERS_WEEK NUMERIC DEFAULT 1500;
+DECLARE TOP_N_USERS_MONTH NUMERIC DEFAULT 5000;
 
 -- ==================
 -- Only need to create the first time we run it
@@ -33,8 +33,8 @@ authors_posts_week AS (
         , "week" AS time_frame
         , *
         , ROW_NUMBER() OVER(
-          partition by subreddit_id ORDER BY post_karma DESC, user_id
-        ) author_post_rank
+          partition by subreddit_id ORDER BY post_karma DESC, post_count DESC, user_id
+        ) author_rank
     FROM (
         SELECT
             sp.subreddit_id
@@ -68,8 +68,15 @@ authors_posts_week AS (
                 WHERE 1=1
                     -- Only posts that were created in the target date range
                     AND dt BETWEEN DT_START_WEEK AND DT_END
-                    -- Exclude posts that have been removed
-                    AND COALESCE(removed, 0) = 0
+                    -- Exclude posts that have been removed. NOTE: some posts appear INCORRECTLY removed
+                    --  Lots of examples in r/amItheAsshole. Maybe b/c of automod?
+                    AND (
+                        COALESCE(removed, 0) = 0
+                        OR (
+                            COALESCE(removed, 0) = 1
+                            AND upvotes >= 5
+                        )
+                    )
 
                     -- Exclude user profiles
                     AND NOT REGEXP_CONTAINS(subreddit_name, r'^u_.*')
@@ -123,11 +130,14 @@ authors_posts_week AS (
             )
 
             -- Test by limiting subreddits
-            -- AND LOWER(slo.subreddit_name) IN ("formula1", "askreddit", "de", "mexico")
+            -- AND LOWER(slo.subreddit_name) IN (
+            --     "amitheasshole"
+            --     , "formula1", "askreddit", "de", "mexico"
+            -- )
         GROUP BY 1, 2, 3
     )
-    QUALIFY author_post_rank <= TOP_N_USERS_WEEK
-    ORDER BY subreddit_name, author_post_rank
+    QUALIFY author_rank <= TOP_N_USERS_WEEK
+    ORDER BY subreddit_name, author_rank
 )
 , authors_posts_month AS (
     SELECT
@@ -135,8 +145,8 @@ authors_posts_week AS (
         , "month" AS time_frame
         , *
         , ROW_NUMBER() OVER(
-          partition by subreddit_id ORDER BY post_karma DESC, user_id
-        ) author_post_rank
+          partition by subreddit_id ORDER BY post_karma DESC, post_count DESC, user_id
+        ) author_rank
     FROM (
         SELECT
             sp.subreddit_id
@@ -170,8 +180,15 @@ authors_posts_week AS (
                 WHERE 1=1
                     -- Only posts that were created in the target date range
                     AND dt BETWEEN DT_START_MONTH AND DT_END
-                    -- Exclude posts that have been removed
-                    AND COALESCE(removed, 0) = 0
+                    -- Exclude posts that have been removed. NOTE: some posts appear INCORRECTLY removed
+                    --  Lots of examples in r/amItheAsshole. Maybe b/c of automod?
+                    AND (
+                        COALESCE(removed, 0) = 0
+                        OR (
+                            COALESCE(removed, 0) = 1
+                            AND upvotes >= 5
+                        )
+                    )
 
                     -- Exclude user profiles
                     AND NOT REGEXP_CONTAINS(subreddit_name, r'^u_.*')
@@ -225,8 +242,7 @@ authors_posts_week AS (
             )
         GROUP BY 1, 2, 3
     )
-    QUALIFY author_post_rank <= TOP_N_USERS_MONTH
-    ORDER BY subreddit_name, author_post_rank
+    QUALIFY author_rank <= TOP_N_USERS_MONTH
 )
 
 

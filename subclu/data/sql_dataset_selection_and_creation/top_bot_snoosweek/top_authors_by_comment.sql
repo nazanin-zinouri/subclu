@@ -3,8 +3,8 @@ DECLARE DT_END DATE DEFAULT CURRENT_DATE() - 2;
 DECLARE DT_START_WEEK DATE DEFAULT DT_END - 6;
 DECLARE DT_START_MONTH DATE DEFAULT DT_END - 27;
 
-DECLARE TOP_N_USERS_WEEK NUMERIC DEFAULT 500;
-DECLARE TOP_N_USERS_MONTH NUMERIC DEFAULT 1500;
+DECLARE TOP_N_USERS_WEEK NUMERIC DEFAULT 2500;
+DECLARE TOP_N_USERS_MONTH NUMERIC DEFAULT 9000;
 
 -- ==================
 -- Only need to create the first time we run it
@@ -32,7 +32,7 @@ authors_comments_week AS (
         DT_END AS pt
         , "week" AS time_frame
         , *
-        , ROW_NUMBER() OVER(partition by subreddit_id ORDER BY comment_karma DESC, user_id) author_comment_rank
+        , ROW_NUMBER() OVER(partition by subreddit_id ORDER BY comment_karma DESC, comment_count DESC, user_id) author_rank
     FROM (
         SELECT
             sp.subreddit_id
@@ -65,8 +65,15 @@ authors_comments_week AS (
                 WHERE 1=1
                     -- Only posts that were created in the target date range
                     AND dt BETWEEN DT_START_WEEK AND DT_END
-                    -- Exclude posts that have been removed
-                    AND COALESCE(removed, 0) = 0
+                    -- Exclude posts that have been removed. NOTE: some posts appear INCORRECTLY removed
+                    --  Lots of examples in r/amItheAsshole. Maybe b/c of automod?
+                    AND (
+                        COALESCE(removed, 0) = 0
+                        OR (
+                            COALESCE(removed, 0) = 1
+                            AND upvotes >= 5
+                        )
+                    )
 
                     -- Exclude user profiles
                     AND NOT REGEXP_CONTAINS(subreddit_name, r'^u_.*')
@@ -123,14 +130,14 @@ authors_comments_week AS (
             -- AND LOWER(slo.subreddit_name) IN ("formula1", "askreddit", "de", "mexico")
         GROUP BY 1, 2, 3
     )
-    QUALIFY author_comment_rank <= TOP_N_USERS_WEEK
+    QUALIFY author_rank <= TOP_N_USERS_WEEK
 )
 , authors_comments_month AS (
     SELECT
         DT_END AS pt
         , "month" AS time_frame
         , *
-        , ROW_NUMBER() OVER(partition by subreddit_id ORDER BY comment_karma DESC, user_id) author_comment_rank
+        , ROW_NUMBER() OVER(partition by subreddit_id ORDER BY comment_karma DESC, comment_count DESC, user_id) author_rank
     FROM (
         SELECT
             sp.subreddit_id
@@ -163,8 +170,15 @@ authors_comments_week AS (
                 WHERE 1=1
                     -- Only posts that were created in the target date range
                     AND dt BETWEEN DT_START_MONTH AND DT_END
-                    -- Exclude posts that have been removed
-                    AND COALESCE(removed, 0) = 0
+                    -- Exclude posts that have been removed. NOTE: some posts appear INCORRECTLY removed
+                    --  Lots of examples in r/amItheAsshole. Maybe b/c of automod?
+                    AND (
+                        COALESCE(removed, 0) = 0
+                        OR (
+                            COALESCE(removed, 0) = 1
+                            AND upvotes >= 5
+                        )
+                    )
 
                     -- Exclude user profiles
                     AND NOT REGEXP_CONTAINS(subreddit_name, r'^u_.*')
@@ -221,7 +235,7 @@ authors_comments_week AS (
             -- AND LOWER(slo.subreddit_name) IN ("formula1", "askreddit", "de", "mexico")
         GROUP BY 1, 2, 3
     )
-    QUALIFY author_comment_rank <= TOP_N_USERS_MONTH
+    QUALIFY author_rank <= TOP_N_USERS_MONTH
 )
 
 
