@@ -46,7 +46,6 @@ WITH capped_score AS (
         )
         AND subreddit_name IN UNNEST(SUBREDDITS_TO_CHECK)
 )
-;
 
 
 SELECT
