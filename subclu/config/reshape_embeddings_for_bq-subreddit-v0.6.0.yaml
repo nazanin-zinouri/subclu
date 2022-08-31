@@ -12,6 +12,8 @@ embeddings_artifact_path: 'df_subs_agg_c1_unweighted'
 bq_project: 'reddit-employee-datasets'
 bq_dataset: 'david_bermejo'
 bq_table: 'cau_subreddit_embeddings'
+bq_table_description: "Subreddit-level embeddings. See the wiki for more details. https://reddit.atlassian.net/wiki/spaces/DataScience/pages/2404220935/"
+update_table_description: True,
 
 pt: '2022-08-11'  # Date original text was pulled
 model_version: 'v0.6.0'
