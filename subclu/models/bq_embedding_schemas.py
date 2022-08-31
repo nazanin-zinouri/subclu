@@ -17,9 +17,31 @@ def embeddings_schema(
     """
     l_bq_schema = [
         bigquery.SchemaField(
+            name="pt",
+            field_type="DATE",
+            description="Date when posts were pulled",
+        ),
+        bigquery.SchemaField(
+            name="mlflow_run_id",
+            field_type="STRING",
+            description="mlflow UUID for job that created the aggregated embeddings",
+        ),
+        bigquery.SchemaField(
+            name="model_name",
+            field_type="STRING",
+            description="Short description of the model used to create the embeddings",
+        ),
+        bigquery.SchemaField(
+            name="model_version",
+            field_type="STRING",
+            description="Model version",
+        ),
+
+        bigquery.SchemaField(
             name="subreddit_id",
             field_type="STRING",
             description="Subreddit ID",
+            mode="REQUIRED"
         ),
         bigquery.SchemaField(
             name="subreddit_name",
@@ -31,26 +53,9 @@ def embeddings_schema(
             field_type="INTEGER",
             description=(
                 "How many posts were used to create this embedding." 
-                "If zero, then only return the subreddit description embedding."
+                " If zero, The embeddings are only based on text from the subreddit description."
             ),
         ),
-
-        bigquery.SchemaField(
-            name="pt",
-            field_type="DATE",
-            description="Date when posts were pulled",
-        ),
-        # bigquery.SchemaField(
-        #     name="model_version",
-        #     field_type="STRING",
-        #     description="Model version",
-        # ),
-        #
-        # bigquery.SchemaField(
-        #     name="model_name",
-        #     field_type="INTEGER",
-        #     description="Description of the model used for embeddings",
-        # ),
 
         bigquery.SchemaField(
             name="embeddings",

@@ -13,6 +13,9 @@ import pandas as pd
 import mlflow
 # import numpy as np
 
+from ..utils.big_query_utils import load_data_to_bq_table
+from .bq_embedding_schemas import embeddings_schema
+
 
 def reshape_embeddings_to_ndjson(
         df_embeddings: pd.DataFrame,
@@ -21,7 +24,7 @@ def reshape_embeddings_to_ndjson(
         f_name_prefix: str = 'sub_embeddings',
         save_path_local: Union[Path, str] = None,
         mlflow_run_id: str = None,
-        log_to_mlflow: bool = False,
+        log_to_mlflow: bool = True,
 ) -> Dict[str, str]:
     """
     Take a dataframe with embeddings and return a string that new-line delimited JSON record.
@@ -42,16 +45,15 @@ def reshape_embeddings_to_ndjson(
     df_new = df_embeddings.drop(embedding_cols, axis=1).copy()
 
     if columns_to_add is not None:
-        l_cols_to_front = list()
+        info(f"Metadata cols to add:\n  {columns_to_add}")
         for k_, v_ in columns_to_add.items():
-            l_cols_to_front.append(k_)
             df_new[k_] = str(v_).strip()
 
     l_cols_to_front = [
         'pt',
         'mlflow_run_id',
-        'model_version',
         'model_name',
+        'model_version',
         'subreddit_id',
         'subreddit_name',
         'posts_for_embeddings_count',
@@ -62,11 +64,12 @@ def reshape_embeddings_to_ndjson(
         [c for c in df_new.columns if c not in l_cols_to_front]
     )
     df_new = df_new[l_new_col_order]
-
+    info(f"Converting embeddings to repeated format...")
     df_new['embeddings'] = df_embeddings[embedding_cols].values.tolist()
 
     info(f"{df_new.shape} <- Shape of new df before converting to JSON")
     info(f"df output cols:\n  {list(df_new.columns)}")
+    info(f"Converting embeddings to JSON...")
     str_json = df_new.to_json(orient='records', lines=True)
 
     if save_path_local is not None:
@@ -87,11 +90,66 @@ def reshape_embeddings_to_ndjson(
             d_paths['mlflow_artifact_path'] = mlflow.get_artifact_uri(
                 artifact_path=f"{subfolder}/{local_f_name}"
             )
-
+        info(f"Logging artifact complete!")
+        info(f"mlflow artifact path:\n{d_paths['mlflow_artifact_path']}")
     return d_paths
 
 
+def reshape_embeddings_and_upload_to_bq(
+        df_embeddings: pd.DataFrame,
+        dict_reshape_config: dict,
+        save_path_local_root: Union[Path, str],
+        f_name_prefix: str = 'sub_embeddings',
+        embedding_col_prefix: str = 'embeddings_',
+        mlflow_run_id_override: str = None,
+        **kwargs
+) -> None:
+    """
+    Take config from reshape_embeddings_for_bq to reshape & upload data
+    to BigQuery table with a single call.
+    """
+    if mlflow_run_id_override is not None:
+        mlflow_run_id = mlflow_run_id_override
+    else:
+        mlflow_run_id = dict_reshape_config['mlflow_run_id']
 
+    # cols from config to add to output:
+    bq_col_keys = [
+        'pt',
+        'mlflow_run_id',
+        'model_name',
+        'model_version',
+    ]
+    d_cols_to_add = {k: v for k, v in dict_reshape_config.items() if k in bq_col_keys}
+
+    # subfolder to save reshaped embeddings locally
+    path_local_json = (
+            Path(save_path_local_root) / f"{dict_reshape_config['embeddings_artifact_path']}_ndjson"
+    )
+    l_embedding_cols = [c for c in df_embeddings.columns if c.startswith(embedding_col_prefix)]
+    info(f"{len(l_embedding_cols):,.0f} <- # embedding columns found")
+
+    d_paths = reshape_embeddings_to_ndjson(
+        df_embeddings,
+        embedding_cols=l_embedding_cols,
+        columns_to_add=d_cols_to_add,
+        f_name_prefix=f_name_prefix,
+        save_path_local=path_local_json,
+        log_to_mlflow=True,
+        mlflow_run_id=mlflow_run_id,
+    )
+
+    info(f"Creating table from file:\n{d_paths['mlflow_artifact_path']}")
+    load_data_to_bq_table(
+        uri=d_paths['mlflow_artifact_path'],
+        bq_project=dict_reshape_config['bq_project'],
+        bq_dataset=dict_reshape_config['bq_dataset'],
+        bq_table_name=dict_reshape_config['bq_table'],
+        schema=embeddings_schema(),
+        partition_column='pt',
+        table_description=dict_reshape_config['bq_table_description'],
+        update_table_description=True,
+    )
 
 
 #
