@@ -2,13 +2,11 @@
 Utilities to load & upload data from/to bigQuery
 """
 import logging
-from typing import Optional, List
+from logging import info
+from typing import List
 
 from google.cloud import bigquery
 from google.api_core.exceptions import NotFound, Conflict
-
-
-logger = logging.getLogger(__name__)
 
 
 def table_exists(
@@ -17,10 +15,10 @@ def table_exists(
 ) -> bool:
     try:
         bq_client.get_table(bq_table)
-        logger.debug("Table %s already exists", bq_table)
+        logging.debug("Table %s already exists", bq_table)
         return True
     except NotFound:
-        logger.debug("Table %s is not found", bq_table)
+        logging.debug("Table %s is not found", bq_table)
         return False
 
 
@@ -37,7 +35,7 @@ def create_partitioned_table_if_not_exist(
     bq_table = ".".join([bq_project, bq_dataset, bq_table_name])
 
     if table_exists(bq_table=bq_table, bq_client=bq_client):
-        logger.info("Table %s already exist", bq_table)
+        info("Table %s already exist", bq_table)
     else:
         try:
             dataset_ref = bigquery.DatasetReference(bq_project, bq_dataset)
@@ -57,14 +55,14 @@ def create_partitioned_table_if_not_exist(
                 table,
                 exists_ok=False,
             )
-            logger.info(
+            info(
                 "Created table %s.%s.%s",
                 table.project,
                 table.dataset_id,
                 table.table_id,
             )
         except Conflict as err:
-            logger.error("Conflict when creating table, %s", err)
+            logging.error("Conflict when creating table, %s", err)
 
 
 def load_data_to_bq_table(
@@ -95,7 +93,7 @@ def load_data_to_bq_table(
         bq_client = bigquery.Client()
 
     bq_table = ".".join([bq_project, bq_dataset, bq_table_name])
-    logger.info(f"Loading data to table:\n  {bq_table}")
+    info(f"Loading data to table:\n  {bq_table}")
 
     create_partitioned_table_if_not_exist(
         bq_project=bq_project,
@@ -111,7 +109,7 @@ def load_data_to_bq_table(
     if verbose:
         if table_exists(bq_table=bq_table, bq_client=bq_client):
             destination_table = bq_client.get_table(bq_table)
-            logger.info(
+            info(
                 f"  {destination_table.num_rows:,.0f} rows in table BEFORE adding data"
             )
 
@@ -137,7 +135,7 @@ def load_data_to_bq_table(
 
     destination_table = bq_client.get_table(bq_table)
     if update_table_description & (table_description is not None):
-        logger.info(
+        info(
             f"Updating subreddit description from:\n  {destination_table.description}"
             f"\nto:\n  {table_description}"
         )
@@ -145,6 +143,6 @@ def load_data_to_bq_table(
 
         destination_table = bq_client.update_table(destination_table, ['description'])
 
-    logger.info(
+    info(
         f"  {destination_table.num_rows:,.0f} rows in table AFTER adding data"
     )

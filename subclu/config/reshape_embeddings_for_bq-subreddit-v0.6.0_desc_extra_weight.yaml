@@ -7,15 +7,15 @@ defaults:
 bucket_output: 'i18n-subreddit-clustering'
 mlflow_tracking_uri: 'sqlite'
 mlflow_run_id: 'badc44b0e5ac467da14f710da0b410c6'
-embeddings_artifact_path: 'df_subs_agg_c1_unweighted'
+embeddings_artifact_path: 'df_subs_agg_c1'
 
 bq_project: 'reddit-employee-datasets'
 bq_dataset: 'david_bermejo'
 bq_table: 'cau_subreddit_embeddings'
 bq_table_description: "Subreddit-level embeddings. See the wiki for more details. https://reddit.atlassian.net/wiki/spaces/DataScience/pages/2404220935/"
-update_table_description: True,
+update_table_description: False,
 
-pt: '2022-08-11'  # Date original text was pulled
+pt: '2022-08-10'  # Date original text was pulled
 model_version: 'v0.6.0'
-model_name: 'cau-text-mUSE'
+model_name: 'cau-text-mUSE extra weight for subreddit description'
 embeddings_config: aggregate_embeddings_v0.6.0

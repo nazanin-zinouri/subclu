@@ -5,6 +5,7 @@ Nested format = 1 column with a list of embeddings.
 The nested format is preferable to serialize data for bigQuery.
 """
 from datetime import datetime
+import logging
 from logging import info
 from pathlib import Path
 from typing import List, Union, Tuple, Dict
@@ -25,6 +26,7 @@ def reshape_embeddings_to_ndjson(
         save_path_local: Union[Path, str] = None,
         mlflow_run_id: str = None,
         log_to_mlflow: bool = True,
+        sort_df: bool = False,
 ) -> Dict[str, str]:
     """
     Take a dataframe with embeddings and return a string that new-line delimited JSON record.
@@ -69,6 +71,17 @@ def reshape_embeddings_to_ndjson(
 
     info(f"{df_new.shape} <- Shape of new df before converting to JSON")
     info(f"df output cols:\n  {list(df_new.columns)}")
+
+    if sort_df:
+        # Sort by most posts so that it's easier to see top subreddits in preview
+        # NOTE: sorting doesn't help for large files because BQ loads lines in parallel
+        try:
+            df_new = (
+                df_new
+                .sort_values(by=['posts_for_embeddings_count', 'subreddit_name'], ascending=[False, True])
+            )
+        except Exception as e:
+            logging.warning(f"Error sorting df:\n{e}")
     info(f"Converting embeddings to JSON...")
     str_json = df_new.to_json(orient='records', lines=True)
 
@@ -91,7 +104,6 @@ def reshape_embeddings_to_ndjson(
                 artifact_path=f"{subfolder}/{local_f_name}"
             )
         info(f"Logging artifact complete!")
-        info(f"mlflow artifact path:\n{d_paths['mlflow_artifact_path']}")
     return d_paths
 
 

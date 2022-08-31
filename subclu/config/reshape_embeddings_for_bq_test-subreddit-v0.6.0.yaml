@@ -17,6 +17,6 @@ update_table_description: True,
 
 pt: '2022-08-10'  # Date original text was pulled
 model_version: "v0.6.0"
-model_name: "cau-text-mUSE-embeddings"
+model_name: "cau-text-mUSE"
 embeddings_config: "aggregate_embeddings_v0.6.0"
 

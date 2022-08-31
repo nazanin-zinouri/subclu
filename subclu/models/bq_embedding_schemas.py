@@ -53,7 +53,7 @@ def embeddings_schema(
             field_type="INTEGER",
             description=(
                 "How many posts were used to create this embedding." 
-                " If zero, The embeddings are only based on text from the subreddit description."
+                " If zero, the embeddings are only based on text from the subreddit description."
             ),
         ),
 
