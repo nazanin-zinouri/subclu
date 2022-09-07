@@ -384,7 +384,7 @@ rating_and_topic_curator_and_crowd AS (
                         AND (predictions_filter_detail = 'remove-rating')
                         AND (primary_topic IN ('Gaming', 'History'))
                         AND (predicted_rating = 'M')
-                    ) THEN 'recommend-gaming_override'
+                    ) THEN 'recommend-model_override'
 
                     -- Some sports subreddits mis-labeled as "fitness & nutrition"
                     WHEN (
@@ -393,7 +393,7 @@ rating_and_topic_curator_and_crowd AS (
                         AND (primary_topic = 'Sports')
                         AND (predicted_topic = 'Fitness and Nutrition')
                         AND (predicted_rating = 'E')
-                    ) THEN 'recommend-sports_override'
+                    ) THEN 'recommend-model_override'
 
                     -- Careers in medicine that get labeled as "medical"
                     WHEN (
