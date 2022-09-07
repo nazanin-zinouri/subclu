@@ -1,10 +1,13 @@
 -- CREATE TABLE OR UPDATE query to apply QA to filter out subreddits for FPRs (add latest partition date)
+-- Each dt in this table is meant to include all subreddits that have
+--  a rating or topic label (curator, crowd, or predicted)
+--  OR 1+ visits, posts, comments recently
+
+-- Update: This table now uses a snapshot of curator labels!
 
 DECLARE PARTITION_DATE DATE DEFAULT (CURRENT_DATE() - 2);
 
 -- Define sensitive topics (actual & predicted) to filter out
--- NOTE: we can't DECLARE variables this in a VIEW ;_; so we should create a table, otherwise we'd have to copy & paste
---   the topics list 4+ times and it's too easy to screw it up
 DECLARE SENSITIVE_TOPICS DEFAULT [
     'Addiction Support'
     , 'Activism'
@@ -30,39 +33,48 @@ WHERE
     pt = PARTITION_DATE
 ;
 
--- Create table (if it doesn't exist)
--- CREATE TABLE IF NOT EXISTS `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
+-- Create table (IF NOT EXISTS) or REPLACE
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
 -- PARTITION BY pt
 -- AS (
 
--- Insert latest data
+-- Insert latest partition
 INSERT INTO `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
 (
+
 WITH
 rating_and_topic_curator_and_crowd AS (
     -- If available, pick the override, otherwise fill with crowdsourced label
+    -- NOTE: It will return some subs even if they have no topic or rating
     SELECT
-        COALESCE(o.subreddit_id, c.subreddit_id) AS subreddit_id
-        , COALESCE(o.override_topic, c.primary_topic) AS primary_topic
-        , COALESCE(o.override_rating_short, c.rating_short) AS rating_short
+        o.date_retrieved AS dt_curator
+        , o.blocklist_dt AS dt_blocklist
+        , blocklist_status
+        , blocklist_reason
+        , c.whitelist_status
+        , COALESCE(o.subreddit_id, c.subreddit_id) AS subreddit_id
+        , COALESCE(o.curator_topic, c.primary_topic) AS primary_topic
+        , COALESCE(o.curator_rating, c.rating_short) AS rating_short
+        , o.curator_topic
+        , o.curator_rating
         , c.primary_topic AS crowd_topic
         , c.rating_short AS crowd_rating
-        , COALESCE(o.override_rating, c.rating_name) AS rating_name
+        , (o.curator_topic IS NOT NULL) AS topic_by_curator
+        , (o.curator_rating IS NOT NULL) AS rating_by_curator
         , CASE
-            WHEN (o.override_topic IS NULL) OR (c.primary_topic IS NULL) THEN NULL
-            ELSE (o.override_topic = c.primary_topic)
+            WHEN (o.curator_topic IS NULL) OR (c.primary_topic IS NULL) THEN NULL
+            ELSE (o.curator_topic = c.primary_topic)
         END AS topic_crowd_curator_agree
         , CASE
-            WHEN (o.override_rating IS NULL) OR (c.rating_name IS NULL) THEN NULL
-            ELSE (o.override_rating = c.rating_name)
+            WHEN (o.curator_rating IS NULL) OR (c.rating_name IS NULL) THEN NULL
+            ELSE (o.curator_rating = c.rating_short)
         END AS rating_crowd_curator_agree
     FROM (
         SELECT *
         FROM `data-prod-165221.cnc.subreddit_metadata_lookup`
         WHERE pt = PARTITION_DATE
-            AND verification_timestamp IS NOT NULL
     ) AS c
-        FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.subreddit_taxonomy_overrides` AS o
+        FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.taxonomy_curated_labels` AS o
             ON c.subreddit_id = o.subreddit_id
 )
 , base_filters AS (
@@ -76,21 +88,26 @@ rating_and_topic_curator_and_crowd AS (
 
     FROM (
         SELECT
-            s.subreddit_id
+            nt.dt_curator
+            , nt.dt_blocklist
+            , s.subreddit_id
+            , blocklist_status
+            , blocklist_reason
+            , whitelist_status
             , s.over_18
             , s.allow_discovery
-            , m.k_0100_label_name
-            , c.k_1000_majority_primary_topic AS k_1000_majority_topic
-            , c.k_1000_label
 
-            , nt.rating_name
             , s.subreddit_name
+
             , nt.rating_short
-            , vr.predicted_rating
+            , nt.curator_rating
             , nt.crowd_rating
+            , vr.predicted_rating
+
             , nt.primary_topic
-            , vt.predicted_topic
+            , nt.curator_topic
             , nt.crowd_topic
+            , vt.predicted_topic
 
             , CASE
                 WHEN (vt.predicted_topic IS NULL) AND (nt.primary_topic IS NULL) THEN 'missing-pred_and_label'
@@ -108,6 +125,8 @@ rating_and_topic_curator_and_crowd AS (
             END AS rating_taxn_model_agree
             , nt.rating_crowd_curator_agree
             , nt.topic_crowd_curator_agree
+            , COALESCE(nt.topic_by_curator, FALSE) AS topic_by_curator
+            , COALESCE(nt.rating_by_curator, FALSE) AS rating_by_curator
 
             , asr.users_l7
             , asr.users_l28
@@ -120,12 +139,15 @@ rating_and_topic_curator_and_crowd AS (
             , s.deleted
             , s.quarantine
 
+            , m.k_0100_label_name
+            , c.k_1000_majority_primary_topic AS k_1000_majority_topic
+            , c.k_1000_label
+
             -- Flag based on NSFW clusters
             , IF(m.k_1000_label_recommend = 'no', 'remove', NULL) sensitive_cluster_filter
             -- Flag based on actual ratings & primary topics
             --  We need to be careful with some COALESCE() statements
             , CASE
-                WHEN s.over_18 = 't' THEN 'remove-over_18'
                 WHEN (COALESCE(nt.rating_short, '') = 'E') AND (nt.primary_topic NOT IN UNNEST(SENSITIVE_TOPICS)) THEN 'recommend'
                 WHEN (nt.rating_short != 'E') AND (nt.primary_topic IN UNNEST(SENSITIVE_TOPICS)) THEN 'remove-rating_and_topic'
                 WHEN (nt.rating_short != 'E') THEN 'remove-rating'
@@ -133,12 +155,12 @@ rating_and_topic_curator_and_crowd AS (
                 WHEN (nt.rating_short IS NULL) AND (nt.primary_topic IS NULL) THEN 'missing-rating_and_topic'
                 WHEN nt.primary_topic IS NULL THEN 'missing-topic'
                 WHEN nt.rating_short IS NULL THEN 'missing-rating'
+                -- NOTE: The over_18 flag comes from mods, so treat it separately from topic & rating
                 ELSE NULL
             END AS taxonomy_filter_detail
 
             -- Flag based on PREDICTED ratings & topics
             , CASE
-                WHEN s.over_18 = 't' THEN 'remove-over_18'
                 WHEN (COALESCE(vr.predicted_rating, '') = 'E') AND (vt.predicted_topic NOT IN UNNEST(SENSITIVE_TOPICS)) THEN 'recommend'
                 WHEN (vr.predicted_rating != 'E') AND (vt.predicted_topic IN UNNEST(SENSITIVE_TOPICS)) THEN 'remove-rating_and_topic'
                 WHEN (vr.predicted_rating != 'E') THEN 'remove-rating'
@@ -147,6 +169,8 @@ rating_and_topic_curator_and_crowd AS (
                 WHEN (vr.predicted_rating IS NULL) AND (vt.predicted_topic IS NULL) THEN 'review-missing_pred_rating_and_topic'
                 WHEN vt.predicted_topic IS NULL THEN 'review-missing_pred_topic'
                 WHEN vr.predicted_rating IS NULL THEN 'review-missing_pred_rating'
+
+                -- NOTE: The over_18 flag comes from mods, so treat it separately from topic & rating
                 ELSE NULL
             END AS predictions_filter_detail
 
@@ -158,6 +182,7 @@ rating_and_topic_curator_and_crowd AS (
                 , type, quarantine
             FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
             WHERE dt = PARTITION_DATE
+                AND NOT REGEXP_CONTAINS(LOWER(name), r'^u_.*')
         ) AS s
             -- Get subreddit activity so we can prioritize larger/more active subs
             LEFT JOIN (
@@ -191,18 +216,22 @@ rating_and_topic_curator_and_crowd AS (
 
         WHERE 1=1
             AND COALESCE(s.type, '') IN ('public', 'private', 'restricted')
+
             -- Only subreddits that match at least one:
             --   - have a prediction (rating|topic)
             --   - have a label (crowd or curator rating|topic)
-            --   - have had some minimum recent activity
+            --   - have had some recent activity
             AND (
                 vt.subreddit_id IS NOT NULL
                 OR vr.subreddit_id IS NOT NULL
-                OR nt.subreddit_id IS NOT NULL
+                OR (
+                    nt.primary_topic IS NOT NULL
+                    OR nt.rating_short IS NOT NULL
+                )
 
-                OR COALESCE(asr.users_l28, 0) >= 20
-                OR COALESCE(asr.comments_l28, 0) >= 9
-                OR COALESCE(asr.posts_l28, 0) >= 2
+                OR COALESCE(asr.users_l7, 0) >= 1
+                OR COALESCE(asr.comments_l28, 0) >= 1
+                OR COALESCE(asr.posts_l28, 0) >= 1
             )
     )
 )
@@ -210,24 +239,39 @@ rating_and_topic_curator_and_crowd AS (
     -- Again, use subquery to reduce the need to define case statements twice
     SELECT
         PARTITION_DATE AS pt
+        , dt_curator
+        , dt_blocklist
         , subreddit_id
         , over_18
-        , allow_discovery
-        , topic_taxn_model_agree
-        , rating_taxn_model_agree
+        , whitelist_status
+        , blocklist_status
+        , blocklist_reason
         , users_l7
         , subreddit_name
+
         , primary_topic
-        , predicted_topic
+        , curator_topic
         , crowd_topic
+        , predicted_topic
+
         , rating_short
-        , predicted_rating
+        , curator_rating
         , crowd_rating
+        , predicted_rating
 
         , CASE
+            WHEN
+                (combined_filter_reason IN ("sensitive_cluster", "allow_discovery_f"))
+                AND (taxonomy_filter = "missing")
+                THEN REGEXP_REPLACE(taxonomy_filter_detail, '-', '_')
+            WHEN
+                (combined_filter_reason IN ("sensitive_cluster", "allow_discovery_f"))
+                AND (taxonomy_filter = "recommend")
+                AND (predictions_filter = "remove")
+                THEN CONCAT("review_", predictions_filter_reason)
             WHEN combined_filter_reason IN (
                 'sensitive_cluster', 'over_18', 'allow_discovery_f'
-                , 'predictions_clean'
+                , 'taxonomy_and_preds_clean'
                 , 'rating', 'topic', 'rating_and_topic'
                 , 'missing_pred_rating_and_topic'
                 , 'missing_pred_topic'
@@ -238,27 +282,46 @@ rating_and_topic_curator_and_crowd AS (
             ELSE combined_filter_reason
         END AS taxonomy_action
         , combined_filter_detail
-        , combined_filter
-        , combined_filter_reason
         , taxonomy_filter_detail
         , predictions_filter_detail
+        , verdict
+        , quarantine
+        , allow_discovery
         , sensitive_cluster_filter
+        , combined_filter
+        , combined_filter_reason
+        , topic_taxn_model_agree
+        , rating_taxn_model_agree
 
         , * EXCEPT (
-            subreddit_id
+            deleted
+            , is_deleted
+            , is_spam
+
+            , dt_curator
+            , dt_blocklist
+            , whitelist_status
+            , blocklist_status
+            , blocklist_reason
+            , subreddit_id
             , over_18
-            , allow_discovery
+
+            , topic_taxn_model_agree
+            , rating_taxn_model_agree
             , users_l7
             , subreddit_name
             , primary_topic
+            , curator_topic
             , predicted_topic
             , crowd_topic
             , rating_short
-            , predicted_rating
+            , curator_rating
             , crowd_rating
-            , topic_taxn_model_agree
-            , rating_taxn_model_agree
+            , predicted_rating
 
+            , allow_discovery
+            , verdict
+            , quarantine
             , combined_filter_detail
             , combined_filter
             , combined_filter_reason
@@ -275,10 +338,13 @@ rating_and_topic_curator_and_crowd AS (
         FROM (
             SELECT
                 *
-                -- NOTE that order of filters can make a big difference.
+                -- NOTE that order of filters can make a big difference!
                 --   Remove over_18 & sensitive clusters first
                 , CASE
-                    WHEN (over_18 = 't') THEN 'remove-over_18'
+                    WHEN (COALESCE(over_18, '') = 't') THEN 'remove-over_18'
+
+                    -- For sensitive cluster subs, we always want to remove them
+                    --   BUT we still might want to flag them for taxonomy team to review
                     WHEN (sensitive_cluster_filter = 'remove') THEN 'remove-sensitive_cluster'
 
                     -- Exclude subs that have been marked as spam or removed
@@ -295,7 +361,7 @@ rating_and_topic_curator_and_crowd AS (
                     WHEN COALESCE(allow_discovery, '') = 'f' THEN 'remove-allow_discovery_f'
 
                     -- Only RECOMMEND if cleared by BOTH taxonomy & predictions
-                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'recommend') THEN 'recommend-predictions_clean'
+                    WHEN (taxonomy_filter_detail = 'recommend') AND (predictions_filter_detail = 'recommend') THEN 'recommend-taxonomy_and_preds_clean'
 
                     -- REVIEW if predictions are misssing or not above threshold
                     --  Can't recommend w/o agreement
@@ -320,7 +386,7 @@ rating_and_topic_curator_and_crowd AS (
                         AND (predicted_rating = 'M')
                     ) THEN 'recommend-gaming_override'
 
-                    -- Sports subreddits mis-labeled as "fitness & nutrition"
+                    -- Some sports subreddits mis-labeled as "fitness & nutrition"
                     WHEN (
                         (taxonomy_filter_detail = 'recommend')
                         AND (predictions_filter_detail = 'remove-topic')
@@ -359,14 +425,10 @@ rating_and_topic_curator_and_crowd AS (
                     WHEN (taxonomy_filter_detail = 'missing-rating_and_topic') AND (predictions_filter = 'remove') THEN 'remove-missing_rating_and_topic'
 
                     -- Apply remove cases last to allow overrides above
-                    WHEN (taxonomy_filter_detail = 'remove-rating_and_topic') THEN 'remove-rating_and_topic'
-                    WHEN (taxonomy_filter_detail = 'remove-rating') THEN 'remove-rating'
-                    WHEN (taxonomy_filter_detail = 'remove-topic') THEN 'remove-topic'
+                    WHEN taxonomy_filter_detail IS NOT NULL THEN taxonomy_filter_detail
 
-                    -- Remove by predicttions, for now apply general remove to be safe, might break it down if need to dig into details
-                    WHEN (predictions_filter_detail = 'remove-rating_and_topic') THEN 'remove-pred_rating_and_topic'
-                    WHEN (predictions_filter_detail = 'remove-rating') THEN 'remove-pred_rating'
-                    WHEN (predictions_filter_detail = 'remove-topic') THEN 'remove-pred_topic'
+                    -- Remove by predicttions last & apply "pred_" prefix
+                    WHEN predictions_filter_detail IS NOT NULL THEN REGEXP_REPLACE(predictions_filter_detail, "-", "-pred_")
 
                     ELSE NULL
                 END AS combined_filter_detail
