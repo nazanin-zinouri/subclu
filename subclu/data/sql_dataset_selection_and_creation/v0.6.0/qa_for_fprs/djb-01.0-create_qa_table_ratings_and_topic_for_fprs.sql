@@ -3,7 +3,7 @@
 --  a rating or topic label (curator, crowd, or predicted)
 --  OR 1+ visits, posts, comments recently
 
--- Update: This table now uses a snapshot of curator labels!
+-- Update 2022-09: This table now uses a snapshot of curator labels!
 
 DECLARE PARTITION_DATE DATE DEFAULT (CURRENT_DATE() - 2);
 
@@ -33,8 +33,8 @@ WHERE
     pt = PARTITION_DATE
 ;
 
--- Create table (IF NOT EXISTS) or REPLACE
--- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
+-- Create table (IF NOT EXISTS) | OR REPLACE
+-- CREATE IF NOT EXISTS TABLE `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
 -- PARTITION BY pt
 -- AS (
 
@@ -61,6 +61,16 @@ rating_and_topic_curator_and_crowd AS (
         , c.rating_short AS crowd_rating
         , (o.curator_topic IS NOT NULL) AS topic_by_curator
         , (o.curator_rating IS NOT NULL) AS rating_by_curator
+        , CASE
+            WHEN (o.curator_topic IS NOT NULL) THEN 'curator'
+            WHEN (c.primary_topic IS NOT NULL) THEN 'crowd'
+            ELSE NULL
+        END AS topic_source
+        , CASE
+            WHEN (o.curator_rating IS NOT NULL) THEN 'curator'
+            WHEN (c.rating_short IS NOT NULL) THEN 'crowd'
+            ELSE NULL
+        END AS rating_source
         , CASE
             WHEN (o.curator_topic IS NULL) OR (c.primary_topic IS NULL) THEN NULL
             ELSE (o.curator_topic = c.primary_topic)
@@ -108,6 +118,9 @@ rating_and_topic_curator_and_crowd AS (
             , nt.curator_topic
             , nt.crowd_topic
             , vt.predicted_topic
+
+            , nt.topic_source
+            , nt.rating_source
 
             , CASE
                 WHEN (vt.predicted_topic IS NULL) AND (nt.primary_topic IS NULL) THEN 'missing-pred_and_label'
@@ -246,6 +259,28 @@ rating_and_topic_curator_and_crowd AS (
         , whitelist_status
         , blocklist_status
         , blocklist_reason
+        , CASE
+            WHEN (curator_topic IS NOT NULL) AND (curator_rating IS NOT NULL) THEN 'topic_and_rating'
+            WHEN (curator_topic IS NULL) AND (curator_rating IS NULL) THEN 'missing_topic_and_rating'
+            WHEN (curator_topic IS NOT NULL) AND (curator_rating IS NULL) THEN 'topic_only'
+            WHEN (curator_topic IS NULL) AND (curator_rating IS NOT NULL) THEN 'rating_only'
+        END AS curator_tags
+        , CASE
+            WHEN (topic_source IS NULL) AND (rating_source IS NULL) THEN 'missing_topic_and_rating'
+            WHEN (topic_source = 'curator') AND (rating_source = 'curator') THEN 'curator_topic_and_rating'
+            WHEN (topic_source = 'crowd') AND (rating_source = 'crowd') THEN 'crowd_topic_and_rating'
+            WHEN (topic_source IS NULL) AND (rating_source IS NOT NULL)
+                THEN CONCAT(
+                'rating_', COALESCE(rating_source, 'missing')
+            )
+            WHEN (topic_source IS NOT NULL) AND (rating_source IS NULL)
+                THEN CONCAT(
+                'topic_', COALESCE(topic_source, 'missing')
+            )
+            ELSE CONCAT(
+                "topic_", COALESCE(topic_source, 'missing'), '-rating_', COALESCE(rating_source, 'missing')
+            )
+        END AS tags_source
         , users_l7
         , subreddit_name
 
@@ -277,7 +312,7 @@ rating_and_topic_curator_and_crowd AS (
                 , 'missing_pred_topic'
                 , 'missing_pred_rating'
                 , 'spam_banned_or_deleted'
-                , 'gaming_override', 'sports_override'
+                , 'model_override'
             ) THEN NULL
             ELSE combined_filter_reason
         END AS taxonomy_action
