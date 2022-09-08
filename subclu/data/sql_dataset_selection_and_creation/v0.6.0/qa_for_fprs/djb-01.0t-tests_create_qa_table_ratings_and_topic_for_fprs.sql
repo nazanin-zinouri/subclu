@@ -1,3 +1,13 @@
+-- Check partitions & row count for the new table
+SELECT table_name, partition_id, total_rows
+FROM `reddit-employee-datasets.david_bermejo.INFORMATION_SCHEMA.PARTITIONS`
+WHERE table_name = 'subreddit_qa_flags'
+    -- We can check a specific paritition by converting timestamp to string:
+    -- AND partition_id = (SELECT FORMAT_TIMESTAMP('%Y%m%d', CURRENT_DATE() - 2))
+ORDER BY partition_id DESC
+;
+
+
 -- Check counts for each CTE
 SELECT
     (SELECT COUNT(*) FROM rating_and_topic_curator_and_crowd) AS topic_and_rating_rows
