@@ -6,6 +6,8 @@
 DECLARE SUBREDDITS_TO_CHECK DEFAULT [
     'indianfood'
     , 'cricket'
+    , 'askreddit'
+    , 'tinder'
 ];
 
 WITH capped_score AS (
@@ -15,7 +17,7 @@ WITH capped_score AS (
         , ROUND(100 * users_percent_by_subreddit_l28, 1) AS sub_dau_perc_l28_djb
         , ROUND(users_percent_by_country_standardized, 2) AS perc_by_country_capped_sd
         , ROUND(100 * users_percent_by_country_l28, 3) AS perc_by_country_l28
-    FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_relevance_beta_20220808`
+    FROM `reddit-employee-datasets.david_bermejo.subclu_subreddit_relevance_beta_20220901`
     WHERE 1=1
         -- AND users_percent_by_subreddit_l28 <= .2
         AND geo_country_code IN (
@@ -30,7 +32,7 @@ WITH capped_score AS (
         , ROUND(100 * sub_dau_perc_l28, 1) AS sub_dau_perc_l28
         , ROUND(perc_by_country_sd, 2) AS perc_by_country_sd
     FROM `data-prod-165221.i18n.community_local_scores`
-    WHERE DATE(pt) = "2022-08-30"
+    WHERE DATE(pt) = "2022-09-06"
         AND geo_country_code IN (
             'IN', 'GB', 'AU'
         )
@@ -56,14 +58,14 @@ SELECT
     , cs.geo_country_code
 
     , cs.perc_by_country_capped_sd AS perc_by_country_sd_djb
-    -- , us.perc_by_country_sd AS perc_by_country_sd_prod
+    , us.perc_by_country_sd AS perc_by_country_sd_prod
     , nc.perc_by_country_sd
 
     , cs.perc_by_country_l28
     , nc.perc_by_country
 
     , cs.sub_dau_perc_l28_djb
-    -- , us.sub_dau_perc_l28 AS sub_dau_perc_l28_prod
+    , us.sub_dau_perc_l28 AS sub_dau_perc_l28_prod
     , nc.sub_dau_perc_l28
 
 FROM capped_score AS cs

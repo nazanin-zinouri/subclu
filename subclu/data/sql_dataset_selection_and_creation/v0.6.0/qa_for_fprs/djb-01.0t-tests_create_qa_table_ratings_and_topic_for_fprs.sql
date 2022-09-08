@@ -1,3 +1,6 @@
+-- ==================
+-- Checks after table is created
+-- ===
 -- Check partitions & row count for the new table
 SELECT table_name, partition_id, total_rows
 FROM `reddit-employee-datasets.david_bermejo.INFORMATION_SCHEMA.PARTITIONS`
@@ -8,6 +11,35 @@ ORDER BY partition_id DESC
 ;
 
 
+-- Check outputs for specific subs/ countries
+SELECT *
+FROM `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
+WHERE pt = (CURRENT_DATE() - 2)
+    AND subreddit_name IN (
+        'de', 'india', 'mexico', 'france', 'tepic'
+        , 'brasilivre', 'france6'
+        , 'holup', 'publicfreakout'
+        , 'hunting'
+    )
+ORDER BY users_l7 DESC
+;
+
+
+-- Get counts by suggested actions
+-- SELECT
+--     combined_filter_detail
+--     , topic_taxn_model_agree
+--     , COUNT(*) AS row_count
+--     , COUNT(DISTINCT subreddit_id) AS subreddit_count
+-- FROM `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
+-- WHERE pt = "2022-09-04"
+-- GROUP BY 1, 2
+-- ORDER BY 1, 2
+-- ;
+
+-- ==================
+-- CTE Checks
+-- ===
 -- Check counts for each CTE
 SELECT
     (SELECT COUNT(*) FROM rating_and_topic_curator_and_crowd) AS topic_and_rating_rows
