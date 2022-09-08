@@ -46,8 +46,6 @@ WHERE
 -- Insert latest data
 INSERT INTO `reddit-employee-datasets.david_bermejo.subclu_v0050_subreddit_clusters_c_qa_flags`
 (
-
-
 WITH
 subs_geo_custom_agg AS (
     -- Select subreddits that meet country + relevance + activity thresholds
@@ -255,7 +253,6 @@ subs_geo_custom_agg AS (
             , predictions_filter_detail
             , sensitive_cluster_filter
         )
-
 
     FROM (
         SELECT

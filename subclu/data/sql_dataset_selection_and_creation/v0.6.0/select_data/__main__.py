@@ -3,7 +3,6 @@ from datetime import datetime
 import logging
 import os
 import string
-from typing import Literal, Optional
 
 from google.cloud import bigquery
 

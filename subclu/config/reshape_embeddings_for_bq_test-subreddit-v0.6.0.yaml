@@ -1,0 +1,22 @@
+description: "Use this config to TEST reshaping embeddings and upload them to BigQuery"
+defaults:
+  - data_text_and_metadata:  v0.6.0_model
+  - data_embeddings_to_aggregate: v0.6.0_2022-08-15_muse_lower_case_false
+  - aggregate_params: v0.6.0_agg
+
+bucket_output: 'i18n-subreddit-clustering'
+mlflow_tracking_uri: 'sqlite'
+mlflow_run_id: 'ca79765b72c5428395b02926612d85fd'
+embeddings_artifact_path: 'df_subs_agg_c1_unweighted'
+
+bq_project: 'reddit-employee-datasets'
+bq_dataset: 'david_bermejo'
+bq_table: 'cau_subreddit_embeddings_test'
+bq_table_description: "Subreddit-level embeddings. See the wiki for more details. https://reddit.atlassian.net/wiki/spaces/DataScience/pages/2404220935/"
+update_table_description: True,
+
+pt: '2022-08-10'  # Date original text was pulled
+model_version: "v0.6.0"
+model_name: "cau-text-mUSE"
+embeddings_config: "aggregate_embeddings_v0.6.0"
+
