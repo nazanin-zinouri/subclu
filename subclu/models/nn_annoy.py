@@ -3,6 +3,7 @@ Get nearest neighbors with ANNOY
 """
 import logging
 
+import dask
 import annoy
 import pandas as pd
 from tqdm import tqdm
@@ -101,7 +102,7 @@ class AnnoyIndex():
                 .merge(
                     pd.DataFrame(
                         {
-                        self.index_labels_name:[self.index_labels[i] for i in indices]
+                            self.index_labels_name: [self.index_labels[i] for i in indices]
                         }
                     ),
                     how='right',
@@ -147,6 +148,22 @@ class AnnoyIndex():
 
         return df_nn
 
+    def get_top_n_by_item_all_fast(
+            self,
+            k: int = 100,
+            search_k: int = -1,
+            include_distances: bool = True,
+            append_i: bool = True,
+            col_distance: str = 'distance',
+            col_distance_rank: str = 'distance_rank',
+            cosine_similarity: bool = True,
+            col_cosine_similarity: str = 'cosine_similarity',
+            tqdm_mininterval: int = 2,
+    ):
+        """Get top_n items for ALL items in parallel (using dask)
+
+        We'll use the output of this table to create SQL table that can be shared & used by others.
+        """
     def get_top_n_by_item_all(
             self,
             k=100,
@@ -157,6 +174,7 @@ class AnnoyIndex():
             col_distance_rank: str = 'distance_rank',
             cosine_similarity: bool = True,
             col_cosine_similarity: str = 'cosine_similarity',
+            tqdm_mininterval: int = 2,
     ):
         """Convenience method to get top_n items for ALL items
 
@@ -164,7 +182,11 @@ class AnnoyIndex():
         """
         l_nn_dfs = list()
 
-        for i in tqdm(range(self.n_rows)):
+        for i in tqdm(
+                range(self.n_rows),
+                ascii=True,
+                mininterval=tqdm_mininterval,
+        ):
             l_nn_dfs.append(
                 self.get_top_n_by_item(
                     i,
@@ -190,4 +212,66 @@ class AnnoyIndex():
         logging.info(f"{df_full.shape} <- df_top_items shape")
         return df_full
 
+    def get_top_n_by_item_all_dask(
+            self,
+            k: int = 100,
+            search_k: int = -1,
+            include_distances: bool = True,
+            append_i: bool = True,
+            col_distance: str = 'distance',
+            col_distance_rank: str = 'distance_rank',
+            cosine_similarity: bool = True,
+            col_cosine_similarity: str = 'cosine_similarity',
+            tqdm_mininterval: int = 2,
+    ):
+        """Get top_n items for ALL items in parallel (using dask)
+
+        We'll use the output of this table to create SQL table that can be shared & used by others.
+        """
+        l_nn_dfs = list()
+
+        logging.info("Creating DAG with dask...")
+        for i in tqdm(
+                range(self.n_rows),
+                ascii=True,
+                mininterval=tqdm_mininterval,
+        ):
+            # instead of running the complex fxn with a ton of pandas work,
+            #  try a stripped down version with only indices
+            # then wait until the end to conver indices to names
+            l_nn_dfs.append(
+                self.index.get_nns_by_item(
+                    i,
+                    k,
+                    search_k=search_k,
+                    include_distances=include_distances
+                )
+            )
+            # l_nn_dfs.append(
+            #     dask.delayed(self.get_top_n_by_item)(
+            #         i,
+            #         k=k,
+            #         search_k=search_k,
+            #         include_distances=include_distances,
+            #         append_i=append_i,
+            #         col_distance=col_distance,
+            #         col_distance_rank=col_distance_rank,
+            #         cosine_similarity=False,
+            #     )
+            # )
+        df_full_delayed = dask.delayed(pd.concat)(l_nn_dfs, axis=0, ignore_index=True)
+
+        logging.info(f"Start Computing DAG...")
+        df_full = df_full_delayed.compute()
+        df_full = df_full[df_full[col_distance_rank] != 0]
+        logging.info(f"DONE Computing DAG ")
+
+        if cosine_similarity & (self.metric == 'angular'):
+            df_full[col_cosine_similarity] = (
+                    1 -
+                    (df_full[col_distance] ** 2) / 2
+            )
+
+        logging.info(f"{df_full.shape} <- df_top_items shape")
+        return df_full
 
