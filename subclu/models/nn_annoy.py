@@ -2,6 +2,8 @@
 Get nearest neighbors with ANNOY
 """
 import logging
+from logging import info
+from typing import Tuple
 
 import dask
 import annoy
@@ -159,11 +161,72 @@ class AnnoyIndex():
             cosine_similarity: bool = True,
             col_cosine_similarity: str = 'cosine_similarity',
             tqdm_mininterval: int = 2,
-    ):
-        """Get top_n items for ALL items in parallel (using dask)
+    ) -> pd.DataFrame:
+        """
+
+        Args:
+            k: Number of nearest neighbors
+            search_k:
+            include_distances: include distance (instead of only ANN IDs)
+            append_i: if True, append the index values (sub names & sub IDs)
+            col_distance:
+                Name of column with distance value
+            col_distance_rank:
+                Name of column with distance rank. Rank=1 most similar
+            cosine_similarity:
+                Calculate cosine similarity? Default distance is euclidean
+            col_cosine_similarity:
+                Name of cosine similarity score
+            tqdm_mininterval:
+                seconds to wait before displaying TQDM refresh
+
+        Returns:
+            pd.DataFrame with scores and other info
+
+        """
+        """
+        Re-write to get top_n items for ALL items in parallel.
+        This one reduces pandas overhead from some dict lookups and tries to do as
+        many vectorized functions as possible.
+
+        NOTE: using dask.delayed actually took longer than this optimized method
 
         We'll use the output of this table to create SQL table that can be shared & used by others.
         """
+        l_topk_dfs = list()
+
+        for i in tqdm(
+                range(self.n_rows),
+                ascii=True,
+                mininterval=tqdm_mininterval,
+        ):
+            # First get the tuples from ANNOY. These are SUPER FAST!
+            # Note k+1 because this method returns self as most similar
+            i_nn: Tuple[int, float] = self.index.get_nns_by_item(
+                i,
+                k + 1,
+                search_k=search_k,
+                include_distances=include_distances
+            )
+            # We should skip the first item because the most similar one is always self
+            l_topk_dfs.append(
+                pd.DataFrame(
+                    {
+                        'seed_ix': [i] * k,
+                        'nn_ix': i_nn[0][1:],
+                        col_distance: i_nn[1][1:],
+                        col_distance_rank: [v for v in range(1, k + 1)]
+                    },
+                )
+            )
+        info(f"Start combining all ANNs into a df...")
+        df_nn_top = pd.concat(l_topk_dfs, ignore_index=True)
+        info(f"{df_nn_top.shape} <- df_nn_top shape")
+
+        #
+
+        return df_nn_top
+
     def get_top_n_by_item_all(
             self,
             k=100,
@@ -212,66 +275,4 @@ class AnnoyIndex():
         logging.info(f"{df_full.shape} <- df_top_items shape")
         return df_full
 
-    def get_top_n_by_item_all_dask(
-            self,
-            k: int = 100,
-            search_k: int = -1,
-            include_distances: bool = True,
-            append_i: bool = True,
-            col_distance: str = 'distance',
-            col_distance_rank: str = 'distance_rank',
-            cosine_similarity: bool = True,
-            col_cosine_similarity: str = 'cosine_similarity',
-            tqdm_mininterval: int = 2,
-    ):
-        """Get top_n items for ALL items in parallel (using dask)
-
-        We'll use the output of this table to create SQL table that can be shared & used by others.
-        """
-        l_nn_dfs = list()
-
-        logging.info("Creating DAG with dask...")
-        for i in tqdm(
-                range(self.n_rows),
-                ascii=True,
-                mininterval=tqdm_mininterval,
-        ):
-            # instead of running the complex fxn with a ton of pandas work,
-            #  try a stripped down version with only indices
-            # then wait until the end to conver indices to names
-            l_nn_dfs.append(
-                self.index.get_nns_by_item(
-                    i,
-                    k,
-                    search_k=search_k,
-                    include_distances=include_distances
-                )
-            )
-            # l_nn_dfs.append(
-            #     dask.delayed(self.get_top_n_by_item)(
-            #         i,
-            #         k=k,
-            #         search_k=search_k,
-            #         include_distances=include_distances,
-            #         append_i=append_i,
-            #         col_distance=col_distance,
-            #         col_distance_rank=col_distance_rank,
-            #         cosine_similarity=False,
-            #     )
-            # )
-        df_full_delayed = dask.delayed(pd.concat)(l_nn_dfs, axis=0, ignore_index=True)
-
-        logging.info(f"Start Computing DAG...")
-        df_full = df_full_delayed.compute()
-        df_full = df_full[df_full[col_distance_rank] != 0]
-        logging.info(f"DONE Computing DAG ")
-
-        if cosine_similarity & (self.metric == 'angular'):
-            df_full[col_cosine_similarity] = (
-                    1 -
-                    (df_full[col_distance] ** 2) / 2
-            )
-
-        logging.info(f"{df_full.shape} <- df_top_items shape")
-        return df_full
 
