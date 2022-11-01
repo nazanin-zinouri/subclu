@@ -1,7 +1,13 @@
 # Run select data locally (withouth kubeflow)
 #  Use this script to test the __main___.py functions before integrating with kubeflow
 #  append a project name to run using a different GCP project. DS-prod is usually much faster
-# GOOGLE_CLOUD_PROJECT='data-science-prod-218515'
+# GOOGLE_CLOUD_PROJECT='data-science-prod-218515' bash run_select_data.sh
+
+# Total Expected run time: ~49 minutes
+#  Queries that take the longest:
+#  - Raw relevance scores:  ~20 minutes (for 90 days)
+#  - Get posts:             ~20 minutes (for 90 days)
+#  - Get Comments:          ~ 3 minutes (for 90 days)
 
 # make a call with only the required argument (which query to run)
 # NOTE: order matters because some queries depend on other queries existing
