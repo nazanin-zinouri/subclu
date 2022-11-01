@@ -107,6 +107,7 @@ AS (
         WHERE DATE(_PARTITIONTIME) BETWEEN START_DATE AND END_DATE
             -- Only posts from seed subreddits (optional)
             -- AND COALESCE(sel.subreddit_seed_for_clusters, FALSE) = TRUE
+        QUALIFY post_thing_user_row_num = 1
     )
     , posts_not_removed AS (
         SELECT

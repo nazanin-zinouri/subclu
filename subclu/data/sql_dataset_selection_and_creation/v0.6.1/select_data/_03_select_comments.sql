@@ -181,19 +181,9 @@ WITH
                 , 'and so do i', 'and thanks!'
                 , 'thank you:)', 'thank you :)'
             )
+        QUALIFY row_num_comment_dupes = 1
     )
 
-    , most_frequent_commenters AS (
-        -- Get IDs for users with most comments so we can filter them out
-        -- usually either spammers or bots that don't add to topic understanding
-        SELECT
-            user_id
-            , COUNT(DISTINCT comment_id) AS comment_count_total
-        FROM comments_not_removed
-        GROUP BY 1
-        ORDER BY 2 DESC
-        LIMIT 1000
-    )
     , comment_language AS (
         -- This table has duplicates. One reason is that people can edit their post
         --  We'll keep the most recent detected language.
@@ -217,6 +207,8 @@ WITH
                     AND sel.post_id = cl.post_id
                     AND sel.comment_id = cl.thing_id
         WHERE DATE(cl._PARTITIONTIME) BETWEEN START_DATE AND END_DATE
+
+        QUALIFY post_thing_user_row_num = 1
     )
 
     -- TL = thing_language. In this case thing=comment
@@ -284,7 +276,7 @@ WITH
 
     )
 
-    , comments_ranked AS (
+    , selected_comments AS (
         -- Rank comments so we only keep the top N comments per post
         SELECT
             tl.subreddit_id
@@ -305,24 +297,14 @@ WITH
             -- Filter to keep only comments that are long enough
             WHERE CHAR_LENGTH(comment_text_clean) >= MIN_COMMENT_LEN
         ) AS tl
-    )
-    , selected_comments AS (
-        -- Pick only comments that meet ALL ranking/filtering criteria
-        SELECT
-            subreddit_id
-            , post_id
-            , comment_id
-            , comment_text_clean_len
-            , comment_rank_by_post_id
-        FROM comments_ranked AS cr
-        -- filter out comments above threshold
-        WHERE comment_rank_by_post_id <= MAX_COMMENTS_PER_POST
+        -- Use `qualify` to remove need for a new subquery
+        QUALIFY comment_rank_by_post_id <= MAX_COMMENTS_PER_POST
     )
 
     , tl_unique_with_meta_top_comments AS (
         SELECT
             tl.* EXCEPT (comment_body_text, comment_text_clean, comment_body_text_len)
-            , comment_rank_by_post_id
+            , sc.comment_rank_by_post_id
             , array_length(regexp_extract_all(comment_text_clean, r"\b[\p{L}\w]+\b")) comment_text_clean_word_count
             , tl.comment_body_text_len
             , sc.comment_text_clean_len
