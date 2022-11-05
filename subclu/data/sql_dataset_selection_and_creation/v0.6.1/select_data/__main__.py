@@ -25,14 +25,18 @@ def main() -> None:
         help="How many days to lookback to get posts. Subtract these days from `end-date`"
     )
 
-    # TODO(djb): add time so that we can compare multiple runs in a single day
-    run_id_default_ = datetime.utcnow().strftime("%Y%m%d_%H%M")  # '20220624_1345'
+    # Add time so that we can compare multiple runs in a single day
+    # "%Y%m%d_%H%M" -> '20220624_1345'
+    run_id_default_ = datetime.utcnow().strftime("%Y%m%d")
     parser.add_argument("--run-id", type=str, default=run_id_default_)
 
     # TODO(djb) change default after testing. 'tmp' gets deleted after 2 weeks
     parser.add_argument("--dataset", type=str, default='tmp')
+    # primary options:
+    #  "i18n-subreddit-clustering"
+    #  'gazette-models-temp'
     parser.add_argument(
-        "--output-bucket-name", type=str, default='gazette-models-temp',
+        "--output-bucket-name", type=str, default="i18n-subreddit-clustering",
         help="bucket to export text needed for embeddings"
     )
 
