@@ -5,12 +5,8 @@
 -- * start date
 -- * end date
 -- * max posts per sub
--- * name of new created table (update date)
+-- * name of new created table (i.e., update date)
 -- * table with latest selected subreddits
-
--- Exporting (separate script)
--- * name of newly created table for exporting
--- * new GCS folder for new table
 
 DECLARE MAX_POSTS_PER_SUB NUMERIC DEFAULT 8400;
 DECLARE END_DATE DATE DEFAULT ${end_date};
@@ -72,8 +68,7 @@ DECLARE IMAGE_EXPLICIT_MODEL_STR STRING DEFAULT "Nudity or sex image.";
 
 
 CREATE OR REPLACE TABLE `reddit-relevance.${dataset}.subclu_posts_for_modeling_${run_id}`
--- TODO(djb): ? partition by end_date because the post might change when we run to refresh
--- PARTITION BY end_date
+
 AS (
 
     WITH
@@ -148,11 +143,45 @@ AS (
         WHERE sp.dt BETWEEN START_DATE AND END_DATE
             AND sp.removed = 0
 
+            -- TODO(djb): Fix removed logic! A post can be removed, but then added back later by mods/admins!
             -- Only posts from seed subreddits (optional)
             -- AND COALESCE(sel.subreddit_seed_for_clusters, FALSE) = TRUE
 
-            -- In next query we can use row_num to remove duplicates in successful_post table
-            --   Example: We can get multiple rows when a post is removed or edited multiple times
+        -- Remove dupes with row_num
+        --   Example: We can get multiple rows when a post is removed or edited multiple times
+        QUALIFY row_num = 1
+    )
+    , ranked_posts AS (
+        -- Rank posts after removing some spam posts
+        SELECT
+            pn.*
+            , plo.net_upvotes_lookup
+            , ROW_NUMBER() OVER(
+                PARTITION BY pn.subreddit_id
+                ORDER BY net_upvotes_lookup DESC, pn.comments DESC, pn.upvotes DESC
+            ) AS rank_post_in_sub
+        FROM posts_not_removed AS pn
+            INNER JOIN (
+                SELECT
+                    *
+                    , (upvotes - downvotes) AS net_upvotes_lookup
+                FROM `data-prod-165221.ds_v2_postgres_tables.post_lookup`
+                WHERE DATE(_PARTITIONTIME) = end_date
+            ) AS plo
+                ON pn.subreddit_id = plo.subreddit_id AND pn.post_id = plo.post_id
+                    AND pn.user_id = plo.author_id
+        WHERE 1=1
+            AND (
+                -- Filter out spam posts
+                COALESCE(plo.neutered, false) = false
+
+                -- Keep posts that were flagged/neutered, but then approved
+                OR (
+                    COALESCE(plo.neutered, false) = true
+                    AND COALESCE(plo.verdict, '') IN ('mod-approved', 'admin-approved')
+                )
+            )
+        QUALIFY rank_post_in_sub <= MAX_POSTS_PER_SUB
     )
     , posts_lang_and_meta AS (
         SELECT
@@ -173,7 +202,8 @@ AS (
             , plo.upvotes    AS upvotes_lookup
             , plo.downvotes  AS downvotes_lookup
             --  Use post-lookup for net upvotes because it's more consistent, even if it doesn't always match the UI
-            , (plo.upvotes - plo.downvotes) AS net_upvotes_lookup
+            , sp.net_upvotes_lookup
+            , sp.rank_post_in_sub
 
             , sp.upvotes AS upvotes
             , sp.comments
@@ -199,11 +229,8 @@ AS (
                 )
             END AS post_title_and_body_text
 
-        FROM posts_not_removed AS sp
-            LEFT JOIN (
-                SELECT * FROM post_language
-                WHERE post_thing_user_row_num = 1
-            ) AS tl
+        FROM ranked_posts AS sp
+            LEFT JOIN post_language AS tl
                 ON tl.subreddit_id = sp.subreddit_id
                     AND tl.post_id = sp.post_id
                     AND tl.user_id = sp.user_id
@@ -215,20 +242,8 @@ AS (
                 ON tl.subreddit_id = plo.subreddit_id AND tl.post_id = plo.post_id
                     AND tl.user_id = plo.author_id
 
-        WHERE 1=1
-            AND sp.row_num = 1
-
-            AND (
-                -- Filter out spam posts
-                COALESCE(plo.neutered, false) = false
-
-                -- Keep posts that were flagged/neutered, but then approved
-                OR (
-                    COALESCE(plo.neutered, false) = true
-                    AND COALESCE(plo.verdict, '') IN ('mod-approved', 'admin-approved')
-                )
-            )
-            -- Test REGEXES keep only some subreddits
+        -- Test REGEXES keep only some subreddits
+        -- WHERE 1=1
             -- AND subreddit_name IN (
             --     "redditsessions", "blursedimages", "hmmm", "hmm", "bollywood", "bollyblindsngossip", "bollyarm", "bollywoodmemes", "twitter", "eyebleach", "makenewfriendshere", "meetpeople", "berlinsocialclub", "nycmeetups", "news"
             --     , "antiwork", "damnthatsinteresting", "publicfreakout", "lifeprotips", "jedi", "jamesbond", "clonewars", "archerfx", "loveislandtv", "residentevil", "mortalkombat", "ukrainewarvideoreport", "sfx", "formula1", "gonewild", "minecraft", "china_irl", "lebanon", "hottiesoftvandyt", "mdma"
@@ -293,18 +308,10 @@ AS (
             , ocr_inferred_text_agg_clean
             , ocr_inferred_text_agg
 
-        FROM (
-            SELECT
-                -- There's something unexpected with votes in both `post_lookup` & `successful_posts`
-                --  (usually votes are missing when compared to the UI)
-                --  So use the combined metric to hedge our bets
-                ROW_NUMBER() OVER(
-                    PARTITION BY subreddit_id
-                    ORDER BY net_upvotes_lookup DESC, comments DESC, upvotes DESC
-                ) AS rank_post_in_sub
-                , *
-            FROM posts_lang_and_meta
-        ) AS pl
+        FROM posts_lang_and_meta AS pl
+            -- There's something unexpected with votes in both `post_lookup` & `successful_posts`
+            --  (usually votes are missing when compared to the UI)
+            --  So use the combined metric to hedge our bets
 
             LEFT JOIN (
                 SELECT * FROM ocr_text_agg
@@ -316,15 +323,18 @@ AS (
             AND pl.rank_post_in_sub <= MAX_POSTS_PER_SUB
     )
     , post_image_explicit_model_agg AS (
+        -- 2022-11-02: Pull from FACT table instead of raw analytics_v2.events!
+        --   When pulling frome events the query takes 20+ minutes or errors out b/c of resource overload
+
         -- Each image gets a rating and a post can have multiple images,
         --   so we'll need to aggregate output multiple images into a single field
         SELECT
             post_id
             -- If multiple images in post are flagged, keep only one instance of it
             , IF(
-                "" = TRIM(STRING_AGG(sexually_expicit_image_pred, " "))
-                , NULL
+                SUM(sexually_expicit_image_pred) >= 1.0
                 , IMAGE_EXPLICIT_MODEL_STR
+                , NULL
             ) AS sexually_explicit_image_pred_text
 
         FROM (
@@ -336,18 +346,23 @@ AS (
                             CAST(JSON_EXTRACT(ml_model_prediction_scores, "$.SexuallyExplicit[0]") AS FLOAT64)
                             , 0.0
                         ) >= 0.9
-                        THEN IMAGE_EXPLICIT_MODEL_STR
-                    ELSE ""
+                        THEN 1
+                    ELSE 0
                 END AS sexually_expicit_image_pred
-            FROM `data-prod-165221.events_v2.analytics` AS a
+            FROM (
+                SELECT
+                    post_id
+                    , ml_model_prediction_scores
+                FROM `data-prod-165221.fact_tables.content_classification_record_response_image`
+
+                WHERE DATE(pt) between START_DATE and END_DATE
+                    AND source = "content_classification"
+                    AND action = "record_response"
+                    AND ml_model_name in ('safety_media_x_model', 'safety_media_x_video_model')
+            ) AS a
             INNER JOIN posts_lang_and_meta_top AS t
                 ON a.post_id = t.post_id
 
-            WHERE DATE(pt) between START_DATE and END_DATE
-                AND source = "content_classification"
-                AND action = "record_response"
-                AND media_type NOT IN ("video", "third_party_video")
-                AND ml_model_name = "safety_media_x_model"
         ) AS sm
 
         GROUP BY 1
@@ -403,7 +418,6 @@ AS (
         SELECT
             post_id
             , post_url_domain
-            , post_url_path_raw -- TODO(djb) remove this raw col from final table once regexes are complete
 
             -- In the simple case we keep everything to create an embedding
             --  the caveat is that this embedding might be useless b/c it'll include meaningless IDs & UUIDs
@@ -576,7 +590,6 @@ AS (
 
                 , post_url
                 -- URL cols from new table:
-                , post_url_path_raw -- Remove col after testing?
                 , post_url_domain
                 , post_url_path_to_concat_word_count
                 , post_url_to_concat
@@ -625,15 +638,15 @@ FROM posts_final_clean_top
 ORDER BY subreddit_name, endpoint_timestamp
 );  -- close CREATE TABLE parens
 
+
 -- Scan size by CTE:
 --     3.4 GB  post_language
 --     3.1 GB  posts_not_removed
 --   112.1 GB  posts_lang_and_meta
 --    69.7 GB  ocr_text_agg
 --   112.7 GB  posts_lang_and_meta_top
--- ** 20.0 TB  post_image_explicit_model_agg ** big scan b/c it needs to check all events
+-- * 988.0 GB  post_image_explicit_model_agg ** big scan b/c it needs to check multiple models
+--             but it's MUCH BETTER than 20+ TB when scanning events_v2.analytics
 --    98.0 GB  post_url_domain_and_raw_paths
 --    98.0 GB  clean_post_urls
---    20.0 TB  posts_final_clean_top
--- SELECT *
--- FROM posts_final_clean_top
+--     1.2 TB  posts_final_clean_top
