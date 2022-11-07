@@ -100,6 +100,12 @@ gcloud compute instances set-machine-type djb-100-2021-04-28-djb-eda-german-subs
   --machine-type=m1-megamem-96
 ```
 
+From the command line you can also make updates to other parts of your VM. For example, you can resize a disk with:
+- https://cloud.google.com/compute/docs/disks/resize-persistent-disk#resize_the_disk
+- 
+```bash 
+gcloud compute disks resize djb-subclu-inference-XXXX --size 756 --zone us-west1-b
+```
 
 ### SSH into Jupyter Lab [optional/debug]
 For some reason, the URLs to connect to a VM can sometimes break (you get a 403 error). If that's the case, you can use SSH to create a tunnel to the VM and connect "locally" to the VM. This is the same method used to connect to the MLflow server below.
