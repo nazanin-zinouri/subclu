@@ -1,0 +1,8 @@
+dataset_name: 'v0.6.1 inputs. ~110k seed subreddits, ~340k with 3+ posts, ~700k total subreddits'
+bucket_name: 'i18n-subreddit-clustering'
+
+folder_subreddits_text_and_meta: 'i18n_topic_model_batch/runs/20221107/subreddits/text'
+folder_posts_text_and_meta: 'i18n_topic_model_batch/runs/20221107/posts'
+folder_comments_text_and_meta: 'i18n_topic_model_batch/runs/20221107/comments'
+
+folder_post_and_comment_text_and_meta: 'i18n_topic_model_batch/runs/20221107/post_and_comment_text_combined/text_all'
