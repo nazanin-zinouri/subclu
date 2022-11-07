@@ -141,11 +141,15 @@ AS (
                 ON sel.subreddit_id = sp.subreddit_id
 
         WHERE sp.dt BETWEEN START_DATE AND END_DATE
-            AND sp.removed = 0
-
-            -- TODO(djb): Fix removed logic! A post can be removed, but then added back later by mods/admins!
-            -- Only posts from seed subreddits (optional)
-            -- AND COALESCE(sel.subreddit_seed_for_clusters, FALSE) = TRUE
+            -- Exclude posts that have been removed. NOTE: some posts appear INCORRECTLY removed
+            --  Example: Lots of examples in r/amItheAsshole. Maybe b/c of automod?
+            AND (
+                COALESCE(sp.removed, 0) = 0
+                OR (
+                    COALESCE(sp.removed, 0) = 1
+                    AND sp.upvotes >= 20
+                )
+            )
 
         -- Remove dupes with row_num
         --   Example: We can get multiple rows when a post is removed or edited multiple times
