@@ -1,7 +1,5 @@
--- Tables to copy from relevance.tmp to employee datasets for long-term use
-
-
 -- Tables needed to create v0.6.1 model:
+--  Copy from relevance.tmp to employee datasets for long-term use (dashboards & replicate)
 CREATE TABLE `reddit-employee-datasets.david_bermejo.subclu_subreddit_geo_relevance_standardized_20221107` AS (
 SELECT *
 FROM `reddit-relevance.tmp.subclu_subreddit_geo_relevance_standardized_20221107`
