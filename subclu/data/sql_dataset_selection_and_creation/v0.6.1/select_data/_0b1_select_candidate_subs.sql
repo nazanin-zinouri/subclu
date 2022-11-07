@@ -39,7 +39,15 @@ CREATE OR REPLACE TABLE `reddit-relevance.${dataset}.subclu_subreddit_candidates
                         AND s.user_id = plo.author_id
             WHERE (dt) BETWEEN PT_POSTS_START AND PARTITION_DATE
                 -- removed = actively removed by mods or automod (maybe admins too?)
-                AND removed = 0
+                -- NOTE: some posts appear INCORRECTLY removed
+                --  Example: Lots of examples in r/amItheAsshole. Maybe b/c of automod or karma threshold?
+                AND (
+                    COALESCE(s.removed, 0) = 0
+                    OR (
+                        COALESCE(s.removed, 0) = 1
+                        AND s.upvotes >= 20
+                    )
+                )
 
                 -- neutered = marked as spam;
                 --  For v0.6.0, let's include neutered posts in case they're flagged incorrectly
