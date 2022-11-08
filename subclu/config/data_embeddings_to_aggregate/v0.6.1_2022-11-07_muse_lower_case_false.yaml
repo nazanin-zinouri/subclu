@@ -1,0 +1,7 @@
+# embeddings_description: 'Embeddings from USE-multilingual with lower_case=False'
+bucket_embeddings: 'i18n-subreddit-clustering'
+
+post_and_comments_folder_embeddings: 'i18n_topic_model_batch/runs/20221107/post_and_comment_text_combined/text_all/embedding/2022-11-07_081017'
+
+subreddit_desc_folder_embeddings: 'i18n_topic_model_batch/runs/20221107/subreddits/text/embedding/2022-11-07_074632'
+col_subreddit_id: 'subreddit_id'

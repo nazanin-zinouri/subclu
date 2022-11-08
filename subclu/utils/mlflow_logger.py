@@ -138,6 +138,16 @@ class MlflowLogger:
             'v0.6.0_mUSE_clustering',
             'v0.6.0_nearest_neighbors',
 
+            # v0.6.1 (still manual refresh, but
+            #  - ~700k subreddits total
+            #  - ~300k subreddits for ANN (3+ posts in L90 days)
+            #  - ~100k subreddits for clustering model ("moderately" active)
+            'v0.6.1_mUSE_aggregates_test',
+            'v0.6.1_mUSE_aggregates',
+            'v0.6.1_mUSE_clustering_test',
+            'v0.6.1_mUSE_clustering',
+            'v0.6.1_nearest_neighbors',
+
         ]
         for i, exp in enumerate(l_experiments):
             try:
