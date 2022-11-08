@@ -105,6 +105,10 @@ From the command line you can also make updates to other parts of your VM. For e
 - 
 ```bash 
 gcloud compute disks resize djb-subclu-inference-XXXX --size 756 --zone us-west1-b
+
+
+gcloud compute disks resize djb-subclu-inference-rapids-20211217-data --size 756 --zone us-west1-b
+
 ```
 
 ### SSH into Jupyter Lab [optional/debug]
