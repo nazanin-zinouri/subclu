@@ -437,7 +437,7 @@ class MlflowLogger:
             read_function: Union[callable, str] = 'pd_parquet',
             columns: iter = None,
             cache_locally: bool = True,
-            local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
+            local_path_root: str = "/home/jupyter/subreddit_clustering_i18n/data/local_cache/i18n-subreddit-clustering",
             n_sample_files: int = None,
             verbose: bool = False,
             read_csv_kwargs: dict = None,
@@ -459,19 +459,21 @@ class MlflowLogger:
               - df_sub_level__sub_desc_similarity (expected)
               - df_sub_level__sub_desc_similarity_pair (DO NOT WANT!)
         """
-        # set some defaults for common file types so we don't have to load
+        # set some defaults for common file types so we don't have to load them
+        d_read_functions_ = {
+            'pd_parquet': pd.read_parquet,
+            'pd_csv': pd.read_csv,
+            'dask_parquet': dd.read_parquet,
+            'json': json.load,
+        }
         if isinstance(read_function, str):
-            if 'pd_parquet' == read_function:
-                read_function = pd.read_parquet
-            elif 'pd_csv' == read_function:
-                read_function = pd.read_csv
-            elif 'dask_parquet' == read_function:
-                read_function = dd.read_parquet
-            elif 'json' == read_function:
-                read_function = json.load
-
+            if read_function in d_read_functions_.keys():
+                read_function = d_read_functions_[read_function]
             else:
-                raise NotImplementedError(f"{read_function} Not implemented...")
+                raise NotImplementedError(
+                    f"`{read_function}` Not implemented."
+                    f"\n  Supported functions: {list(d_read_functions_.keys())}"
+                )
 
         if artifact_file is not None:
             artifact_file_name_only = artifact_file.split('/')[-1]
