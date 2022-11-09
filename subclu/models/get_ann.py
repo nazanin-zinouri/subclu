@@ -172,11 +172,21 @@ class GetANN:
 
         r_, c_ = df_embeddings.shape
         log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
-        mlflow.log_metrics(
-            {'input_embeddings-n_rows': r_,
-             'input_embeddings-n_cols': c_}
+
+        total_emb_time = elapsed_time(
+            start_time=t_start_load_embeddings_,
+            log_label='Load embeddings time', verbose=True
         )
-        self.mlf.log_ram_stats(param=False, only_memory_used=True)
+        if mlflow.active_run() is not None:
+            mlflow.log_metrics(
+                {'input_embeddings-n_rows': r_,
+                 'input_embeddings-n_cols': c_}
+            )
+            mlflow.log_metric(
+                'model_fit_time_minutes',
+                total_emb_time / timedelta(minutes=1)
+            )
+            self.mlf.log_ram_stats(param=False, only_memory_used=True)
         return df_embeddings
 
     def _set_path_local_model(self):
