@@ -41,6 +41,7 @@ class AnnoyIndex():
         self.n_trees = n_trees
         self.vectors = df_vectors.drop(index_cols, axis=1).to_numpy()  # vectors.astype('float32')
 
+        self.index = None
         self.index_labels = df_vectors[index_cols[0]].to_list()
         self.index_labels_name = index_cols[0]
         self.index_labels_df = df_vectors[index_cols].copy()
