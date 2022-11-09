@@ -76,7 +76,7 @@ class GetANN:
         self.post_embeddings_folder = post_embeddings_folder
 
         self.n_sample_embedding_rows = n_sample_embedding_rows
-        self.n_min_post_per_sub = n_min_post_per_sub
+        self.n_min_posts_per_sub = n_min_post_per_sub
 
         self.mlflow_experiment_name = mlflow_experiment_name
         self.mlflow_run_name = mlflow_run_name
@@ -166,9 +166,21 @@ class GetANN:
         )
         self.l_cols_embeddings = [c for c in df_embeddings.columns if c.startswith('embeddings_')]
 
+        r1_, c1_ = df_embeddings.shape
+        log.info(f"{r1_:9,.0f} | {c1_:5,.0f} <- RAW df_embeddings SHAPE")
+        if self.n_min_posts_per_sub is not None:
+            log.info(f"  Keeping only subs with {self.n_min_posts_per_sub} >= posts")
+            df_embeddings = df_embeddings[
+                df_embeddings['posts_for_embeddings_count'] >= self.n_min_posts_per_sub
+            ]
+            r2_, c2_ = df_embeddings.shape
+            log.info(f"{r2_:9,.0f} | {c2_:5,.0f} <- df_embeddings SHAPE, after min post filter")
+
         if self.n_sample_embedding_rows is not None:
-            log.info(f"  SAMPLING n_rows: {self.n_sample_embedding_rows}")
-            df_embeddings = df_embeddings.sample(n=self.n_sample_embedding_rows, random_state=42)
+            # pick the min, otherwise the sample function can raise error kill job
+            n_sample = min([self.n_sample_embedding_rows, len(df_embeddings)])
+            log.info(f"  SAMPLING n_rows: {n_sample:,.0f}")
+            df_embeddings = df_embeddings.sample(n=n_sample, random_state=42)
 
         r_, c_ = df_embeddings.shape
         log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
