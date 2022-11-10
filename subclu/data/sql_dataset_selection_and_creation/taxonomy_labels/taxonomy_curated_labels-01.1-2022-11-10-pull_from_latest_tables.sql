@@ -1,37 +1,25 @@
 -- Create view combining taxonomy snapshots & fixing topic names
--- NOTE: this uses old snapshots (2022-08-05 or earlier)
+-- NOTE: this view pulls from latest daily snapshot provided by taxonomy
 
 WITH
-curator_labels_raw AS (
-    -- NOTE1: We pick the most recent label when available
-    -- Note2: Some topics are misnamed, unclear if it's a problem with the raw data or datadump
+curator_labels_fix AS (
     SELECT
-        COALESCE(s2.subreddit_id, s1.Subreddit_ID) AS subreddit_id
-        , COALESCE(s2.curator_rating_short, s1.Curator_Rating) AS curator_rating
-        , COALESCE(s2.curator_topic, s1.Curator_Topic) AS curator_topic
-        , COALESCE(s2.date_retrieved, CAST("2022-08-05" AS DATE)) AS date_retrieved
-
-        -- NOTE: s2 doesn't have blocklist status
-        , s1.Blocklist_Status AS blocklist_status
-        , s1.Blocklist_Reason AS blocklist_reason
+        * EXCEPT(
+            dau, posts_7d, x_rated_percentage, x_rated_posts_7d
+            , crowd_topic, crowd_rating, crowd_mature_themes
+            , curator_topic, curator_rating, curator_mature_themes
+            , geo, ml_rating, ml_topic
+            , ads_allowlist_override_reason, ads_allowlist_override_status
+        )
+        , curator_rating AS curator_rating_name
         , CASE
-            WHEN s1.Blocklist_Status IS NULL THEN NULL
-            ELSE "2022-08-05"
-        END AS blocklist_dt
-    FROM `reddit-employee-datasets.amy_jeffrey.taxonomy_2022_08_05_v0` AS s1
-        FULL OUTER JOIN (
-            SELECT *
-            FROM `reddit-employee-datasets.david_bermejo.taxonomy_curated_snapshot_20220817`
-            WHERE
-                -- Drop subreddits that don't have ANY labels
-                curator_topic IS NOT NULL
-                AND curator_rating IS NOT NULL
-        ) AS s2
-            ON s2.subreddit_id = s1.Subreddit_ID
-)
-, curator_labels_fix AS (
-    SELECT
-        * EXCEPT(curator_topic)
+            WHEN (curator_rating = "Everyone") THEN 'E'
+            WHEN (curator_rating = "Sexually Explicit") THEN 'X'
+            WHEN (curator_rating = "Mature") THEN 'M'
+            WHEN (curator_rating = "Violence & Gore") THEN 'V'
+            WHEN (curator_rating = "High-Risk Drug Use") THEN 'D'
+            ELSE NULL
+        END AS curator_rating_short
         , CASE
             WHEN (curator_topic = "N/A") THEN NULL
             WHEN (curator_topic = "admin test sub") THEN NULL
@@ -45,17 +33,21 @@ curator_labels_raw AS (
 
             ELSE curator_topic
         END AS curator_topic
-    FROM curator_labels_raw
+    FROM `data-prod-165221.taxonomy.daily_export`
 )
-
 
 -- Subreddit name can change, so only pull it as last step
 SELECT
     l.subreddit_id
     , LOWER(slo.name) AS subreddit_name
-    , l.curator_rating
+    , l.curator_rating_short
     , l.curator_topic
-    , l.* EXCEPT(subreddit_id, curator_rating, curator_topic)
+    , l.curator_topic_v2
+    , l.curator_rating_name
+    , l.* EXCEPT(
+        subreddit_id, curator_rating_short, curator_topic
+        , curator_topic_v2, curator_rating_name
+    )
 FROM curator_labels_fix AS l
     LEFT JOIN (
       SELECT
@@ -66,5 +58,14 @@ FROM curator_labels_fix AS l
       WHERE dt = (CURRENT_DATE() - 2)
     ) AS slo
         ON l.subreddit_id = slo.subreddit_id
-ORDER BY slo.subscribers DESC
+-- ORDER BY slo.subscribers DESC
 ;
+
+-- Because view can take 20+ seconds to run, create a snapshot table
+-- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.taxonomy_curated_labels` AS (
+--     SELECT
+--         *
+--         , CURRENT_DATE() AS dt_created
+--     FROM `reddit-employee-datasets.david_bermejo.taxonomy_curated_labels_vw`
+-- )
+-- ;
