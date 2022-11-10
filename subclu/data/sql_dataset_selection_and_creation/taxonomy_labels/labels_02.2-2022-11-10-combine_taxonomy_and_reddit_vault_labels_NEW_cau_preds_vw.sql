@@ -1,5 +1,8 @@
 -- Get all label sources for a subreddit
--- NOTE: as of 2022-08 we only have snapshots of the Reddit curator (taxonomy) labels
+-- NOTES
+-- - as of 2022-11-10
+--   - the curator (taxonomy) labels are updated manually (not automated yet)
+--   - the v6 rating is out with M1 & M2 replacing M (mature)
 
 -- CREATE VIEW `reddit-employee-datasets.david_bermejo.reddit_vault_predictions_and_overrides_vw`
 -- OPTIONS(
