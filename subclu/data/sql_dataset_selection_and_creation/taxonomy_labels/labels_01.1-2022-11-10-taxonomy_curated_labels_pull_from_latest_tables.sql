@@ -7,7 +7,7 @@ curator_labels_fix AS (
         * EXCEPT(
             dau, posts_7d, x_rated_percentage, x_rated_posts_7d
             , crowd_topic, crowd_rating, crowd_mature_themes
-            , curator_topic, curator_rating, curator_mature_themes
+            , curator_topic, curator_mature_themes
             , geo, ml_rating, ml_topic
             , ads_allowlist_override_reason, ads_allowlist_override_status
         )
@@ -65,7 +65,7 @@ FROM curator_labels_fix AS l
 -- CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.taxonomy_curated_labels` AS (
 --     SELECT
 --         *
---         , CURRENT_DATE() AS dt_created
+--         , CURRENT_DATE() AS date_retrieved
 --     FROM `reddit-employee-datasets.david_bermejo.taxonomy_curated_labels_vw`
 -- )
 -- ;
