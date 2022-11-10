@@ -1,5 +1,5 @@
 -- Create view combining taxonomy snapshots & fixing topic names
--- NOTE: this view pulls from latest daily snapshot provided by taxonomy
+-- NOTE: 2022-11-10 this view pulls from latest daily snapshot provided by taxonomy
 
 WITH
 curator_labels_fix AS (
@@ -16,6 +16,9 @@ curator_labels_fix AS (
             WHEN (curator_rating = "Everyone") THEN 'E'
             WHEN (curator_rating = "Sexually Explicit") THEN 'X'
             WHEN (curator_rating = "Mature") THEN 'M'
+            -- M1 & M2 replace M. New v6 (around 2022-11)
+            WHEN (curator_rating = "Mature 1") THEN 'M1'
+            WHEN (curator_rating = "Mature 2") THEN 'M2'
             WHEN (curator_rating = "Violence & Gore") THEN 'V'
             WHEN (curator_rating = "High-Risk Drug Use") THEN 'D'
             ELSE NULL
