@@ -21,7 +21,7 @@ WITH all_subreddit_labels AS (
         -- When deciding the subreddit rating we take the first available rating in this order:
         --  curator > crowd > predicted
          , CASE
-            WHEN c.curator_rating IS NOT NULL THEN c.curator_rating
+            WHEN c.curator_rating_short IS NOT NULL THEN c.curator_rating_short
             WHEN t.rating_short IS NOT NULL THEN t.rating_short
             ELSE p.predicted_rating
         END AS subreddit_rating
