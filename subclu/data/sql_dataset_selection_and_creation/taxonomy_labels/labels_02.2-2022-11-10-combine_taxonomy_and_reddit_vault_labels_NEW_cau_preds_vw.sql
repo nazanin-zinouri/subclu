@@ -4,11 +4,20 @@
 --   - the curator (taxonomy) labels are updated manually (not automated yet)
 --   - the v6 rating is out with M1 & M2 replacing M (mature)
 
+-- Predictions below these thresholds will be taken as null/unlabeled
+--   For the i18n QA process we only want to keep predictions over the thresholds where the models
+--   are confident enough.
+DECLARE PRED_RATING_THRESHOLD NUMERIC DEFAULT 0.5;
+DECLARE PRED_TOPIC_THRESHOLD NUMERIC DEFAULT 0.5;
+
+
 -- CREATE VIEW `reddit-employee-datasets.david_bermejo.reddit_vault_predictions_and_overrides_vw`
 -- OPTIONS(
 --     description="View that combines all sources for topic & rating labels: curator, crowd, & CA model. Wiki: https://reddit.atlassian.net/wiki/spaces/DataScience/pages/2389278980/Content+Analytics+Key+Tables"
 -- )
 -- AS (
+
+
 
 WITH all_subreddit_labels AS (
     SELECT
@@ -76,6 +85,20 @@ WITH all_subreddit_labels AS (
             ELSE pt.topic_score_1
         END AS topic_score
 
+        , CASE
+            WHEN (c.curator_topic IS NOT NULL) THEN 'curator'
+            WHEN (t.primary_topic IS NOT NULL) THEN 'crowd'
+            ELSE NULL
+        END AS taxonomy_topic_source
+        , CASE
+            WHEN (c.curator_rating_short IS NOT NULL) THEN 'curator'
+            WHEN (t.rating_short IS NOT NULL) THEN 'crowd'
+            ELSE NULL
+        END AS taxonomy_rating_source
+
+        , (pr.rating_score_1 < PRED_RATING_THRESHOLD) AS pred_rating_low_confidence
+        , (pt.topic_score_1 < PRED_TOPIC_THRESHOLD) AS pred_topic_low_confidence
+
         , slo.subscribers
 
     FROM (
@@ -119,13 +142,41 @@ WITH all_subreddit_labels AS (
     WHERE 1=1
 )
 
-SELECT *
+SELECT
+    *
+    , CASE
+        WHEN taxonomy_topic_source IS NULL THEN NULL
+        ELSE (curator_topic = crowd_topic)
+    END AS topic_crowd_curator_agree
+    , CASE
+        WHEN taxonomy_rating_source IS NULL THEN NULL
+        ELSE (curator_rating = crowd_rating)
+    END AS rating_crowd_curator_agree
+
+    , CASE
+        WHEN (predicted_rating IS NULL) AND (taxonomy_rating IS NULL) THEN 'missing-pred_and_label'
+        WHEN (pred_rating_low_confidence = TRUE) THEN 'pred_confidence_low'
+        WHEN (predicted_rating IS NULL) THEN 'missing-pred'
+        WHEN (taxonomy_rating IS NULL) THEN 'missing-label'
+        WHEN (predicted_rating = taxonomy_rating) THEN 'agree'
+        ELSE 'disagree'
+    END AS rating_taxn_model_agree
+    , CASE
+        WHEN (predicted_topic IS NULL) AND (taxonomy_topic IS NULL) THEN 'missing-pred_and_label'
+        WHEN (pred_topic_low_confidence = TRUE) THEN 'pred_confidence_low'
+        WHEN (predicted_topic IS NULL) THEN 'missing-pred'
+        WHEN (taxonomy_topic IS NULL) THEN 'missing-label'
+        WHEN (predicted_topic = taxonomy_topic) THEN 'agree'
+        ELSE 'disagree'
+    END AS topic_taxn_model_agree
+
 FROM all_subreddit_labels
 WHERE
     -- Only display subs that have at least one tag
     (
         curator_rating_tag + crowd_rating_tag + model_rating_tag
         + curator_topic_tag + crowd_topic_tag + model_topic_tag
+        + curator_topic_v2_tag
     ) >= 1
 ORDER BY subscribers DESC
 ;
