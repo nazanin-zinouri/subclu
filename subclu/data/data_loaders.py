@@ -357,7 +357,7 @@ class LoadSubreddits(LoadPosts):
             df_subs['subreddit_id']
         )
 
-        # Remove duplicat cols & co_new_manual_topic
+        # Remove duplicate cols & co_new_manual_topic
         if self.col_new_manual_topic in df_subs.columns:
             try:
                 df_subs[self.col_new_manual_topic] = np.where(
