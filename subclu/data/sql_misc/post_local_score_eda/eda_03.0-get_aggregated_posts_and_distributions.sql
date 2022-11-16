@@ -160,4 +160,3 @@ WHERE 1=1
 
 ORDER BY subreddit_name, geo_country_name, post_count DESC, post_dau_mean DESC # , country_name
 ;
-
