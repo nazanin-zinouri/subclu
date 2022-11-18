@@ -18,7 +18,7 @@ INSTALL_REQUIRES = [
     #  are not guaranteed to be the same, so don't pin them to prevent errors
     "mlflow == 1.16.0",
 
-    # Exclude dask & modin while I test out spark
+    # Use dask to load parquet files in parallel
     "dask[complete] == 2021.6.0",
 
     # Auth
@@ -31,7 +31,7 @@ INSTALL_REQUIRES = [
 
     # Visualization
     "seaborn == 0.11.1",
-    "plotly == 4.14.3",
+    "plotly == 5.11.0",
     "kaleido == 0.2.1",
 
     # Read & write to GCS & google sheets
