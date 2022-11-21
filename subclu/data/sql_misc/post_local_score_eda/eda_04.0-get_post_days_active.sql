@@ -69,3 +69,57 @@ ORDER BY post_id, ve.pt
 --     )
 -- GROUP BY 1, 2
 -- ;
+
+--- Try pulling data from a new source to compare
+-- Use this query to decide on active window to count a post as active
+-- Hypothesis: 24hrs (current) is too short and
+--  - gives us a lot of false positives (posts that aren't local show up as local)
+--  - gives us a lot of false negatives (posts that ARE local don't show up as local)
+
+DECLARE PT_DATE DATE DEFAULT '2022-11-14';
+DECLARE POST_CREATED_DT DATE DEFAULT '2022-10-11';
+DECLARE TEST_SUBS DEFAULT [
+    'mexico'
+    -- , 'askreddit'
+    -- , 'mapporn'
+    -- , 'fragreddit'
+    -- , 'de'
+    -- , 'france'
+    -- , 'bundesliga'
+    -- , 'ligamx'
+    -- , 'casualuk'
+    -- , 'personalfinancecanada'
+    -- , 'dataisbeautiful'
+];
+
+WITH
+total_post_views AS (
+    SELECT
+        pl.subreddit_id
+        , subreddit_name
+        , post_create_dt
+        , pl.post_id
+
+        , SUM(post_dau_24hr) AS total_dau
+        , MIN(DATE(pl.pt)) AS first_dt_with_views
+        , MAX(DATE(pl.pt)) AS last_dt_with_views
+    FROM `data-prod-165221.i18n.post_local_scores` AS pl
+    WHERE DATE(pl.pt) BETWEEN POST_CREATED_DT AND PT_DATE
+        AND pl.post_create_dt = POST_CREATED_DT
+        AND subreddit_name IN UNNEST(TEST_SUBS)
+
+    GROUP BY 1,2,3,4
+)
+
+-- , last_day_with_views AS (
+--     SELECT
+
+
+--     FROM `data-prod-165221.i18n.post_local_scores` AS pl
+--         INNER JOIN total_post_views AS tp
+--             ON pl.post_id = tp.post_id
+-- )
+
+SELECT *
+FROM total_post_views
+ORDER BY last_dt_with_views DESC # total_dau DESC

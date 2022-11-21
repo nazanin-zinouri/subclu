@@ -70,4 +70,3 @@ WHERE DATE(pl.pt) = PT_DATE
     )
 ORDER BY subreddit_name, post_id, post_dau_24hr DESC
 ;
-

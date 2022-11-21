@@ -160,3 +160,102 @@ WHERE 1=1
 
 ORDER BY subreddit_name, geo_country_name, post_count DESC, post_dau_mean DESC # , country_name
 ;
+
+
+
+-- ==================
+-- Slightly different EDA querycut
+-- ===
+-- Get localness count per sub & country
+--  Make a different cut later to include location of POSTER
+DECLARE PT_DATE DATE DEFAULT '2022-11-10';
+DECLARE POST_CREATED_DT DATE DEFAULT '2022-11-09';
+
+WITH
+posts_per_subreddit AS (
+    SELECT
+        pl.subreddit_id
+        , COUNT(DISTINCT post_id) AS post_total_count
+    FROM `data-prod-165221.i18n.post_local_scores` AS pl
+    WHERE DATE(pl.pt) = PT_DATE
+        AND pl.post_create_dt = POST_CREATED_DT
+        AND subreddit_name IN (
+            'mexico'
+        )
+    GROUP BY 1
+)
+
+-- SELECT * FROM posts_per_subreddit;
+
+-- -- Get sum of posts per subreddit
+SELECT
+    pl.subreddit_id
+    , geo_country_code
+    , subreddit_name
+    , cm.country_name AS local_country_name
+    -- , poster_geo_country_code
+    , localness
+
+    , COUNT(DISTINCT pl.post_id) AS post_count
+    -- , SUM(COUNT(DISTINCT pl.post_id)) OVER ()
+    , COUNT(DISTINCT pl.post_id) / (SUM(COUNT(DISTINCT pl.post_id)) OVER (PARTITION BY pl.subreddit_id)) AS pct_of_posts
+
+    -- , COUNT(DISTINCT pl.post_id) / (COUNT(DISTINCT pl.post_id) OVER (PARTITION BY pl.subreddit_id)) AS pct_of_posts
+    -- , COUNT(DISTINCT pl.post_id) / (SUM(post_total_count) OVER (PARTITION BY pc.subreddit_id)) AS pct_of_posts
+    -- , post_dau_24hr
+    -- , ROUND(100.0 * post_dau_perc_24hr, 1) AS post_dau_perc_24hr
+    -- , ROUND(100.0 * perc_by_country, 3) AS perc_by_country
+    -- , ROUND(perc_by_country_z_score, 2) AS perc_by_country_z_score
+
+FROM `data-prod-165221.i18n.post_local_scores` AS pl
+    LEFT JOIN `reddit-employee-datasets.david_bermejo.countrycode_name_mapping` AS cm
+        ON pl.geo_country_code = cm.country_code
+    LEFT JOIN posts_per_subreddit AS pc
+        ON pl.subreddit_id = pc.subreddit_id
+    LEFT JOIN (
+        SELECT
+            -- Use row_number to get the latest edit as row=1, (a post_id can have multiple rows when edited)
+            ROW_NUMBER() OVER (
+                PARTITION BY post_id
+                ORDER BY endpoint_timestamp DESC
+            ) AS row_num
+            , post_id
+            , user_id
+            , subreddit_id
+            , geo_country_code AS poster_geo_country_code
+        FROM `data-prod-165221.andrelytics_ez_schema.post_submit`
+        WHERE DATE(_PARTITIONTIME) = POST_CREATED_DT
+        QUALIFY row_num = 1
+    ) as ps
+        ON pl.post_id = ps.post_id AND pl.subreddit_id = ps.subreddit_id
+WHERE DATE(pl.pt) = PT_DATE
+    AND pl.post_create_dt = POST_CREATED_DT
+
+    -- AND (
+    --     geo_country_code IN (
+    --         'MX'
+    --         , 'DE'
+    --         , 'US'
+    --         -- , 'FR'
+    --         -- , 'BR'
+    --         -- , 'CA', 'GB', 'IN', 'IE'
+    --     )
+    --     OR post_dau_perc_24hr >= 0.15
+    --     OR localness != 'not_local'
+    -- )
+    AND subreddit_name IN (
+        'mexico'
+    )
+
+GROUP BY 1,2,3,4,5  # ,6
+HAVING 1=1
+    AND (
+        localness != 'not_local'
+        OR geo_country_code IN (
+            'MX'
+        )
+    )
+    -- AND post_count >= 6
+
+ORDER BY subreddit_name, country_name, localness
+;
