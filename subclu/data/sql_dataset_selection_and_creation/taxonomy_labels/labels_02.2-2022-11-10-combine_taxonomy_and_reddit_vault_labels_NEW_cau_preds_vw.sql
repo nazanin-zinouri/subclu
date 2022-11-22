@@ -7,8 +7,8 @@
 -- Predictions below these thresholds will be taken as null/unlabeled
 --   For the i18n QA process we only want to keep predictions over the thresholds where the models
 --   are confident enough.
-DECLARE PRED_RATING_THRESHOLD NUMERIC DEFAULT 0.5;
-DECLARE PRED_TOPIC_THRESHOLD NUMERIC DEFAULT 0.5;
+-- DECLARE PRED_RATING_THRESHOLD NUMERIC DEFAULT 0.5;
+-- DECLARE PRED_TOPIC_THRESHOLD NUMERIC DEFAULT 0.5;
 
 
 -- CREATE VIEW `reddit-employee-datasets.david_bermejo.reddit_vault_predictions_and_overrides_vw`
@@ -24,7 +24,7 @@ WITH all_subreddit_labels AS (
         (CURRENT_DATE() - 2) AS dt
         , slo.subreddit_id
         , LOWER(name) AS subreddit_name
-        , DATE(verification_timestamp) AS crowd_verification_dt
+        -- , DATE(verification_timestamp) AS crowd_verification_dt
         , c.date_retrieved AS curator_dt
 
         -- Booleans to indicate source for RATING
@@ -44,6 +44,11 @@ WITH all_subreddit_labels AS (
             WHEN t.rating_short IS NOT NULL THEN t.rating_short
             ELSE NULL
         END AS taxonomy_rating
+        , CASE
+            WHEN c.curator_rating_name IS NOT NULL THEN c.curator_rating_name
+            WHEN t.rating_name IS NOT NULL THEN t.rating_name
+            ELSE NULL
+        END AS taxonomy_rating_name
         , c.curator_rating_name
         , c.curator_rating_short AS curator_rating
         , t.rating_short AS crowd_rating
@@ -85,6 +90,7 @@ WITH all_subreddit_labels AS (
             ELSE pt.topic_score_1
         END AS topic_score
 
+        , t.survey_version
         , CASE
             WHEN (c.curator_topic IS NOT NULL) THEN 'curator'
             WHEN (t.primary_topic IS NOT NULL) THEN 'crowd'
@@ -96,8 +102,8 @@ WITH all_subreddit_labels AS (
             ELSE NULL
         END AS taxonomy_rating_source
 
-        , (pr.rating_score_1 < PRED_RATING_THRESHOLD) AS pred_rating_low_confidence
-        , (pt.topic_score_1 < PRED_TOPIC_THRESHOLD) AS pred_topic_low_confidence
+        , (pr.rating_score_1 < 0.5) AS pred_rating_low_confidence
+        , (pt.topic_score_1 < 0.5) AS pred_topic_low_confidence
 
         , slo.subscribers
 
@@ -110,26 +116,13 @@ WITH all_subreddit_labels AS (
         WHERE dt = (CURRENT_DATE() - 2)
             AND NOT REGEXP_CONTAINS(LOWER(name), r'^u_.*')
     ) AS slo
+        -- pull from .shredded_crowdsource_topic_and_rating because it seems to include more
+        --  labels than .subreddit_metadata_lookup
         LEFT JOIN (
-            SELECT DISTINCT
-                m1.subreddit_id,
-                subreddit_name,
-                survey_version,
-                primary_topic,
-                rating_short,
-                verification_timestamp
-            FROM
-                `data-prod-165221.cnc.subreddit_metadata_lookup` AS m1
-            INNER JOIN (
-                    SELECT
-                        subreddit_id,
-                        MAX(pt) AS ts
-                    FROM `data-prod-165221.cnc.subreddit_metadata_lookup`
-                    GROUP BY 1
-                    ) AS m2
-                ON m1.pt = m2.ts
-                AND m1.subreddit_id = m2.subreddit_id
-            WHERE survey_version = 'v5'
+            SELECT *
+            FROM `data-prod-165221.cnc.shredded_crowdsource_topic_and_rating`
+            WHERE pt = CURRENT_DATE() - 2
+                AND survey_version IN ('v3', 'v5')
         ) AS t
             ON slo.subreddit_id = t.subreddit_id
         LEFT JOIN `reddit-employee-datasets.anna_scaramuzza.reddit_vault_all_topics_inference_20220929` AS pt
@@ -139,7 +132,7 @@ WITH all_subreddit_labels AS (
         LEFT JOIN `reddit-employee-datasets.david_bermejo.taxonomy_curated_labels` AS c
             ON slo.subreddit_id = c.subreddit_id
 
-    WHERE 1=1
+    -- WHERE 1=1
 )
 
 SELECT
