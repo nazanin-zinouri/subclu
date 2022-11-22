@@ -115,23 +115,22 @@ def similar_sub_schema() -> List[bigquery.SchemaField]:
             field_type="RECORD",
             mode="REPEATED",
             description="Most similar subreddits by distance",
+            # The nested fields should be a list of dictionaries,
+            #  so the mode should NOT be 'repeated'
             fields=(
                 bigquery.SchemaField(
                     name="subreddit_id",
                     field_type="STRING",
-                    mode="REPEATED",
                     description="Subreddit id",
                 ),
                 bigquery.SchemaField(
                     name="subreddit_name",
                     field_type="STRING",
-                    mode="REPEATED",
                     description="Lower case subreddit name",
                 ),
                 bigquery.SchemaField(
                     name="cosine_similarity",
                     field_type="FLOAT",
-                    mode="REPEATED",
                     description=(
                         "Cosine similarity between subreddits. Range from 1 to -1."
                         "  1: the same content, 0: unrelated, -1: opposite"
@@ -140,7 +139,6 @@ def similar_sub_schema() -> List[bigquery.SchemaField]:
                 bigquery.SchemaField(
                     name="distance_rank",
                     field_type="INTEGER",
-                    mode="REPEATED",
                     description="Rank for most similar subreddits where 1=closest",
                 ),
             ),

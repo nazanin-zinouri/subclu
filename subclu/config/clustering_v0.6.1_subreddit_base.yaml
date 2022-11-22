@@ -57,7 +57,7 @@ pipeline_config:
 hydra:
   launcher:
     # override the number of jobs for joblib
-    n_jobs: 11
+    n_jobs: 12
   job_logging:
     formatters:
       simple:
