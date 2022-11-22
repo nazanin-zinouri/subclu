@@ -15,7 +15,7 @@ defaults:
 
 embeddings_to_cluster: 'df_sub_level_agg_c1_post_comments_and_sub_desc'
 n_sample_embedding_rows: null
-n_max_clusters_to_check_for_optimal_k: 8000
+n_max_clusters_to_check_for_optimal_k: 9000
 
 # Filter out posts or subreddits BEFORE aplying clustering algo.
 #  Useful when some subreddits only have 1 or 2 posts so there's not
@@ -50,7 +50,7 @@ pipeline_config:
     add_step: false
     name: TruncatedSVD
     kwargs_:
-      n_components: 128
+      n_components: 256
 
 
 # Change n_jobs(parallel jobs) & logging for hydra itself
