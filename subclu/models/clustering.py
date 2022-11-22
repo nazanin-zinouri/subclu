@@ -333,7 +333,7 @@ class ClusterEmbeddings:
                     )
         log.info(f"  Pipeline to train:\n  {self.pipeline}")
 
-    def _load_embeddings(self):
+    def _load_embeddings(self) -> pd.DataFrame:
         """Load embeddings for clustering"""
         df_embeddings = self.mlf.read_run_artifact(
             run_id=self.data_embeddings_to_cluster['run_uuid'],
@@ -351,64 +351,92 @@ class ClusterEmbeddings:
 
         r_, c_ = df_embeddings.shape
         log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE")
-        mlflow.log_metrics(
-            {'input_embeddings-n_rows': r_,
-             'input_embeddings-n_cols': c_}
-        )
-        self.mlf.log_ram_stats(param=False, only_memory_used=True)
+        if mlflow.active_run() is not None:
+            mlflow.log_metrics(
+                {'input_embeddings-n_rows': r_,
+                 'input_embeddings-n_cols': c_}
+            )
+            self.mlf.log_ram_stats(param=False, only_memory_used=True)
         return df_embeddings
 
-    def _load_metadata_for_filtering(self) -> pd.DataFrame:
+    def _load_metadata_for_filtering(
+            self,
+            df_embeddings: pd.DataFrame,
+    ) -> pd.DataFrame:
         """Load metadata to filter embeddings"""
-        log.warning(f"** Loading metadata **")
-        try:
-            df_subs = LoadSubreddits(
-                bucket_name=self.data_text_and_metadata['bucket_name'],
-                folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
-                folder_posts=self.data_text_and_metadata['folder_posts_text_and_meta'],
-                columns=None,
-                # col_new_manual_topic=col_manual_labels,
-            ).read_apply_transformations_and_merge_post_aggs(
-                cols_post='post_count_only_',
-                df_format='dask',
-                read_fxn='dask',
-                unique_check=False,
-            )
-        except Exception as e:
-            # in new case we might have post-meta mixed with post+comments, so use
-            #  a different place to load subreddit metadata from
-            log.warning(f"  Error loading subreddit meta: {e}")
+        log.info(f"-- Checking filtering conditions... --")
+        col_filter_counts_ = self.filter_embeddings['filter_subreddits'].get('filter_column')
+        col_filter_active_ = self.filter_embeddings['filter_active_subreddits'].get('filter_column')
 
+        l_filter_cols_ = list()
+        for c_ in [col_filter_counts_, col_filter_active_]:
+            if c_ is not None:
+                l_filter_cols_.append(c_)
+
+        # save loading time by checking whether cols already exist in df_embeddings
+        if 0 == len(l_filter_cols_):
+            log.info(f"  No columns received to filter SUBREDDITS")
+            df_subs = pd.DataFrame()
+        elif all([c_ in df_embeddings.columns for c_ in l_filter_cols_]):
+            log.info(f"  Columns to filter SUBREDDITS already in df_embeddings\n  {l_filter_cols_}")
+            df_subs = pd.DataFrame()
+
+        elif col_filter_counts_ in df_embeddings.columns:
+            log.info(f"  Post-counts column already in df_embeddings. Calculation not needed {col_filter_counts_}")
             log.info(f"  Loading subreddit meta")
             df_subs = LoadSubreddits(
                 bucket_name=self.data_text_and_metadata['bucket_name'],
                 folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
-                columns=['subreddit_id', 'subreddit_name', 'primary_topic'],
-                # col_new_manual_topic=col_manual_labels,
+                columns=['subreddit_id', 'subreddit_name', 'primary_topic'] + [col_filter_active_],
             ).read_raw()
-
-            log.info(f"  Loading POSTS meta")
-            # calculate the # of posts for modeling
-            col_posts_for_modeling = 'posts_for_modeling_count'
-            df_posts = dd.read_parquet(
-                f"gs://{self.data_text_and_metadata['bucket_name']}/"
-                f"{self.data_text_and_metadata['folder_post_and_comment_text_and_meta']}/*.parquet",
-                columns=['post_id', 'subreddit_id']
-            ).compute()
-            df_posts_per_sub = (
-                df_posts
-                .groupby('subreddit_id', as_index=False)
-                .agg(
-                    **{
-                        col_posts_for_modeling: ('post_id', 'nunique')
-                   }
+        else:
+            log.info(f"  Post-counts column NOT in df_embeddings: {col_filter_counts_}")
+            log.warning(f"** Loading metadata **")
+            try:
+                df_subs = LoadSubreddits(
+                    bucket_name=self.data_text_and_metadata['bucket_name'],
+                    folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
+                    folder_posts=self.data_text_and_metadata['folder_posts_text_and_meta'],
+                    columns=None,
+                ).read_apply_transformations_and_merge_post_aggs(
+                    cols_post='post_count_only_',
+                    df_format='dask',
+                    read_fxn='dask',
+                    unique_check=False,
                 )
-            )
-            df_subs = df_subs.merge(
-                df_posts_per_sub,
-                how='left',
-                on='subreddit_id',
-            )
+            except Exception as e:
+                # in new case we might have post-meta mixed with post+comments, so use
+                #  a different place to load subreddit metadata from
+                log.warning(f"  Error loading subreddit meta: {e}")
+
+                log.info(f"  Loading subreddit meta")
+                df_subs = LoadSubreddits(
+                    bucket_name=self.data_text_and_metadata['bucket_name'],
+                    folder_path=self.data_text_and_metadata['folder_subreddits_text_and_meta'],
+                    columns=['subreddit_id', 'subreddit_name', 'primary_topic'],
+                ).read_raw()
+
+                log.info(f"  Loading POSTS meta to calculate post count...")
+                col_posts_for_modeling = 'posts_for_modeling_count'
+                df_posts = dd.read_parquet(
+                    f"gs://{self.data_text_and_metadata['bucket_name']}/"
+                    f"{self.data_text_and_metadata['folder_post_and_comment_text_and_meta']}/*.parquet",
+                    columns=['post_id', 'subreddit_id']
+                ).compute()
+                df_posts_per_sub = (
+                    df_posts
+                    .groupby('subreddit_id', as_index=False)
+                    .agg(
+                        **{
+                            col_posts_for_modeling: ('post_id', 'nunique')
+                       }
+                    )
+                )
+                df_subs = df_subs.merge(
+                    df_posts_per_sub,
+                    how='left',
+                    on='subreddit_id',
+                )
         return df_subs
 
     def _apply_filtering(
