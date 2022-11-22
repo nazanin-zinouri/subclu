@@ -150,6 +150,7 @@ class ClusterEmbeddings:
             filter_embeddings: dict = None,
             logs_path: str = 'logs',
             col_model_leaves_order: str = 'model_sort_order',
+            gcloud_project_id: str = "data-prod-165221",
             # **kwargs
     ):
         """"""
@@ -179,6 +180,10 @@ class ClusterEmbeddings:
         self.df_accel = None
         self.optimal_ks = None
         self.col_model_leaves_order = col_model_leaves_order
+
+        log.info(f"Setting google project ID: {gcloud_project_id}")
+        # For some reason we've been getting errors from MLflow because it can't determine the project
+        os.environ["GOOGLE_CLOUD_PROJECT"] = gcloud_project_id
 
         # Set mlflowLogger instance for central tracker
         self.mlf = MlflowLogger(tracking_uri=self.mlflow_tracking_uri)
@@ -310,7 +315,7 @@ class ClusterEmbeddings:
         ])
 
         # Then add other steps if set in the config
-        #  Start with latest step first (reduce first, normalize last)
+        #  Start with the latest step first (reduce first, normalize last)
         l_pipe_steps_to_check = ['reduce', 'normalize']
         if self.pipeline_config is not None:
             log.info(f"Checking custom pipeline config...\n  {self.pipeline_config}")
@@ -671,7 +676,7 @@ class ClusterEmbeddings:
         except Exception as e:
             log.error(f"Failed to append model leaves order\n  {e}")
 
-        # for plots we'd like a smoother or more constant interval between k's,
+        # For plots: we'd like a smoother or more constant interval between k's,
         #  but for the final df_labels table (which will be uploaded to bigquery)
         #  we want fewer k's because each k will be a column and we want to make it easier
         #  for people to pick one k -- they could get overwhelmed if we give them a ton
