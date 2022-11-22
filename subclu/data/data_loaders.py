@@ -162,6 +162,10 @@ class LoadPosts:
 
         bucket = storage_client.get_bucket(self.bucket_name)
         l_files_to_download = list(bucket.list_blobs(prefix=self.folder_path))
+        if self.verbose:
+            info(f"  Bucket name: {self.bucket_name}")
+            info(f"  Prefix to download: {self.folder_path}")
+            info(f"  # of files to download: {len(l_files_to_download)}")
         for blob_ in tqdm(l_files_to_download, ascii=True, ncols=70, position=0, leave=True):
             # Skip files that aren't in the same folder as the expected (input) folder
             parent_folder = blob_.name.split('/')[-2]
