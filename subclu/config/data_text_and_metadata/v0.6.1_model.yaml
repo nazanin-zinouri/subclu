@@ -1,7 +1,12 @@
 dataset_name: 'v0.6.1 inputs. ~110k seed subreddits, ~340k with 3+ posts, ~700k total subreddits'
 bucket_name: 'i18n-subreddit-clustering'
 
-folder_subreddits_text_and_meta: 'i18n_topic_model_batch/runs/20221107/subreddits/text'
+# Crowd topic -> the only source for primary topic is the crowd. In the FIXED version
+#   we pull from curator and only fall back to crowd if curator label is missing
+# Text for embeddings should be the same in both files
+folder_subreddits_text_and_meta: 'i18n_topic_model_batch/runs/20221107/subreddits_fix/text'
+folder_subreddits_text_and_meta_crowd_topic: 'i18n_topic_model_batch/runs/20221107/subreddits/text'
+
 folder_posts_text_and_meta: 'i18n_topic_model_batch/runs/20221107/posts'
 folder_comments_text_and_meta: 'i18n_topic_model_batch/runs/20221107/comments'
 
