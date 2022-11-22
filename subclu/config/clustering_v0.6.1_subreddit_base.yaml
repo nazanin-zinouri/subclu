@@ -22,9 +22,16 @@ n_max_clusters_to_check_for_optimal_k: 8000
 #   enough signal and/or they create noisy clusters.
 filter_embeddings:
   filter_subreddits:
-    filter: true
+    # Filter out subreddits with fewer than min posts in target col
+    # - Set column to "null" / None to skip filtering
     filter_column: posts_for_embeddings_count
     minimum_column_value: 4
+  filter_active_subreddits:
+    # NEW filter as of v0.6.1 (2022-11)
+    # Keep only subreddits that are Active as flagged by these values
+    # - Set column to "null" / None to skip filtering
+    filter_column: subreddit_seed_for_clusters
+    val_to_keep: true
 
 mlflow_tracking_uri: 'sqlite'
 mlflow_experiment_name: 'v0.6.1_mUSE_clustering'
