@@ -210,9 +210,11 @@ class ClusterEmbeddings:
             df_embeddings = self._load_embeddings()
 
             if self.filter_embeddings is not None:
-                if self.filter_embeddings.get('filter_subreddits', False):
-                    log.info(f"-- Loading data to filter SUBREDDITS")
-                    df_subs = self._load_metadata_for_filtering()
+                if any([
+                    self.filter_embeddings.get('filter_subreddits', False),
+                    self.filter_embeddings.get('filter_active_subreddits', False),
+                ]):
+                    df_subs = self._load_metadata_for_filtering(df_embeddings)
 
                     df_embeddings = self._apply_filtering(
                         df_embeddings=df_embeddings,
@@ -446,32 +448,57 @@ class ClusterEmbeddings:
     ) -> pd.DataFrame:
         """If we have kwargs for filtering, filter out embeddings
         example: if a sub only has 2 or 3 posts, then we're not going to trust
-        those embeddings very much.
+        those embeddings much.
         """
         log.info(f"** Applying filters... **")
-        col_filter_ = self.filter_embeddings['filter_subreddits']['filter_column']
-        min_value = self.filter_embeddings['filter_subreddits']['minimum_column_value']
-        log.info(f"  {col_filter_} >= {min_value}")
+        log.info(f"  {self.filter_embeddings}")
+        col_filter_counts_ = self.filter_embeddings['filter_subreddits'].get('filter_column')
+        min_posts_ = self.filter_embeddings['filter_subreddits'].get('minimum_column_value')
 
-        df_embeddings = (
-            df_subs[self.l_ix_subs + [col_filter_]]
-            .merge(
-                df_embeddings,
-                how='right',
-                on=self.l_ix_subs,
+        col_filter_active_ = self.filter_embeddings['filter_active_subreddits'].get('filter_column')
+        active_val_to_keep_ = self.filter_embeddings['filter_active_subreddits'].get('val_to_keep')
+
+        l_filter_cols_ = list()
+        l_filter_cols_to_append_ = list()
+        for c_ in [col_filter_counts_, col_filter_active_]:
+            if c_ is not None:
+                l_filter_cols_.append(c_)
+                if c_ not in df_embeddings.columns:
+                    l_filter_cols_to_append_.append(c_)
+
+        # Only merge cols that are missing
+        df_emb_new = df_embeddings.copy()
+        if len(l_filter_cols_to_append_) >= 1:
+            df_emb_new = (
+                df_subs[self.l_ix_subs + l_filter_cols_to_append_]
+                .merge(
+                    df_emb_new,
+                    how='right',
+                    on=self.l_ix_subs,
+                )
             )
-        )
-        mask_above_threshold = df_embeddings[col_filter_] >= min_value
-        log.info(f"  Subreddits to drop: {(~mask_above_threshold).sum():,.0f}")
 
-        r_, c_ = df_embeddings[mask_above_threshold].shape
+        # TODO(djb): apply threshold for active subs (if given)
+        if active_val_to_keep_ is not None:
+            mask_active_subs = df_emb_new[col_filter_active_] == active_val_to_keep_
+            log.info(f"  {(~mask_active_subs).sum():,.0f} <- Subreddits to drop b/c not active")
+            df_emb_new = df_emb_new[mask_active_subs]
+
+        # TODO(djb): apply threshold for minimum posts (if given)
+        if active_val_to_keep_ is not None:
+            mask_above_threshold = df_emb_new[col_filter_counts_] >= min_posts_
+            log.info(f"  {(~mask_above_threshold).sum():,.0f} <- Subreddits to drop below post threshold")
+            df_emb_new = df_emb_new[mask_above_threshold]
+
+        r_, c_ = df_emb_new.shape
         log.info(f"{r_:9,.0f} | {c_:5,.0f} <- df_embeddings SHAPE FILTERED")
-        mlflow.log_metrics(
-            {'filtered_embeddings-n_rows': r_,
-             'filtered_embeddings-n_cols': c_}
-        )
-        self.mlf.log_ram_stats(param=False, only_memory_used=True)
-        return df_embeddings[mask_above_threshold]
+        if mlflow.active_run() is not None:
+            mlflow.log_metrics(
+                {'filtered_embeddings-n_rows': r_,
+                 'filtered_embeddings-n_cols': c_}
+            )
+            self.mlf.log_ram_stats(param=False, only_memory_used=True)
+        return df_emb_new
 
     def _log_pipeline_to_mlflow(self):
         """Set schema so we can og the mlflow model"""
