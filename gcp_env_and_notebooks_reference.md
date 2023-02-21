@@ -81,13 +81,14 @@ Here's a list of machine types:
 - https://cloud.google.com/compute/docs/general-purpose-machines
 ```bash
 # General purpose:
-n1-highmem-96   |  96 vCPUs |  624 GB Memory
+n1-standard-32  |  32 vCPUs |  120 GB Memory (RAM) 
+n1-highmem-96   |  96 vCPUs |  624 GB  |  ~6 USD/hour ** Ok for general work & loading SUBREDDIT-level embeddings **
 
 # Memory-optimized:
-m1-highmem-96   |  96 vCPUs | 1433 GB Memory
-
-m1-ultramem-80  |  80 vCPUs | 1922 GB Memory
-m1-ultramem-160 | 160 vCPUs | 3844 GB Memory
+m1-megamem-96   |  96 vCPUs | 1433 GB Memory  |  ~12 USD/hour ** Usual sweetspot for POST-level embedding aggregation **
+...
+m1-ultramem-80  |  80 vCPUs | 1922 GB
+m1-ultramem-160 | 160 vCPUs | 3844 GB
 ```
 
 Example commands
@@ -96,8 +97,13 @@ Example commands
 gcloud compute instances stop VM_NAME
 
 # 1. Change the machine type:
+#  A) Embeddings job
 gcloud compute instances set-machine-type djb-100-2021-04-28-djb-eda-german-subs \
   --machine-type=m1-megamem-96
+  
+#  B) Generic work (less RAM & much cheaper)
+gcloud compute instances set-machine-type djb-100-2021-04-28-djb-eda-german-subs \
+  --machine-type=n1-highmem-96
 ```
 
 From the command line you can also make updates to other parts of your VM. For example, you can resize a disk with:
