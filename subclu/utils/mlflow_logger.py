@@ -366,6 +366,7 @@ class MlflowLogger:
             experiment_ids: Union[str, int, List[int]] = None,
             only_top_level: bool = True,
             verbose: bool = False,
+            full_path: bool = False,
     ):
         """list artifacts for a run in GCS"""
         # first get a df for all runs
@@ -406,7 +407,11 @@ class MlflowLogger:
             # parent_folders_1_2_3 = '/'.join(b_name.split('/')[-4:-1])
 
             if root_artifact_prefix in b_name:
-                l_files_and_folders_clean.append(b_name)
+                if full_path:
+                    # TODO(djb):
+                    l_files_and_folders_clean.append(f"gs://{bucket_name}/{b_name}")
+                else:
+                    l_files_and_folders_clean.append(b_name)
             else:
                 if verbose:
                     info(f"Skip files that aren't in the run's artifacts folder")
@@ -415,7 +420,13 @@ class MlflowLogger:
             # first get the directory/path AFTER the /artifacts
             keys_after_root = b_name.split(f"{root_artifact_prefix}/")[-1]
             # Then append ONLY the first path or file
-            l_files_and_folders_top_level.append(keys_after_root.strip().split('/')[0])
+            if full_path:
+                l_files_and_folders_top_level.append(
+                    f"{artifact_uri}/"
+                    f"{keys_after_root.strip().split('/')[0]}"
+                )
+            else:
+                l_files_and_folders_top_level.append(keys_after_root.strip().split('/')[0])
 
         # Convert the list to a set b/c we'll have dupes when multiple files are in a subfolder
         l_files_and_folders_top_level = set(l_files_and_folders_top_level)
