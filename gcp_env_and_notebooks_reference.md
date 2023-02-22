@@ -299,6 +299,40 @@ gcloud auth application-default revoke
 
 **NOTE** make sure to logout after using the VM! Unlike Colab, the VM persists your credentials.
 
+### Troubleshoot gcloud auth: Update gcloud SDK if you get errors!!
+If you have an old version of `gcloud`, you might not be able to log in!  Use this command to update gcloud on a VM:
+```bash
+sudo apt-get install google-cloud-sdk
+```
+
+Here we see that we had an old version `338.0.0` from 2021.04. After we update we're on `410.0.0` from 2022.11.
+```bash
+gcloud version
+#Google Cloud SDK 338.0.0
+#alpha 2021.04.23
+#beta 2021.04.23
+#bq 2.0.67
+#core 2021.04.23
+#gsutil 4.61
+
+sudo apt-get install google-cloud-sdk
+#Reading package lists... Done
+#Building dependency tree       
+# ...
+#The following packages will be upgraded:
+#  google-cloud-sdk
+# ...
+
+gcloud version
+#Google Cloud SDK 410.0.0
+#alpha 2022.11.11
+#beta 2022.11.11
+#bq 2.0.81
+#bundled-python3-unix 3.9.12
+#core 2022.11.11
+#gcloud-crc32c 1.0.0
+#gsutil 5.16
+```
 
 # Running mlflow-server on GCP
 
