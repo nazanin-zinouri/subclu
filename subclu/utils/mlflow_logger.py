@@ -58,12 +58,13 @@ class MlflowLogger:
         if tracking_uri in [None, 'sqlite']:
             # TODO(djb): update path to config file?
             try:
-                # remove VMs:
+                # First check the pattern in vertex AI VMs:
                 path_mlruns_db = Path(f"/home/jupyter/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
                 Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
                 tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
                 mlflow.set_tracking_uri(tracking_uri)
             except (OSError, FileNotFoundError):
+                # Else, Try the local (laptop) sqlite database
                 path_mlruns_db = Path(f"/Users/david.bermejo/repos/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
                 Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
                 tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"

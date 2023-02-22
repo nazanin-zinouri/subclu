@@ -93,7 +93,10 @@ def load_data_to_bq_table(
         bq_client = bigquery.Client()
 
     bq_table = ".".join([bq_project, bq_dataset, bq_table_name])
-    info(f"Loading data to table:\n  {bq_table}")
+    info(
+        f"Loading this URI:\n  {uri}"
+        f"\nInto this table:\n  {bq_table}"
+    )
 
     create_partitioned_table_if_not_exist(
         bq_project=bq_project,
