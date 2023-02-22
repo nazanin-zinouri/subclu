@@ -1,0 +1,16 @@
+# embeddings_description: 'Embeddings from USE-multilingual with lower_case=False'
+config_description: "v0.6.1 config for embeddings. C1= Post & comment text were combined and created as single embedding (no averaging)."
+run_uuid: '91ac7ca171024c779c0992f59470c81b'
+l_ix_sub: ['subreddit_name', 'subreddit_id']
+l_ix_post: ['subreddit_name', 'post_id']
+
+df_post_level_agg_b_post_and_comments: null
+df_post_level_agg_c_post_comments_sub_desc: null
+df_post_level_agg_c1_post_comments_sub_desc: 'df_posts_agg_c1'
+
+df_sub_level_agg_a_post_only: null
+
+df_sub_level_agg_b_post_and_comments: null
+
+df_sub_level_agg_c_post_comments_and_sub_desc: null
+df_sub_level_agg_c1_post_comments_and_sub_desc: 'df_subs_agg_c1'

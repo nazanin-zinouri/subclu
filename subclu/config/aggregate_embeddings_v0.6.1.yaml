@@ -1,0 +1,16 @@
+# Use this config to get aggregate embeddings
+defaults:
+  - data_text_and_metadata:  v0.6.1_model
+  - data_embeddings_to_aggregate: v0.6.1_2022-11-07_muse_lower_case_false
+  - aggregate_params: v0.6.1_agg
+
+bucket_output: 'i18n-subreddit-clustering'
+mlflow_tracking_uri: 'sqlite'
+#  Make sure experiment name is in this method BEFORE running exerpiment:
+#   `subclu.utils.MlflowLogger.initialize_experiment_names()`
+mlflow_experiment: 'v0.6.1_mUSE_aggregates'
+n_sample_subreddits: null
+n_sample_posts_files: null
+n_sample_comments_files: null
+
+agg_style: 'dask_delayed'

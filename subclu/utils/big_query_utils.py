@@ -1,6 +1,7 @@
 """
 Utilities to load & upload data from/to bigQuery
 """
+from datetime import datetime, timedelta
 import logging
 from logging import info
 from typing import List
@@ -77,7 +78,8 @@ def load_data_to_bq_table(
         table_description: str = None,
         update_table_description: bool = True,
         location: str = 'US',
-        partition_expiration_days: int = 90,
+        partition_expiration_days: int = 450,
+        table_expiration_days_from_today: int = None,
         bq_client: bigquery.Client = None,
         verbose: bool = True,
 ) -> None:
@@ -93,7 +95,10 @@ def load_data_to_bq_table(
         bq_client = bigquery.Client()
 
     bq_table = ".".join([bq_project, bq_dataset, bq_table_name])
-    info(f"Loading data to table:\n  {bq_table}")
+    info(
+        f"Loading this URI:\n  {uri}"
+        f"\nInto this table:\n  {bq_table}"
+    )
 
     create_partitioned_table_if_not_exist(
         bq_project=bq_project,
@@ -123,7 +128,7 @@ def load_data_to_bq_table(
         )
     )
 
-    # Make API request to load new
+    # Make API request to load new data
     load_job = bq_client.load_table_from_uri(
         uri,
         bq_table,
@@ -133,7 +138,18 @@ def load_data_to_bq_table(
 
     load_job.result()  # Wait for the job to complete
 
+    # Get table after upload & check metadata
     destination_table = bq_client.get_table(bq_table)
+    info(f"Original Table Expiration: {destination_table.expires}")
+    if table_expiration_days_from_today is not None:
+        destination_table.expires = datetime.utcnow() + timedelta(
+            days=table_expiration_days_from_today
+        )
+    else:
+        destination_table.expires = None
+    destination_table = bq_client.update_table(destination_table, ["expires"])
+    info(f"NEW Table Expiration: {destination_table.expires}")
+
     if update_table_description & (table_description is not None):
         info(
             f"Updating subreddit description from:\n  {destination_table.description}"

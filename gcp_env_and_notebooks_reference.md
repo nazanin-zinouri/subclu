@@ -81,13 +81,14 @@ Here's a list of machine types:
 - https://cloud.google.com/compute/docs/general-purpose-machines
 ```bash
 # General purpose:
-n1-highmem-96   |  96 vCPUs |  624 GB Memory
+n1-standard-32  |  32 vCPUs |  120 GB Memory (RAM) 
+n1-highmem-96   |  96 vCPUs |  624 GB  |  ~6 USD/hour ** Ok for general work & loading SUBREDDIT-level embeddings **
 
 # Memory-optimized:
-m1-highmem-96   |  96 vCPUs | 1433 GB Memory
-
-m1-ultramem-80  |  80 vCPUs | 1922 GB Memory
-m1-ultramem-160 | 160 vCPUs | 3844 GB Memory
+m1-megamem-96   |  96 vCPUs | 1433 GB Memory  |  ~12 USD/hour ** Usual sweetspot for POST-level embedding aggregation **
+...
+m1-ultramem-80  |  80 vCPUs | 1922 GB
+m1-ultramem-160 | 160 vCPUs | 3844 GB
 ```
 
 Example commands
@@ -96,10 +97,25 @@ Example commands
 gcloud compute instances stop VM_NAME
 
 # 1. Change the machine type:
+#  A) Embeddings job
 gcloud compute instances set-machine-type djb-100-2021-04-28-djb-eda-german-subs \
   --machine-type=m1-megamem-96
+  
+#  B) Generic work (less RAM & much cheaper)
+gcloud compute instances set-machine-type djb-100-2021-04-28-djb-eda-german-subs \
+  --machine-type=n1-highmem-96
 ```
 
+From the command line you can also make updates to other parts of your VM. For example, you can resize a disk with:
+- https://cloud.google.com/compute/docs/disks/resize-persistent-disk#resize_the_disk
+- 
+```bash 
+gcloud compute disks resize djb-subclu-inference-XXXX --size 756 --zone us-west1-b
+
+
+gcloud compute disks resize djb-subclu-inference-rapids-20211217-data --size 756 --zone us-west1-b
+
+```
 
 ### SSH into Jupyter Lab [optional/debug]
 For some reason, the URLs to connect to a VM can sometimes break (you get a 403 error). If that's the case, you can use SSH to create a tunnel to the VM and connect "locally" to the VM. This is the same method used to connect to the MLflow server below.
@@ -283,6 +299,40 @@ gcloud auth application-default revoke
 
 **NOTE** make sure to logout after using the VM! Unlike Colab, the VM persists your credentials.
 
+### Troubleshoot gcloud auth: Update gcloud SDK if you get errors!!
+If you have an old version of `gcloud`, you might not be able to log in!  Use this command to update gcloud on a VM:
+```bash
+sudo apt-get install google-cloud-sdk
+```
+
+Here we see that we had an old version `338.0.0` from 2021.04. After we update we're on `410.0.0` from 2022.11.
+```bash
+gcloud version
+#Google Cloud SDK 338.0.0
+#alpha 2021.04.23
+#beta 2021.04.23
+#bq 2.0.67
+#core 2021.04.23
+#gsutil 4.61
+
+sudo apt-get install google-cloud-sdk
+#Reading package lists... Done
+#Building dependency tree       
+# ...
+#The following packages will be upgraded:
+#  google-cloud-sdk
+# ...
+
+gcloud version
+#Google Cloud SDK 410.0.0
+#alpha 2022.11.11
+#beta 2022.11.11
+#bq 2.0.81
+#bundled-python3-unix 3.9.12
+#core 2022.11.11
+#gcloud-crc32c 1.0.0
+#gsutil 5.16
+```
 
 # Running mlflow-server on GCP
 

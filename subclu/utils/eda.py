@@ -441,6 +441,7 @@ def value_counts_and_pcts(
 
     df_out = df_out.head(top_n)
 
+    # Sort index BEFORE calculating cum-sum
     if sort_index & (index_group_cols is None):
         df_out = df_out.sort_index(ascending=sort_index_ascending)
     elif sort_index & (index_group_cols is not None):
@@ -450,12 +451,6 @@ def value_counts_and_pcts(
             index_group_cols=index_group_cols,
             ascending=sort_index_ascending,
         )
-
-    if reset_index & (col is not None):
-        df_out = df_out.reset_index().rename(columns={'index': col})
-    elif reset_index:
-        df_out = df_out.reset_index()
-
     if cumsum_count:
         df_out[col_cumsum_count] = df_out[col_count].cumsum()
     if cumsum:
@@ -476,6 +471,14 @@ def value_counts_and_pcts(
                      for c in df_out.columns
                      if any(lbl in c for lbl in [pct_label, cumsum_col])
                      })
+
+    # Reset index AFTER setting formatting for numeric cols in case index is
+    #  string, but might match a numberic col pattern
+    if reset_index & (col is not None):
+        df_out = df_out.reset_index().rename(columns={'index': col})
+    elif reset_index:
+        df_out = df_out.reset_index()
+
     if rename_cols_for_display:
         df_out = (
             df_out

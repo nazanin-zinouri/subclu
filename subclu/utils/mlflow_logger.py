@@ -58,12 +58,13 @@ class MlflowLogger:
         if tracking_uri in [None, 'sqlite']:
             # TODO(djb): update path to config file?
             try:
-                # remove VMs:
+                # First check the pattern in vertex AI VMs:
                 path_mlruns_db = Path(f"/home/jupyter/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
                 Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
                 tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
                 mlflow.set_tracking_uri(tracking_uri)
             except (OSError, FileNotFoundError):
+                # Else, Try the local (laptop) sqlite database
                 path_mlruns_db = Path(f"/Users/david.bermejo/repos/subreddit_clustering_i18n/mlflow_sync/{self.host_name}")
                 Path.mkdir(path_mlruns_db, exist_ok=True, parents=True)
                 tracking_uri = f"sqlite:///{path_mlruns_db}/mlruns.db"
@@ -137,6 +138,16 @@ class MlflowLogger:
             'v0.6.0_mUSE_clustering_test',
             'v0.6.0_mUSE_clustering',
             'v0.6.0_nearest_neighbors',
+
+            # v0.6.1 (still manual refresh, but
+            #  - ~700k subreddits total
+            #  - ~300k subreddits for ANN (3+ posts in L90 days)
+            #  - ~100k subreddits for clustering model ("moderately" active)
+            'v0.6.1_mUSE_aggregates_test',
+            'v0.6.1_mUSE_aggregates',
+            'v0.6.1_mUSE_clustering_test',
+            'v0.6.1_mUSE_clustering',
+            'v0.6.1_nearest_neighbors',
 
         ]
         for i, exp in enumerate(l_experiments):
@@ -356,6 +367,7 @@ class MlflowLogger:
             experiment_ids: Union[str, int, List[int]] = None,
             only_top_level: bool = True,
             verbose: bool = False,
+            full_path: bool = False,
     ):
         """list artifacts for a run in GCS"""
         # first get a df for all runs
@@ -396,7 +408,11 @@ class MlflowLogger:
             # parent_folders_1_2_3 = '/'.join(b_name.split('/')[-4:-1])
 
             if root_artifact_prefix in b_name:
-                l_files_and_folders_clean.append(b_name)
+                if full_path:
+                    # TODO(djb):
+                    l_files_and_folders_clean.append(f"gs://{bucket_name}/{b_name}")
+                else:
+                    l_files_and_folders_clean.append(b_name)
             else:
                 if verbose:
                     info(f"Skip files that aren't in the run's artifacts folder")
@@ -405,7 +421,13 @@ class MlflowLogger:
             # first get the directory/path AFTER the /artifacts
             keys_after_root = b_name.split(f"{root_artifact_prefix}/")[-1]
             # Then append ONLY the first path or file
-            l_files_and_folders_top_level.append(keys_after_root.strip().split('/')[0])
+            if full_path:
+                l_files_and_folders_top_level.append(
+                    f"{artifact_uri}/"
+                    f"{keys_after_root.strip().split('/')[0]}"
+                )
+            else:
+                l_files_and_folders_top_level.append(keys_after_root.strip().split('/')[0])
 
         # Convert the list to a set b/c we'll have dupes when multiple files are in a subfolder
         l_files_and_folders_top_level = set(l_files_and_folders_top_level)
@@ -427,7 +449,7 @@ class MlflowLogger:
             read_function: Union[callable, str] = 'pd_parquet',
             columns: iter = None,
             cache_locally: bool = True,
-            local_path_root: str = f"/home/jupyter/subreddit_clustering_i18n/data/local_cache/",
+            local_path_root: str = "/home/jupyter/subreddit_clustering_i18n/data/local_cache/i18n-subreddit-clustering",
             n_sample_files: int = None,
             verbose: bool = False,
             read_csv_kwargs: dict = None,
@@ -449,19 +471,21 @@ class MlflowLogger:
               - df_sub_level__sub_desc_similarity (expected)
               - df_sub_level__sub_desc_similarity_pair (DO NOT WANT!)
         """
-        # set some defaults for common file types so we don't have to load
+        # set some defaults for common file types so we don't have to load them
+        d_read_functions_ = {
+            'pd_parquet': pd.read_parquet,
+            'pd_csv': pd.read_csv,
+            'dask_parquet': dd.read_parquet,
+            'json': json.load,
+        }
         if isinstance(read_function, str):
-            if 'pd_parquet' == read_function:
-                read_function = pd.read_parquet
-            elif 'pd_csv' == read_function:
-                read_function = pd.read_csv
-            elif 'dask_parquet' == read_function:
-                read_function = dd.read_parquet
-            elif 'json' == read_function:
-                read_function = json.load
-
+            if read_function in d_read_functions_.keys():
+                read_function = d_read_functions_[read_function]
             else:
-                raise NotImplementedError(f"{read_function} Not implemented...")
+                raise NotImplementedError(
+                    f"`{read_function}` Not implemented."
+                    f"\n  Supported functions: {list(d_read_functions_.keys())}"
+                )
 
         if artifact_file is not None:
             artifact_file_name_only = artifact_file.split('/')[-1]
@@ -508,6 +532,7 @@ class MlflowLogger:
             #  'd_ix_to_id/d_ix_to_id.csv',
             #  then the file won't be saved, instead we'll create a folder that has the file name
             #   and we can't download/read the file! hmm:
+            info(f"Remote artifact path to download:\n  gs://{bucket_name}/{full_artifact_folder}")
             info(f"Local folder to download artifact(s):\n  {path_local_folder}")
             Path.mkdir(path_local_folder, exist_ok=True, parents=True)
 

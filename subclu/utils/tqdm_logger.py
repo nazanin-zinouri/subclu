@@ -64,7 +64,7 @@ class FileLogger:
             self,
             logs_path: Union[str, Path],
             log_name: str = 'log',
-            log_level = logging.INFO
+            log_level=logging.INFO
     ):
         """"""
         self.logs_path = Path(logs_path)

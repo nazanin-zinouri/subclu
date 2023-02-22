@@ -18,7 +18,7 @@ INSTALL_REQUIRES = [
     #  are not guaranteed to be the same, so don't pin them to prevent errors
     "mlflow == 1.16.0",
 
-    # Exclude dask & modin while I test out spark
+    # Use dask to load parquet files in parallel
     "dask[complete] == 2021.6.0",
 
     # Auth
@@ -31,7 +31,7 @@ INSTALL_REQUIRES = [
 
     # Visualization
     "seaborn == 0.11.1",
-    "plotly == 4.14.3",
+    "plotly == 5.11.0",
     "kaleido == 0.2.1",
 
     # Read & write to GCS & google sheets
@@ -334,7 +334,7 @@ EXTRAS_REQUIRE = {
 setup(
     name='subclu',
     packages=find_packages(),
-    version='0.6.0',
+    version='0.6.1',
     description='A package to identify clusters of subreddits and/or posts',
     author='david.bermejo@reddit.com',
     license='',

@@ -12,7 +12,6 @@ from typing import List, Union, Tuple, Dict
 
 import pandas as pd
 import mlflow
-# import numpy as np
 
 from ..utils.big_query_utils import load_data_to_bq_table
 from .bq_embedding_schemas import embeddings_schema
