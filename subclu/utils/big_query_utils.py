@@ -77,7 +77,7 @@ def load_data_to_bq_table(
         table_description: str = None,
         update_table_description: bool = True,
         location: str = 'US',
-        partition_expiration_days: int = 90,
+        partition_expiration_days: int = 450,
         bq_client: bigquery.Client = None,
         verbose: bool = True,
 ) -> None:
@@ -126,7 +126,7 @@ def load_data_to_bq_table(
         )
     )
 
-    # Make API request to load new
+    # Make API request to load new data
     load_job = bq_client.load_table_from_uri(
         uri,
         bq_table,
