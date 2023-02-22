@@ -128,9 +128,7 @@ class GetANN:
             log.info(f"Loading subreddit embeddings...")
             df_embeddings = self._load_sub_embeddings()
 
-
-
-
+            # TODO(djb): filter subreddits
             if self.filter_embeddings is not None:
                 if self.filter_embeddings.get('filter_subreddits', False):
                     log.info(f"-- Loading data to filter SUBREDDITS")
@@ -140,6 +138,26 @@ class GetANN:
                         df_embeddings=df_embeddings,
                         df_subs=df_subs,
                     )
+
+            # TODO(djb): build ANNOY index
+
+            # TODO(djb): save ANNOY index to local & log to mlflow
+
+            # TODO(djb): create df with all items with get_top_n_by_item_all_fast()
+
+            # TODO(djb): Add pt & metadata columns
+
+            # TODO(djb): log examples from a few expected subs
+            #  e.g., finanzen, antivegan, de, ireland, mexico
+
+            # TODO(djb): Save df to local & log to mlflow
+
+            # TODO(djb): Reshape df to ndJSON & log to mlflow
+
+            # TODO(djb): [OPTIONAL based on flag] Upload JSON data to BigQuery table
+
+
+
 
             log.info(f"-- Training clustering model --")
             t_start_model_fit = datetime.utcnow()
