@@ -532,6 +532,7 @@ class MlflowLogger:
             #  'd_ix_to_id/d_ix_to_id.csv',
             #  then the file won't be saved, instead we'll create a folder that has the file name
             #   and we can't download/read the file! hmm:
+            info(f"Remote artifact path to download:\n  gs://{bucket_name}/{full_artifact_folder}")
             info(f"Local folder to download artifact(s):\n  {path_local_folder}")
             Path.mkdir(path_local_folder, exist_ok=True, parents=True)
 
