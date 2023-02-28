@@ -1,5 +1,4 @@
--- Initial candidate list for subreddit counterparts for a single country
---   We can use these for FPRs or other surfaces like in-feed recommendations
+-- Initial candidate list for subreddit counterpart FPR for a single country
 
 -- Use this date to pull the latest partitions for subreddit_lookup, etc.
 DECLARE PT_DATE DATE DEFAULT CURRENT_DATE() - 2;
@@ -49,19 +48,20 @@ WITH
             ga.geo_country_code
             , ga.subreddit_id
             , ga.subreddit_name
+            , tx.curator_rating
+            , tx.curator_topic_v2
         FROM `data-prod-165221.i18n.community_local_scores` AS ga
             -- Get primary language
             LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddit_language_rank_20220808` AS lan
                 ON ga.subreddit_id = lan.subreddit_id
-            -- TODO(djb): Use taxonomy's ratings to filter to subs already approved & some subs that haven't been rated
 
-            -- LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddit_qa_flags` AS q
-            --     ON ga.subreddit_id = q.subreddit_id
+            -- Use taxonomy's ratings to filter to subs already approved or unrated
+            LEFT JOIN `data-prod-165221.taxonomy.daily_export` AS tx
+                ON ga.subreddit_id = tx.subreddit_id
 
         WHERE DATE(ga.pt) = PT_DATE
-            -- TODO(djb): remove subreddits flagged as sensitive in taxonomy table
-            -- AND q.pt = PT_DATE
-            -- AND q.combined_filter IN ('recommend', 'review')
+            -- Remove subreddits flagged as sensitive by taxonomy
+            AND COALESCE(tx.curator_rating, "") IN ("", 'Everyone', 'Mature 1')
 
             -- filters for geo-relevant country
             AND (
@@ -93,9 +93,11 @@ WITH
             , cosine_similarity
             , slo.over_18 AS over_18_geo
             , slo.allow_discovery AS allow_discovery_geo
-            -- TODO(djb): get curator rating & topic from TAXONOMY table
-            -- , q.rating_short AS rating_short_geo
-            -- , q.primary_topic AS primary_topic_geo
+
+            , ga.curator_rating AS curator_rating_geo
+            , ga.curator_topic_v2 AS curator_topic_v2_geo
+            , tx.curator_rating AS curator_rating_us
+            , tx.curator_topic_v2 AS curator_topic_v2_us
 
         FROM `reddit-employee-datasets.david_bermejo.cau_similar_subreddits_by_text` AS d
             -- We need to UNNEST & join the field with nested JSON
@@ -112,18 +114,17 @@ WITH
             ) AS slo
                 ON d.subreddit_id = slo.subreddit_id
             -- Get topic & rating from QA table because it includes CURATOR labels, not just crowd
-            -- LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddit_qa_flags` AS q
-            --     ON ga.subreddit_id = q.subreddit_id
-            -- LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddits_no_recommendation` AS nr
-            --     ON d.subreddit_name_b = nr.subreddit_name
+            LEFT JOIN `data-prod-165221.taxonomy.daily_export` AS tx
+                ON n.subreddit_id = tx.subreddit_id
 
         WHERE 1=1
-            -- Exclude subreddits that are geo-relevant to the country
+            -- Exclude subreddits that are geo-relevant to the country (no DE<>DE recommendations)
             AND gb.subreddit_id IS NULL
-            -- TODO(djb): remove subreddits flagged as sensitive (keep only E, M1, or Unrated)
-            -- AND nr.subreddit_name IS NULL
 
-            -- exclude subs with covid or corona in name
+            -- Filter out US subs that are not clean for recommendations
+            AND COALESCE(tx.curator_rating, "") IN ("", 'Everyone', 'Mature 1')
+
+            -- Exclude subs with covid or corona in name
             AND d.subreddit_name NOT LIKE "%covid%"
             AND d.subreddit_name NOT LIKE "%coronavirus%"
             AND n.subreddit_name NOT LIKE "%covid%"
@@ -135,18 +136,13 @@ WITH
             a.* EXCEPT(
                 -- language_name_geo, language_percent_geo, language_rank_geo,
                 over_18_geo, allow_discovery_geo
-                -- TODO(djb): add rating & topic from TAXONOMY
-                -- , rating_short_geo, primary_topic_geo
             )
             , slo.subscribers AS subscribers_us
-            , ROW_NUMBER() OVER (PARTITION BY subreddit_id_GEO ORDER BY cosine_similarity DESC) AS rank_geo_to_us
+            , asg.users_l7 AS users_l7_geo
+            , asu.users_l7 AS users_l7_us
 
+            , ROW_NUMBER() OVER (PARTITION BY subreddit_id_GEO ORDER BY cosine_similarity DESC) AS rank_geo_to_us
             , allow_discovery_geo
-            -- TODO(djb): add ratings & topics from TAXONOMY
-            -- , rating_short_geo
-            -- , q.rating_short AS rating_short_us
-            -- , primary_topic_geo
-            -- , primary_topic AS primary_topic_us
 
             -- , language_name_geo, language_percent_geo, language_rank_geo
             -- , lan.language_name AS primary_language_name_us
@@ -161,26 +157,34 @@ WITH
             -- Get primary language
             LEFT JOIN `reddit-employee-datasets.david_bermejo.subreddit_language_rank_20220808` AS lan
                 ON a.subreddit_id_us = lan.subreddit_id
-            -- get subscribers
+            -- Get subscribers
             LEFT JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup` AS slo
                 ON a.subreddit_id_us = slo.subreddit_id
-            -- LEFT JOIN (
-            --     SELECT * FROM `reddit-employee-datasets.david_bermejo.subreddit_qa_flags`
-            --     WHERE pt = PT_DATE
-            -- ) AS q
-            --     ON a.subreddit_id_us = q.subreddit_id
+
+            -- Get users for geo
+            LEFT JOIN (
+                SELECT subreddit_name, users_l7 FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+                WHERE DATE(pt) = PT_DATE
+            ) AS asg
+                ON a.subreddit_name_geo = LOWER(asg.subreddit_name)
+
+            -- Get users for US
+            LEFT JOIN (
+                SELECT subreddit_name, users_l7 FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
+                WHERE DATE(pt) = PT_DATE
+            ) AS asu
+                ON a.subreddit_name_us = LOWER(asu.subreddit_name)
 
         WHERE DATE(g.pt) = PT_DATE
             AND slo.dt = PT_DATE
-            -- TODO(djb): filters for US counterparts
+            -- Filter out US counterparts that are too small
             AND slo.subscribers >= MIN_US_SUBSCRIBERS
-            -- AND q.combined_filter IN ('recommend', 'review')
 
             -- more filters for US counterparts
             AND (
                 g.geo_country_code = 'US'
                 -- relevance filters
-                AND g.sub_dau_perc_l28 >= 0.35
+                AND g.sub_dau_perc_l28 >= 0.25
                 -- language filters
                 AND (
                     lan.language_name = 'English'
@@ -208,10 +212,21 @@ SELECT
     PT_DATE AS pt
     , geo_country_code
     , subreddit_id_geo AS subreddit_id
-    , subreddit_name_geo AS subreddit_name
+    , subreddit_id_us
 
-    , ARRAY_AGG(subreddit_id_us) AS subreddit_ids
-    , ARRAY_AGG(subreddit_name_us) AS subreddit_names
+    , cosine_similarity
+    , subreddit_name_geo AS subreddit_name
+    , subreddit_name_us
+    , users_l7_geo
+    , users_l7_us
+    , subscribers_us
+
+    , curator_rating_geo
+    , curator_topic_v2_geo
+    , curator_rating_us
+    , curator_topic_v2_us
+
 FROM counterparts_geo
-GROUP BY 1, 2, 3, 4
-;
+ORDER BY users_l7_geo DESC, subreddit_name_geo, users_l7_us DESC
+-- GROUP BY 1, 2, 3, 4
+
