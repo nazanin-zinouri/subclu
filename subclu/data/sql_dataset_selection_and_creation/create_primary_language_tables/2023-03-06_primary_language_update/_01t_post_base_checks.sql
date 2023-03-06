@@ -81,7 +81,48 @@
 DECLARE PT_END DATE DEFAULT "2023-03-04";
 DECLARE POST_PT_START DATE DEFAULT PT_END - 1;
 
-SELECT *
+-- check rows
+-- SELECT *
+-- FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`
+-- WHERE dt BETWEEN POST_PT_START AND PT_END
+-- ;
+
+-- check counts by subreddit
+-- SELECT
+--   subreddit_name
+--   , COUNT(*) AS row_count
+--   , COUNT(DISTINCT post_id) AS unique_post
+-- FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`
+-- WHERE dt BETWEEN POST_PT_START AND PT_END
+--   AND subreddit_name IN (
+--       'de', 'mexico', 'meirl', 'ich_iel'
+--       , 'india'
+--       , 'france', 'rance'
+--       , 'czech', 'prague', 'sweden'
+--       , 'japan', 'china_irl', 'newsokunomoral'
+--       , 'ligamx', 'absoluteunits', 'aww'
+--   )
+-- GROUP BY 1
+-- ORDER BY unique_post DESC
+-- ;
+
+-- check counts by language
+SELECT
+  weighted_language_code
+  , COUNT(*) AS row_count
+  , COUNT(DISTINCT post_id) AS unique_post
 FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`
 WHERE dt BETWEEN POST_PT_START AND PT_END
+  AND subreddit_name IN (
+      'de', 'mexico', 'meirl', 'ich_iel'
+      , 'india'
+      , 'france', 'rance'
+      , 'czech', 'prague', 'sweden'
+      , 'japan', 'china_irl', 'newsokunomoral'
+      , 'ligamx', 'absoluteunits', 'aww'
+  )
+GROUP BY 1
+ORDER BY unique_post DESC
 ;
+
+-- check counts by subreddit & language

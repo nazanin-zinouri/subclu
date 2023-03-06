@@ -5,12 +5,14 @@
 
 -- Get subreddit language using both posts and comments
 -- shape is long, e.g., 1 row = 1 subreddit + language + type(comment/post)
+DECLARE PT_END DATE DEFAULT "2023-03-04";
+DECLARE POST_PT_START DATE DEFAULT PT_END - 1;
 
-DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 20;
-DECLARE MIN_POST_LEN NUMERIC DEFAULT 20;
+DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 10;
+DECLARE MIN_POST_LEN NUMERIC DEFAULT 10;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_language_rank_20220808` AS (
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_language_rank_20230306` AS (
     WITH comments_lang AS (
         SELECT
             co.subreddit_id
@@ -22,7 +24,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
             , co.weighted_language_name AS language_name
 
         FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean` AS co
-        WHERE comment_text_length >= MIN_COMMENT_LEN
+        WHERE dt BETWEEN POST_PT_START AND PT_END
+            AND comment_text_length >= MIN_COMMENT_LEN
             AND COALESCE(removed, 0) = 0
 
     ),
@@ -47,8 +50,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
                 PARTITION BY subreddit_id
                 ORDER BY language_percent DESC, language_name
             ) AS language_rank
-            , (SELECT MIN(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_start
-            , (SELECT MAX(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_end
+            , POST_PT_START AS dt_start
+            , PT_END AS dt_end
         FROM subreddit_lang_comments
     ),
     posts_lang AS (
@@ -61,7 +64,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
             , p.weighted_language_name AS language_name
 
         FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean` AS p
-        WHERE post_title_and_body_text_length >= MIN_POST_LEN
+        WHERE dt BETWEEN POST_PT_START AND PT_END
+            AND post_title_and_body_text_length >= MIN_POST_LEN
             AND COALESCE(removed, 0) = 0
     ),
     subreddit_lang_posts AS (
@@ -85,8 +89,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
                 PARTITION BY subreddit_id
                 ORDER BY language_percent DESC, language_name
             ) AS language_rank
-            , (SELECT MIN(dt) FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`) AS dt_start
-            , (SELECT MAX(dt) FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`) AS dt_end
+            , POST_PT_START AS dt_start
+            , PT_END AS dt_end
         FROM subreddit_lang_posts
     )
     -- Create new table that gets percent and rank for BOTH posts and comments
@@ -135,8 +139,8 @@ CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_langua
                 ORDER BY language_count DESC, language_name
             ) AS language_rank
             -- get dt_start & dt_end
-            , (SELECT MIN(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_start
-            , (SELECT MAX(dt) FROM `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`) AS dt_end
+            , POST_PT_START AS dt_start
+            , PT_END AS dt_end
 
         FROM subreddit_lang_things
     )

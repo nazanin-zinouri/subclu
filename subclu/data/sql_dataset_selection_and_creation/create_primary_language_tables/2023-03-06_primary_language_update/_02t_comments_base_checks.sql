@@ -78,3 +78,13 @@
 -- )
 -- ORDER BY 1 ASC, 4 DESC
 -- ;
+
+
+-- Check completed table
+DECLARE PT_END DATE DEFAULT "2023-03-04";
+DECLARE POST_PT_START DATE DEFAULT PT_END - 1;
+
+SELECT *
+FROM `reddit-employee-datasets.david_bermejo.post_language_detection_cld3_clean`
+WHERE dt BETWEEN POST_PT_START AND PT_END
+;
