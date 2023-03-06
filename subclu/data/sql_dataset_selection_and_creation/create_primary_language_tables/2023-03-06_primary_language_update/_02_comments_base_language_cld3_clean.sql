@@ -2,18 +2,19 @@
 -- Use this as foundation to get subreddit primary language
 --  Includes comment date so that we can do language trends over time
 DECLARE PT_END DATE DEFAULT "2023-03-04";
-DECLARE POST_PT_START DATE DEFAULT PT_END - 1;
+DECLARE POST_PT_START DATE DEFAULT PT_END - 180;
 
 
 -- Delete data from partition, if it exists
 DELETE
-    `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`
+`reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`
 WHERE
     dt BETWEEN POST_PT_START AND PT_END
 ;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`
+CREATE
+OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.comment_language_detection_cld3_clean`
 PARTITION BY dt AS (
 WITH
     comment_language AS (
@@ -44,11 +45,11 @@ WITH
             , COALESCE(lc1.language_code = pl.weighted_language, FALSE) AS top1_equals_weighted_language_code
 
             , lc1.language_name AS top1_language_name
-            , COALESCE(lc1.language_code, 'UNPROCESSED') AS top1_language_code
+            , COALESCE(lc1.language_code, ''UNPROCESSED'') AS top1_language_code
             , pl.cld3_top1_probability AS top1_language_probability
 
             , lc.language_name AS weighted_language_name
-            , COALESCE(pl.weighted_language, 'UNPROCESSED') AS weighted_language_code
+            , COALESCE(pl.weighted_language, ''UNPROCESSED'') AS weighted_language_code
             , pl.weighted_probability AS weighted_language_probability
             , sp.geo_country_code
 
@@ -110,14 +111,14 @@ WITH
             ) = 1
 
             -- Only posts from seed subreddits (optional/testing)
-            AND LOWER(slo.name) IN (
-                'de', 'mexico', 'meirl', 'ich_iel'
-                , 'india'
-                , 'france', 'rance'
-                , 'czech', 'prague', 'sweden'
-                , 'japan', 'china_irl', 'newsokunomoral'
-                , 'ligamx', 'absoluteunits', 'aww'
-            )
+            -- AND LOWER(slo.name) IN (
+            --     ''de'', ''mexico'', ''meirl'', ''ich_iel''
+            --     , ''india''
+            --     , ''france'', ''rance''
+            --     , ''czech'', ''prague'', ''sweden''
+            --     , ''japan'', ''china_irl'', ''newsokunomoral''
+            --     , ''ligamx'', ''absoluteunits'', ''aww''
+            -- )
     )
 
 

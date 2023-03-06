@@ -2,7 +2,7 @@
 -- Use this as foundation to get subreddit primary language
 --  Includes language per post date so that we can do language trends over time
 DECLARE PT_END DATE DEFAULT "2023-03-04";
-DECLARE POST_PT_START DATE DEFAULT PT_END - 1;
+DECLARE POST_PT_START DATE DEFAULT PT_END - 180;
 
 
 -- Delete data from partition, if it exists
@@ -120,14 +120,14 @@ WITH
             -- AND pl.weighted_language != 'en'
 
             -- Only posts from seed subreddits (optional/testing)
-            AND LOWER(slo.name) IN (
-                'de', 'mexico', 'meirl', 'ich_iel'
-                , 'india'
-                , 'france', 'rance'
-                , 'czech', 'prague', 'sweden'
-                , 'japan', 'china_irl', 'newsokunomoral'
-                , 'ligamx', 'absoluteunits', 'aww'
-            )
+            -- AND LOWER(slo.name) IN (
+            --     'de', 'mexico', 'meirl', 'ich_iel'
+            --     , 'india'
+            --     , 'france', 'rance'
+            --     , 'czech', 'prague', 'sweden'
+            --     , 'japan', 'china_irl', 'newsokunomoral'
+            --     , 'ligamx', 'absoluteunits', 'aww'
+            -- )
     )
 
 -- Select deduped posts and some precomputed stats

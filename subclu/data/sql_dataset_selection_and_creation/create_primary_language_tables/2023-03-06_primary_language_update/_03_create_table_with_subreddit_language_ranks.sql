@@ -6,10 +6,10 @@
 -- Get subreddit language using both posts and comments
 -- shape is long, e.g., 1 row = 1 subreddit + language + type(comment/post)
 DECLARE PT_END DATE DEFAULT "2023-03-04";
-DECLARE POST_PT_START DATE DEFAULT PT_END - 1;
+DECLARE POST_PT_START DATE DEFAULT PT_END - 180;
 
-DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 10;
-DECLARE MIN_POST_LEN NUMERIC DEFAULT 10;
+DECLARE MIN_COMMENT_LEN NUMERIC DEFAULT 20;
+DECLARE MIN_POST_LEN NUMERIC DEFAULT 20;
 
 
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.subreddit_language_rank_20230306` AS (
