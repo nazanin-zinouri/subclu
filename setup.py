@@ -85,6 +85,9 @@ EXTRAS_REQUIRE = {
 
         # visualize sets
         "matplotlib-venn == 0.11.6",
+
+        # visualize geo-location data
+        "geopy == 2.3.0",
     ],
 
     "cpu_eda": [
