@@ -1,0 +1,925 @@
+city_to_encode,city_users_l7_ln,pt,geo_country_code,geo_region,geo_city,city_users_l7,city_rank_country,city_rank_world,country_name,geopy_location,geopy_country_name,latitude,longitude
+"London, ENG United Kingdom",15.124055517273407,2023-03-01,GB,ENG,London,3700775,1,1,United Kingdom,"London, Greater London, England, United Kingdom",United Kingdom,51.5073359,-0.12765
+"Los Angeles, CA United States",14.813316389933116,2023-03-01,US,CA,Los Angeles,2712314,1,2,United States,"Los Angeles, Los Angeles County, CAL Fire Contract Counties, California, United States",United States,34.0536909,-118.242766
+"New York, NY United States",14.723371861825967,2023-03-01,US,NY,New York,2479005,2,3,United States,"City of New York, New York, United States",United States,40.7127281,-74.0060152
+"Chicago, IL United States",14.6172793809232,2023-03-01,US,IL,Chicago,2229471,3,4,United States,"Chicago, Cook County, Illinois, United States",United States,41.8755616,-87.6244212
+"Sydney, NSW Australia",14.560105795935355,2023-03-01,AU,NSW,Sydney,2105579,1,5,Australia,"Sydney, Council of the City of Sydney, New South Wales, Australia",Australia,-33.8698439,151.2082848
+"Toronto, ON Canada",14.464634793089083,2023-03-01,CA,ON,Toronto,1913854,1,6,Canada,"Old Toronto, Toronto, Golden Horseshoe, Ontario, Canada",Canada,43.6534817,-79.3839347
+"Melbourne, VIC Australia",14.31629917912121,2023-03-01,AU,VIC,Melbourne,1650012,2,7,Australia,"Melbourne, City of Melbourne, Victoria, Australia",Australia,-37.8142176,144.9631608
+"Dallas, TX United States",14.276545967677599,2023-03-01,US,TX,Dallas,1585705,4,8,United States,"Dallas, Dallas County, Texas, United States",United States,32.7762719,-96.7968559
+"Seattle, WA United States",14.270736152977257,2023-03-01,US,WA,Seattle,1576519,5,9,United States,"Seattle, King County, Washington, United States",United States,47.6038321,-122.330062
+"Brooklyn, NY United States",14.258256036439146,2023-03-01,US,NY,Brooklyn,1556966,6,10,United States,"Brooklyn, Kings County, City of New York, New York, United States",United States,40.6526006,-73.9497211
+"Philadelphia, PA United States",14.15840427553085,2023-03-01,US,PA,Philadelphia,1409009,7,11,United States,"Philadelphia, Philadelphia County, Pennsylvania, United States",United States,39.9527237,-75.1635262
+"Houston, TX United States",14.154851532960798,2023-03-01,US,TX,Houston,1404012,8,12,United States,"Houston, Harris County, Texas, United States",United States,29.7589382,-95.3676974
+"Atlanta, GA United States",14.106908468132099,2023-03-01,US,GA,Atlanta,1338287,9,13,United States,"Atlanta, Fulton County, Georgia, United States",United States,33.7489924,-84.3902644
+"Phoenix, AZ United States",13.973391699530096,2023-03-01,US,AZ,Phoenix,1171017,10,14,United States,"Phoenix, Maricopa County, Arizona, United States",United States,33.4484367,-112.074141
+"Charlotte, NC United States",13.934674861453095,2023-03-01,US,NC,Charlotte,1126545,11,15,United States,"Charlotte, Mecklenburg County, North Carolina, United States",United States,35.2272086,-80.8430827
+"Washington, DC United States",13.897962054482845,2023-03-01,US,DC,Washington,1085936,12,16,United States,"Washington, District of Columbia, United States",United States,38.8950368,-77.0365427
+"Denver, CO United States",13.86342128792573,2023-03-01,US,CO,Denver,1049067,13,17,United States,"Denver, Colorado, United States",United States,39.7392364,-104.984862
+"Brisbane, QLD Australia",13.822589443428567,2023-03-01,AU,QLD,Brisbane,1007094,3,18,Australia,"Brisbane City, Queensland, Australia",Australia,-27.4689682,153.0234991
+"Moscow, MOW Russia",13.820431430586325,2023-03-01,RU,MOW,Moscow,1004923,1,19,Russia,"Москва, Центральный федеральный округ, Россия",Россия,55.7504461,37.6174943
+"Miami, FL United States",13.808288541873281,2023-03-01,US,FL,Miami,992794,14,20,United States,"Miami, Miami-Dade County, Florida, United States",United States,25.7741728,-80.19362
+"Vancouver, BC Canada",13.777531393770023,2023-03-01,CA,BC,Vancouver,962723,2,21,Canada,"Vancouver, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.2608724,-123.113952
+"San Antonio, TX United States",13.764396194935975,2023-03-01,US,TX,San Antonio,950160,15,22,United States,"San Antonio, Bexar County, Texas, United States",United States,29.4246002,-98.4951405
+"San Jose, CA United States",13.756039707797274,2023-03-01,US,CA,San Jose,942253,16,23,United States,"San Jose, Santa Clara County, CAL Fire Northern Region, California, United States",United States,37.3361663,-121.890591
+"San Francisco, CA United States",13.72715245636619,2023-03-01,US,CA,San Francisco,915423,17,24,United States,"San Francisco, CAL Fire Northern Region, California, United States",United States,37.7790262,-122.419906
+"Montreal, QC Canada",13.71358413904073,2023-03-01,CA,QC,Montreal,903086,3,25,Canada,"Montréal, Agglomération de Montréal, Montréal (06), Québec, Canada",Canada,45.5031824,-73.5698065
+"Minneapolis, MN United States",13.673473379200724,2023-03-01,US,MN,Minneapolis,867579,18,26,United States,"Minneapolis, Hennepin County, Minnesota, United States",United States,44.9772995,-93.2654692
+"Portland, OR United States",13.662150731996313,2023-03-01,US,OR,Portland,857811,19,27,United States,"Portland, Multnomah County, Oregon, United States",United States,45.5202471,-122.674194
+"Amsterdam, NH Netherlands",13.592774423644489,2023-03-01,NL,NH,Amsterdam,800316,1,28,Netherlands,"Amsterdam, Noord-Holland, Nederland",Nederland,52.3730796,4.8924534
+"Calgary, AB Canada",13.582704221951538,2023-03-01,CA,AB,Calgary,792297,4,29,Canada,"Calgary, Alberta, Canada",Canada,51.0460954,-114.065465
+"Austin, TX United States",13.581539854000994,2023-03-01,US,TX,Austin,791375,20,30,United States,"Austin, Travis County, Texas, United States",United States,30.2711286,-97.7436995
+"Helsinki, 18 Finland",13.567026121476422,2023-03-01,FI,18,Helsinki,779972,1,31,Finland,"Helsinki, Helsingin seutukunta, Uusimaa, Etelä-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,60.1674881,24.9427473
+"Berlin, BE Germany",13.565044626750755,2023-03-01,DE,BE,Berlin,778428,1,32,Germany,"Berlin Ostbahnhof, Mitteltunnel, Friedrichshain, Friedrichshain-Kreuzberg, Berlin, 10243, Deutschland",Deutschland,52.5103817,13.4349112
+"Delhi, DL India",13.561722214935358,2023-03-01,IN,DL,Delhi,775846,1,33,India,"Delhi, Kotwali Tehsil, Central Delhi, Delhi, 110006, India",India,28.6517178,77.2219388
+"Dublin, L Ireland",13.55034377009407,2023-03-01,IE,L,Dublin,767068,1,34,Ireland,"Dublin, Dublin 1, Leinster, Éire / Ireland",Éire / Ireland,53.3498006,-6.2602964
+"Flushing, NY United States",13.53499871784673,2023-03-01,US,NY,Flushing,755387,21,35,United States,"Flushing, Queens County, City of New York, New York, 11354, United States",United States,40.7654301,-73.8174291
+"Istanbul, 34 Turkey",13.522353525232223,2023-03-01,TR,34,Istanbul,745895,1,36,Turkey,"İstanbul, Fatih, İstanbul, Marmara Bölgesi, 34126, Türkiye",Türkiye,41.0091982,28.9662187
+"Orlando, FL United States",13.508052897850739,2023-03-01,US,FL,Orlando,735304,22,37,United States,"Orlando, Orange County, Florida, United States",United States,28.5421109,-81.3790304
+"Las Vegas, NV United States",13.50527062604773,2023-03-01,US,NV,Las Vegas,733261,23,38,United States,"Las Vegas, Clark County, Nevada, United States",United States,36.1672559,-115.148516
+"Sacramento, CA United States",13.497685379265272,2023-03-01,US,CA,Sacramento,727720,24,39,United States,"Sacramento, Sacramento County, CAL Fire Northern Region, California, United States",United States,38.5810606,-121.493895
+"San Diego, CA United States",13.48652720948854,2023-03-01,US,CA,San Diego,719645,25,40,United States,"San Diego, San Diego County, CAL Fire Southern Region, California, United States",United States,32.7174202,-117.1627728
+"Paris, 75 France",13.455359579611887,2023-03-01,FR,75,Paris,697561,1,41,France,"Paris, Île-de-France, France métropolitaine, France",France,48.8588897,2.3200410217200766
+"Columbus, OH United States",13.409343703689855,2023-03-01,US,OH,Columbus,666189,26,42,United States,"Columbus, Franklin County, Ohio, United States",United States,39.9622601,-83.0007065
+"Frankfurt am Main, HE Germany",13.401156560474575,2023-03-01,DE,HE,Frankfurt am Main,660757,2,43,Germany,"Frankfurt am Main, Hessen, Deutschland",Deutschland,50.1106444,8.6820917
+"Ashburn, VA United States",13.398527370727573,2023-03-01,US,VA,Ashburn,659022,27,44,United States,"Ashburn, Loudoun County, Virginia, United States",United States,39.030019100000004,-77.46964646557657
+"Mumbai, MH India",13.385756343346209,2023-03-01,IN,MH,Mumbai,650659,2,45,India,"Mumbai, Mumbai Suburban, Maharashtra, India",India,19.0785451,72.878176
+"Bengaluru, KA India",13.34268695633129,2023-03-01,IN,KA,Bengaluru,623230,3,46,India,"Bengaluru, Bangalore North, Bangalore Urban, Karnataka, India",India,12.9767936,77.590082
+"Boston, MA United States",13.325351567218963,2023-03-01,US,MA,Boston,612519,28,47,United States,"Boston, Suffolk County, Massachusetts, United States",United States,42.3554334,-71.060511
+"Kuala Lumpur, 14 Malaysia",13.321440440071655,2023-03-01,MY,14,Kuala Lumpur,610128,1,48,Malaysia,"KA02 Kuala Lumpur, Jalan Tun Sambanthan, Kuala Lumpur, 50566, Malaysia",Malaysia,3.1396189,101.6937436
+"Stockholm, AB Sweden",13.30443156877064,2023-03-01,SE,AB,Stockholm,599838,1,49,Sweden,"Stockholm, Stockholms kommun, Stockholms län, 111 29, Sverige",Sverige,59.3251172,18.0710935
+"Vienna, 9 Austria",13.295477677197345,2023-03-01,AT,9,Vienna,594491,1,50,Austria,"Bank Austria, 9, Kürschnergasse, Großfeldsiedlung, KG Leopoldau, Floridsdorf, Wien, 1210, Österreich",Österreich,48.2721547,16.4458693
+"São Paulo, SP Brazil",13.290246195496142,2023-03-01,BR,SP,São Paulo,591389,1,51,Brazil,"São Paulo, Região Imediata de São Paulo, Região Metropolitana de São Paulo, Região Geográfica Intermediária de São Paulo, São Paulo, Região Sudeste, Brasil",Brasil,-23.5506507,-46.6333824
+"Auckland, AUK New Zealand",13.257319005324094,2023-03-01,NZ,AUK,Auckland,572233,1,52,New Zealand,"Auckland, Waitematā, Auckland, 1010, New Zealand/Aotearoa",New Zealand/Aotearoa,-36.852095,174.7631803
+"St Petersburg, SPE Russia",13.254615452050462,2023-03-01,RU,SPE,St Petersburg,570688,2,53,Russia,"Санкт-Петербург, Северо-Западный федеральный округ, Россия",Россия,59.938732,30.316229
+"Manchester, MAN United Kingdom",13.250256907104674,2023-03-01,GB,MAN,Manchester,568206,2,54,United Kingdom,"Manchester, Greater Manchester, England, United Kingdom",United Kingdom,53.4794892,-2.2451148
+"Warsaw, 14 Poland",13.24346888752464,2023-03-01,PL,14,Warsaw,564362,1,55,Poland,"Warszawa, województwo mazowieckie, Polska",Polska,52.2319581,21.0067249
+"St Louis, MO United States",13.23839198606441,2023-03-01,US,MO,St Louis,561504,29,56,United States,"St. Louis, Missouri, United States",United States,38.6280278,-90.1910154
+"Perth, WA Australia",13.226011427629846,2023-03-01,AU,WA,Perth,554595,4,57,Australia,"Perth, City of Perth, Western Australia, 6000, Australia",Australia,-31.9558964,115.8605801
+"Quezon City, 00 Philippines",13.196338483588901,2023-03-01,PH,00,Quezon City,538380,1,58,Philippines,"Quezon City, Eastern Manila District, Metro Manila, 1100, Philippines",Philippines,14.6504951,121.0490906
+"Edmonton, AB Canada",13.194045695751376,2023-03-01,CA,AB,Edmonton,537147,5,59,Canada,"Edmonton, Alberta, Canada",Canada,53.5462055,-113.491241
+"Tampa, FL United States",13.184178819324744,2023-03-01,US,FL,Tampa,531873,30,60,United States,"Tampa, Hillsborough County, Florida, United States",United States,27.9477595,-82.458444
+"Birmingham, BIR United Kingdom",13.141540318803827,2023-03-01,GB,BIR,Birmingham,509671,3,61,United Kingdom,"University of Law, Birmingham, 133, Great Hampton Street, Jewellery Quarter, Aston, Birmingham, West Midlands Combined Authority, England, B18 6AQ, United Kingdom",United Kingdom,52.488676999999996,-1.9076503007446248
+"Indianapolis, IN United States",13.122725311898137,2023-03-01,US,IN,Indianapolis,500171,31,62,United States,"Indianapolis, Marion County, Indiana, United States",United States,39.7683331,-86.1583502
+"Central, HCW Hong Kong",13.110236138805927,2023-03-01,HK,HCW,Central,493963,1,63,Hong Kong,"香港 Hong Kong, 8, 金融街 Finance Street, 國際金融中心 International Finance Centre, 中環 Central, 中西區 Central and Western District, 香港島 Hong Kong Island, 香港 Hong Kong, 中国",中国,22.2850394,114.1583819
+"Riverside, CA United States",13.069361255381082,2023-03-01,US,CA,Riverside,474179,32,64,United States,"Riverside, Riverside County, California, United States",United States,33.9533546,-117.3961623
+"Budapest, BU Hungary",13.058059495403509,2023-03-01,HU,BU,Budapest,468850,1,65,Hungary,"Budapest, Babits Mihály sétány, Vár, I. kerület, Budapest, Közép-Magyarország, 1014, Magyarország",Magyarország,47.505291,19.0312076
+"Perm, PER Russia",13.039062200013182,2023-03-01,RU,PER,Perm,460027,3,66,Russia,"Пермский городской округ, Пермский край, Приволжский федеральный округ, Россия",Россия,58.014965,56.246723
+"Salt Lake City, UT United States",13.030037540016957,2023-03-01,US,UT,Salt Lake City,455894,33,67,United States,"Salt Lake City, Salt Lake County, Utah, United States",United States,40.7596198,-111.886797
+"Pittsburgh, PA United States",13.026127769523503,2023-03-01,US,PA,Pittsburgh,454115,34,68,United States,"Pittsburgh, Allegheny County, Pennsylvania, United States",United States,40.4416941,-79.9900861
+"Hamburg, HH Germany",13.023620914048077,2023-03-01,DE,HH,Hamburg,452978,3,69,Germany,"Bremen, Hamburg, Lübeck, Sievekingplatz, Neustadt, Hamburg-Mitte, Hamburg, 20355, Deutschland",Deutschland,53.5565323,9.9776028
+"Oakland, CA United States",13.007587565514559,2023-03-01,US,CA,Oakland,445773,35,70,United States,"Oakland, Alameda County, CAL Fire Northern Region, California, United States",United States,37.8044557,-122.271356
+"Mexico City, CMX Mexico",12.998137128761087,2023-03-01,MX,CMX,Mexico City,441580,1,71,Mexico,"México, Xochimilco, Ciudad de México, 16030, México",México,19.2667063,-99.1269596
+"Madrid, M Spain",12.975062186180313,2023-03-01,ES,M,Madrid,431507,1,72,Spain,"Madrid, Área metropolitana de Madrid y Corredor del Henares, Comunidad de Madrid, España",España,40.4167047,-3.7035825
+"Bangkok, 10 Thailand",12.961015526631993,2023-03-01,TH,10,Bangkok,425488,1,73,Thailand,"กรุงเทพมหานคร, 10200, ประเทศไทย",ประเทศไทย,13.7524938,100.4935089
+"Adelaide, SA Australia",12.948145695336915,2023-03-01,AU,SA,Adelaide,420047,5,74,Australia,"Adelaide, Adelaide City Council, South Australia, Australia",Australia,-34.9281805,138.5999312
+"Oslo, 03 Norway",12.940061820410376,2023-03-01,NO,03,Oslo,416665,1,75,Norway,"Oslo, Norge",Norge,59.97239745,10.775729194051895
+"Nashville, TN United States",12.930512561094227,2023-03-01,US,TN,Nashville,412705,36,76,United States,"Nashville-Davidson, Davidson County, Tennessee, United States",United States,36.1622767,-86.7742984
+"Detroit, MI United States",12.9274792408039,2023-03-01,US,MI,Detroit,411455,37,77,United States,"Detroit, Wayne County, Michigan, United States",United States,42.3315509,-83.0466403
+"Santiago, RM Chile",12.91516207051087,2023-03-01,CL,RM,Santiago,406418,1,78,Chile,"Santiago, Provincia de Santiago, Región Metropolitana de Santiago, Chile",Chile,-33.4377756,-70.6504502
+"Ottawa, ON Canada",12.901083089136895,2023-03-01,CA,ON,Ottawa,400736,6,79,Canada,"Ottawa, Eastern Ontario, Ontario, Canada",Canada,45.4208777,-75.6901106
+"Munich, BY Germany",12.900351685295748,2023-03-01,DE,BY,Munich,400443,4,80,Germany,"München, Bayern, Deutschland",Deutschland,48.1371079,11.5753822
+"Rotterdam, ZH Netherlands",12.881679388113131,2023-03-01,NL,ZH,Rotterdam,393035,2,81,Netherlands,"Rotterdam, Zuid-Holland, Nederland",Nederland,51.9244424,4.47775
+"Cincinnati, OH United States",12.84865258385238,2023-03-01,US,OH,Cincinnati,380266,38,82,United States,"Cincinnati, Hamilton County, Ohio, United States",United States,39.1014537,-84.5124602
+"Cleveland, OH United States",12.834894615533562,2023-03-01,US,OH,Cleveland,375070,39,83,United States,"Cleveland, Cuyahoga County, Ohio, United States",United States,41.4996574,-81.6936772
+"Bucharest, B Romania",12.832286439550275,2023-03-01,RO,B,Bucharest,374093,1,84,Romania,"Universitatea din București, 4-12, Bulevardul Regina Elisabeta, Centrul Istoric, Sector 3, București, 030018, România",România,44.43564445,26.10092625223488
+"Mississauga, ON Canada",12.825438723585615,2023-03-01,CA,ON,Mississauga,371540,7,85,Canada,"Mississauga, Peel Region, Golden Horseshoe, Ontario, Canada",Canada,43.5896231,-79.6443879
+"Chennai, TN India",12.81992225739823,2023-03-01,IN,TN,Chennai,369496,4,86,India,"Chennai, Chennai District, Tamil Nadu, 600001, India",India,13.0836939,80.270186
+"Prague, 10 Czechia",12.814176511195187,2023-03-01,CZ,10,Prague,367379,1,87,Czechia,"Hudební divadlo Karlín, 10, Křižíkova, Florenc, Karlín, Hlavní město Praha, Praha, 186 00, Praha",Praha,50.0901221,14.441241
+"Brampton, ON Canada",12.797740657140265,2023-03-01,CA,ON,Brampton,361390,8,88,Canada,"Brampton, Peel Region, Golden Horseshoe, Ontario, Canada",Canada,43.685832,-79.7599366
+"Milan, MI Italy",12.775811309545135,2023-03-01,IT,MI,Milan,353551,1,89,Italy,"Milano, Lombardia, Italia",Italia,45.4641943,9.1896346
+"Zurich, ZH Switzerland",12.762749834294976,2023-03-01,CH,ZH,Zurich,348963,1,90,Switzerland,"Zürich, Bezirk Zürich, Zürich, Schweiz/Suisse/Svizzera/Svizra",Schweiz/Suisse/Svizzera/Svizra,47.3744489,8.5410422
+"Kansas City, MO United States",12.758770272364451,2023-03-01,US,MO,Kansas City,347577,40,91,United States,"Kansas City, Jackson County, Missouri, United States",United States,39.100105,-94.5781416
+"Hyderabad, TG India",12.7501599162765,2023-03-01,IN,TG,Hyderabad,344597,5,92,India,"Hyderabad, Telangana, India",India,17.38878595,78.46106473453146
+"Brussels, BRU Belgium",12.745523626304493,2023-03-01,BE,BRU,Brussels,343003,1,93,Belgium,"Ville de Bruxelles - Stad Brussel, Brussel-Hoofdstad - Bruxelles-Capitale, Région de Bruxelles-Capitale - Brussels Hoofdstedelijk Gewest, België / Belgique / Belgien",België / Belgique / Belgien,50.8465573,4.351697
+"Edinburgh, EDH United Kingdom",12.739144966242891,2023-03-01,GB,EDH,Edinburgh,340822,4,94,United Kingdom,"Edinburgh Waverley, South Ramp, Old Town, City of Edinburgh, Alba / Scotland, EH1 1BE, United Kingdom",United Kingdom,55.9519018,-3.1904199
+"The Bronx, NY United States",12.737274261598973,2023-03-01,US,NY,The Bronx,340185,41,95,United States,"Bronx County, The Bronx, City of New York, New York, United States",United States,40.8506558,-73.8665241
+"Glasgow, GLG United Kingdom",12.735985935185985,2023-03-01,GB,GLG,Glasgow,339747,5,96,United Kingdom,"Glasgow, Glasgow City, Alba / Scotland, G2 1DY, United Kingdom",United Kingdom,55.8606182,-4.2497933
+"Buffalo, NY United States",12.713606858541754,2023-03-01,US,NY,Buffalo,332228,42,97,United States,"Buffalo, Erie County, New York, United States",United States,42.8867166,-78.8783922
+"Tucson, AZ United States",12.713411196518676,2023-03-01,US,AZ,Tucson,332163,43,98,United States,"Tucson, Pima County, Arizona, United States",United States,32.2228765,-110.9748477
+"Jacksonville, FL United States",12.712796870045073,2023-03-01,US,FL,Jacksonville,331959,44,99,United States,"Jacksonville, Duval County, Florida, United States",United States,30.3321838,-81.655651
+"Tokyo, 13 Japan",12.702109451822725,2023-03-01,JP,13,Tokyo,328430,1,100,Japan,"東京都, 179-0085, 日本",日本,35.75165925,139.65035823231096
+"Albuquerque, NM United States",12.695247575376342,2023-03-01,US,NM,Albuquerque,326184,45,101,United States,"Albuquerque, Bernalillo County, New Mexico, United States",United States,35.0841034,-106.650985
+"Omaha, NE United States",12.681741447339675,2023-03-01,US,NE,Omaha,321808,46,102,United States,"Omaha, Douglas County, Nebraska, United States",United States,41.2587459,-95.9383758
+"Chelyabinsk, CHE Russia",12.67325354461899,2023-03-01,RU,CHE,Chelyabinsk,319088,4,103,Russia,"Челябинск, Челябинский городской округ, Челябинская область, Уральский федеральный округ, Россия",Россия,55.1598408,61.4025547
+"Oklahoma City, OK United States",12.662376611451895,2023-03-01,US,OK,Oklahoma City,315636,47,104,United States,"Oklahoma City, Oklahoma County, Oklahoma, United States",United States,35.4729886,-97.5170536
+"Raleigh, NC United States",12.660648501336015,2023-03-01,US,NC,Raleigh,315091,48,105,United States,"Raleigh, Wake County, North Carolina, United States",United States,35.7803977,-78.6390989
+"Winnipeg, MB Canada",12.658958726925334,2023-03-01,CA,MB,Winnipeg,314559,9,106,Canada,"Winnipeg, Division No. 11, Manitoba, Canada",Canada,49.8955367,-97.1384584
+"Pune, MH India",12.657511256325868,2023-03-01,IN,MH,Pune,314104,6,107,India,"Pune City, Pune, Maharashtra, India",India,18.521428,73.8544541
+"Leeds, LDS United Kingdom",12.652743674449463,2023-03-01,GB,LDS,Leeds,312610,6,108,United Kingdom,"Leeds, Sandford Street, Holbeck Urban Village, Leeds, West Yorkshire, England, LS1 4JB, United Kingdom",United Kingdom,53.794414,-1.548621
+"Louisville, KY United States",12.649764383110533,2023-03-01,US,KY,Louisville,311680,49,109,United States,"Louisville, Jefferson County, Kentucky, United States",United States,38.2542376,-85.759407
+"Surrey, BC Canada",12.645990708818717,2023-03-01,CA,BC,Surrey,310506,10,110,Canada,"Surrey, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.1913033,-122.849143
+"Ho Chi Minh City, SG Vietnam",12.640555956708045,2023-03-01,VN,SG,Ho Chi Minh City,308823,1,111,Vietnam,"Bệnh viện Trưng Vương, 266, Đường Lý Thường Kiệt, Phường 14, Quận 10, Thành phố Hồ Chí Minh, 72000, Việt Nam",Việt Nam,10.77112195,106.65988339921
+"Birmingham, AL United States",12.634938475186148,2023-03-01,US,AL,Birmingham,307093,50,112,United States,"Birmingham, Jefferson County, Alabama, United States",United States,33.5206824,-86.8024326
+"Athens, I Greece",12.6288405268753,2023-03-01,GR,I,Athens,305226,1,113,Greece,"Αθήνα, Δήμος Αθηναίων, Περιφερειακή Ενότητα Κεντρικού Τομέα Αθηνών, Περιφέρεια Αττικής, Αποκεντρωμένη Διοίκηση Αττικής, 104 31, Ελλάς",Ελλάς,37.9839412,23.7283052
+"Ankara, 06 Turkey",12.602416279188777,2023-03-01,TR,06,Ankara,297266,2,114,Turkey,"Ankara, Çankaya, Ankara, İç Anadolu Bölgesi, 06420, Türkiye",Türkiye,39.9207886,32.8540482
+"Rochester, NY United States",12.595885899950115,2023-03-01,US,NY,Rochester,295331,51,115,United States,"City of Rochester, Monroe County, New York, United States",United States,43.157285,-77.615214
+"Dubai, DU United Arab Emirates",12.594971284329763,2023-03-01,AE,DU,Dubai,295061,1,116,United Arab Emirates,"دبي, الإمارات العربية المتحدة",الإمارات العربية المتحدة,25.074282349999997,55.18853865430702
+"Alexandria, VA United States",12.592433082713933,2023-03-01,US,VA,Alexandria,294313,52,117,United States,"Alexandria, Virginia, United States",United States,38.8051095,-77.0470229
+"Baltimore, MD United States",12.560444439253454,2023-03-01,US,MD,Baltimore,285047,53,118,United States,"Baltimore, Maryland, United States",United States,39.2908816,-76.610759
+"Fort Worth, TX United States",12.558513136815256,2023-03-01,US,TX,Fort Worth,284497,54,119,United States,"Fort Worth, Tarrant County, Texas, United States",United States,32.753177,-97.3327459
+"Saint Paul, MN United States",12.55056265374497,2023-03-01,US,MN,Saint Paul,282244,55,120,United States,"Saint Paul, Ramsey County, Minnesota, United States",United States,44.9497487,-93.0931028
+"Jersey City, NJ United States",12.52756176519223,2023-03-01,US,NJ,Jersey City,275826,56,121,United States,"Jersey City, Hudson County, New Jersey, United States",United States,40.7215682,-74.047455
+"Rio de Janeiro, RJ Brazil",12.505947581981962,2023-03-01,BR,RJ,Rio de Janeiro,269928,2,122,Brazil,"Rio de Janeiro, Região Geográfica Imediata do Rio de Janeiro, Região Metropolitana do Rio de Janeiro, Região Geográfica Intermediária do Rio de Janeiro, Rio de Janeiro, Região Sudeste, Brasil",Brasil,-22.9110137,-43.2093727
+"Copenhagen, 84 Denmark",12.496590692801163,2023-03-01,DK,84,Copenhagen,267414,1,123,Denmark,"Københavns Kommune, Region Hovedstaden, Danmark",Danmark,55.65554675,12.601643209374739
+"Barcelona, B Spain",12.48592539869262,2023-03-01,ES,B,Barcelona,264577,2,124,Spain,"Barcelona, Barcelonès, Barcelona, Catalunya, 08001, España",España,41.3828939,2.1774322
+"Milwaukee, WI United States",12.477979693991587,2023-03-01,US,WI,Milwaukee,262483,57,125,United States,"Milwaukee Area Technical College Downtown Campus, 700, West State Street, Bronzeville, Milwaukee, Milwaukee County, Wisconsin, 53233, United States",United States,43.04437365,-87.92031411388143
+"Lisbon, 11 Portugal",12.475970003329884,2023-03-01,PT,11,Lisbon,261956,1,126,Portugal,"Lisboa, Portugal",Portugal,38.7077507,-9.1365919
+"Cologne, NW Germany",12.473535428894305,2023-03-01,DE,NW,Cologne,261319,5,127,Germany,"Köln, Nordrhein-Westfalen, Deutschland",Deutschland,50.938361,6.959974
+"Manila, 00 Philippines",12.464378686536811,2023-03-01,PH,00,Manila,258937,2,128,Philippines,"Manila, Capital District, Metro Manila, Philippines",Philippines,14.5948914,120.9782618
+"Kolkata, WB India",12.458642951533083,2023-03-01,IN,WB,Kolkata,257456,7,129,India,"Kolkata, West Bengal, India",India,22.5726459,88.3638953
+"Richmond, VA United States",12.448799192180093,2023-03-01,US,VA,Richmond,254934,58,130,United States,"Richmond, Virginia, United States",United States,37.5385087,-77.43428
+"New Orleans, LA United States",12.443797372921841,2023-03-01,US,LA,New Orleans,253662,59,131,United States,"New Orleans, Orleans Parish, Louisiana, United States",United States,29.9759983,-90.0782127
+"Irvine, CA United States",12.43081491820808,2023-03-01,US,CA,Irvine,250390,60,132,United States,"Irvine, Orange County, CAL Fire Southern Region, California, United States",United States,33.6856969,-117.8259819
+"Hanoi, HN Vietnam",12.413558248487675,2023-03-01,VN,HN,Hanoi,246106,2,133,Vietnam,"British International School, Hanoi, Hoa Lan, Vinhomes Riverside, Phường Phúc Lợi, Quận Long Biên, Thành phố Hà Nội, 08443, Việt Nam",Việt Nam,21.04455905,105.91867533594649
+"Volgograd, VGG Russia",12.40972344153292,2023-03-01,RU,VGG,Volgograd,245164,5,134,Russia,"Волгоград, городской округ Волгоград, Волгоградская область, Южный федеральный округ, Россия",Россия,48.7081906,44.5153353
+"Bristol, BST United Kingdom",12.404070681709136,2023-03-01,GB,BST,Bristol,243782,7,135,United Kingdom,"Bristol, City of Bristol, West of England, England, United Kingdom",United Kingdom,51.4538022,-2.5972985
+"Rome, RM Italy",12.401585973698067,2023-03-01,IT,RM,Rome,243177,2,136,Italy,"Roma, Roma Capitale, Lazio, Italia",Italia,41.8933203,12.4829321
+"Arlington, VA United States",12.393618034324332,2023-03-01,US,VA,Arlington,241247,61,137,United States,"Arlington County, Virginia, United States",United States,38.8769326,-77.0893094
+"San Bernardino, CA United States",12.38906064686729,2023-03-01,US,CA,San Bernardino,240150,62,138,United States,"San Bernardino, San Bernardino County, CAL Fire Southern Region, California, United States",United States,34.1081621,-117.28946
+"Scarborough, ON Canada",12.376975084998692,2023-03-01,CA,ON,Scarborough,237265,11,139,Canada,"Scarborough, Toronto, Golden Horseshoe, Ontario, Canada",Canada,43.7729744,-79.2576479
+"Anaheim, CA United States",12.367944865956709,2023-03-01,US,CA,Anaheim,235132,63,140,United States,"Anaheim, Orange County, CAL Fire Contract Counties, California, United States",United States,33.8347516,-117.911732
+"Etobicoke, ON Canada",12.355604101723321,2023-03-01,CA,ON,Etobicoke,232248,12,141,Canada,"Etobicoke, Toronto, Golden Horseshoe, Ontario, Canada",Canada,43.6435559,-79.5656326
+"Nizhniy Novgorod, NIZ Russia",12.343287869508321,2023-03-01,RU,NIZ,Nizhniy Novgorod,229405,6,142,Russia,"Нижний Новгород, городской округ Нижний Новгород, Нижегородская область, Приволжский федеральный округ, Россия",Россия,56.3264816,44.0051395
+"Krasnodar, KDA Russia",12.334734074106157,2023-03-01,RU,KDA,Krasnodar,227451,7,143,Russia,"Краснодар, городской округ Краснодар, Краснодарский край, Южный федеральный округ, 350000, Россия",Россия,45.0351532,38.9772396
+"Yekaterinburg, SVE Russia",12.319365615913693,2023-03-01,RU,SVE,Yekaterinburg,223982,8,144,Russia,"Екатеринбург, городской округ Екатеринбург, Свердловская область, Уральский федеральный округ, Россия",Россия,56.839104,60.60825
+"Hyattsville, MD United States",12.318740398183587,2023-03-01,US,MD,Hyattsville,223842,64,145,United States,"Hyattsville, Prince George's County, Maryland, 20782, United States",United States,38.9529442,-76.9408647
+"Honolulu, HI United States",12.306768297610837,2023-03-01,US,HI,Honolulu,221178,65,146,United States,"Honolulu, Honolulu County, Hawaii, 96813, United States",United States,21.304547,-157.855676
+"Newark, NJ United States",12.295890497349292,2023-03-01,US,NJ,Newark,218785,66,147,United States,"Newark, Essex County, New Jersey, United States",United States,40.735657,-74.1723667
+"Sheffield, SHF United Kingdom",12.288960532608643,2023-03-01,GB,SHF,Sheffield,217274,8,148,United Kingdom,"Sheffield, Granville Street, Sheaf Valley, Park Hill, Sheffield, South Yorkshire Mayoral Combined Authority, England, S2 5QX, United Kingdom",United Kingdom,53.3783713,-1.4621381
+"Samara, SAM Russia",12.283598342033265,2023-03-01,RU,SAM,Samara,216112,9,149,Russia,"Самара, городской округ Самара, Самарская область, Приволжский федеральный округ, 443028, Россия",Россия,53.198627,50.113987
+"Caloocan City, 00 Philippines",12.262169384882045,2023-03-01,PH,00,Caloocan City,211530,3,150,Philippines,"Caloocan, Northern Manila District, Metro Manila, 1421, Philippines",Philippines,14.7554953,121.0389485
+"Izhevsk, UD Russia",12.25510563735744,2023-03-01,RU,UD,Izhevsk,210041,10,151,Russia,"городской округ Ижевск, Удмуртия, Приволжский федеральный округ, Россия",Россия,56.866557,53.2094166
+"Colorado Springs, CO United States",12.247670339118102,2023-03-01,US,CO,Colorado Springs,208485,67,152,United States,"Colorado Springs, El Paso County, Colorado, 80903, United States",United States,38.8339578,-104.825348
+"Krakow, 12 Poland",12.245682705954891,2023-03-01,PL,12,Krakow,208071,2,153,Poland,"12, Krąków, gmina Warta, powiat sieradzki, województwo łódzkie, 98-290, Polska",Polska,51.7295863,18.5172975
+"Madison, WI United States",12.242780588935553,2023-03-01,US,WI,Madison,207468,68,154,United States,"Madison, Dane County, Wisconsin, United States",United States,43.074761,-89.3837613
+"Hayward, CA United States",12.238786659028097,2023-03-01,US,CA,Hayward,206641,69,155,United States,"Hayward, Alameda County, CAL Fire Northern Region, California, United States",United States,37.6688205,-122.080796
+"Billingsgate, LND United Kingdom",12.221857408085622,2023-03-01,GB,LND,Billingsgate,203172,9,156,United Kingdom,"Old Billingsgate Market, 10, Lower Thames Street, Cornhill, City of London, Greater London, England, EC3R 6EA, United Kingdom",United Kingdom,51.50892555,-0.08403202312234055
+"Stuttgart, BW Germany",12.218845721360806,2023-03-01,DE,BW,Stuttgart,202561,6,157,Germany,"Stuttgart, Baden-Württemberg, Deutschland",Deutschland,48.7784485,9.1800132
+"Dayton, OH United States",12.216686122789785,2023-03-01,US,OH,Dayton,202124,70,158,United States,"Dayton, Montgomery County, Ohio, United States",United States,39.7589478,-84.1916069
+"Tacoma, WA United States",12.213003571078424,2023-03-01,US,WA,Tacoma,201381,71,159,United States,"Tacoma, Pierce County, Washington, United States",United States,47.2495798,-122.439874
+"Gainesville, FL United States",12.188000320397427,2023-03-01,US,FL,Gainesville,196408,72,160,United States,"Gainesville, Alachua County, Florida, United States",United States,29.6519684,-82.3249846
+"Gothenburg, O Sweden",12.186680833837707,2023-03-01,SE,O,Gothenburg,196149,2,161,Sweden,"Göteborg, Göteborgs Stad, Västra Götalands län, 411 10, Sverige",Sverige,57.7072326,11.9670171
+"Nottingham, NGM United Kingdom",12.184302383710204,2023-03-01,GB,NGM,Nottingham,195683,10,162,United Kingdom,"Nottingham, Carrington Street, Lace Market, The Meadows, City of Nottingham, England, NG2 3AQ, United Kingdom",United Kingdom,52.9473037,-1.1449555
+"Grand Rapids, MI United States",12.183377037597985,2023-03-01,US,MI,Grand Rapids,195502,73,163,United States,"Grand Rapids, Kent County, Michigan, United States",United States,42.9632405,-85.6678639
+"Providence, RI United States",12.175768065265318,2023-03-01,US,RI,Providence,194020,74,164,United States,"Providence, Providence County, Rhode Island, United States",United States,41.8239891,-71.4128343
+"Liverpool, LIV United Kingdom",12.17548456376215,2023-03-01,GB,LIV,Liverpool,193965,11,165,United Kingdom,"King's Leadership Academy, Liverpool, Dingle Vale, Dingle, Liverpool, Liverpool City Region, England, L8 9SJ, United Kingdom",United Kingdom,53.3782584,-2.958688609021225
+"London, ON Canada",12.16870301806017,2023-03-01,CA,ON,London,192654,13,166,Canada,"London, Southwestern Ontario, Ontario, N6A 3N7, Canada",Canada,42.9832406,-81.243372
+"Yaroslavl, YAR Russia",12.166322992512864,2023-03-01,RU,YAR,Yaroslavl,192196,11,167,Russia,"Ярославль, городской округ Ярославль, Ярославская область, Центральный федеральный округ, 150000, Россия",Россия,57.6263877,39.8933705
+"Monterrey, NLE Mexico",12.16487037037907,2023-03-01,MX,NLE,Monterrey,191917,2,168,Mexico,"Monterrey, Nuevo León, 64010, México",México,25.6802019,-100.315258
+"Boardman, OR United States",12.163608678710913,2023-03-01,US,OR,Boardman,191675,75,169,United States,"Boardman, Morrow County, Oregon, 97818, United States",United States,45.839855,-119.7005834
+"Lawrenceville, GA United States",12.161681790195365,2023-03-01,US,GA,Lawrenceville,191306,76,170,United States,"Lawrenceville, Gwinnett County, Georgia, United States",United States,33.9566391,-83.9890066
+"Memphis, TN United States",12.15491618388586,2023-03-01,US,TN,Memphis,190016,77,171,United States,"Memphis, Shelby County, West Tennessee, Tennessee, United States",United States,35.1460249,-90.0517638
+"Fontana, CA United States",12.15337309967646,2023-03-01,US,CA,Fontana,189723,78,172,United States,"Fontana, San Bernardino County, CAL Fire Southern Region, California, United States",United States,34.0922335,-117.435048
+"Wroclaw, 02 Poland",12.146020047576888,2023-03-01,PL,02,Wroclaw,188333,3,173,Poland,"Wrocław, województwo dolnośląskie, Polska",Polska,51.1089776,17.0326689
+"Halifax, NS Canada",12.144978851169512,2023-03-01,CA,NS,Halifax,188137,14,174,Canada,"Halifax, Halifax Regional Municipality, Halifax County, Nova Scotia, Canada",Canada,44.648618,-63.5859487
+"Omsk, OMS Russia",12.143297901356451,2023-03-01,RU,OMS,Omsk,187821,12,175,Russia,"городской округ Омск, Омская область, Сибирский федеральный округ, Россия",Россия,54.991375,73.371529
+"Santa Ana, CA United States",12.140514938532426,2023-03-01,US,CA,Santa Ana,187299,79,176,United States,"Santa Ana, Orange County, CAL Fire Southern Region, California, United States",United States,33.7494951,-117.8732213
+"Knoxville, TN United States",12.123940255991554,2023-03-01,US,TN,Knoxville,184220,80,177,United States,"Knoxville, Knox County, East Tennessee, Tennessee, United States",United States,35.9603948,-83.9210261
+"Poznan, 30 Poland",12.118852155768902,2023-03-01,PL,30,Poznan,183285,4,178,Poland,"30, Poznań, gmina Serokomla, powiat łukowski, województwo lubelskie, 21-413, Polska",Polska,51.6781382,22.299472119342976
+"Izmir, 35 Turkey",12.11007923237509,2023-03-01,TR,35,Izmir,181684,3,179,Turkey,"İzmir, Konak, İzmir, Ege Bölgesi, 00000, Türkiye",Türkiye,38.4224548,27.1310699
+"Cebu City, CEB Philippines",12.103746410671684,2023-03-01,PH,CEB,Cebu City,180537,4,180,Philippines,"Cebu, P. Burgos Street, Santo Niño, Cebu City, Central Visayas, 6000, Philippines",Philippines,10.2934208,123.9022613
+"Fremont, CA United States",12.084706949804522,2023-03-01,US,CA,Fremont,177132,81,181,United States,"Fremont, Alameda County, CAL Fire Northern Region, California, United States",United States,37.5482697,-121.988571
+"Utrecht, UT Netherlands",12.067505738815376,2023-03-01,NL,UT,Utrecht,174111,3,182,Netherlands,"Utrecht, Nederland",Nederland,52.080985600000005,5.12768396945229
+"Long Beach, CA United States",12.058656736139021,2023-03-01,US,CA,Long Beach,172577,82,183,United States,"Long Beach, Los Angeles County, CAL Fire Contract Counties, California, United States",United States,33.7690164,-118.191604
+"Burnaby, BC Canada",12.055511349483954,2023-03-01,CA,BC,Burnaby,172035,15,184,Canada,"Burnaby, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.2433804,-122.972545
+"Victoria, BC Canada",12.055069506993611,2023-03-01,CA,BC,Victoria,171959,16,185,Canada,"Beco Canada, Joana d'Arc, Região Administrativa IV - Maruípe, Vitória, Região Geográfica Imediata de Vitória, Região Metropolitana da Grande Vitória, Região Geográfica Intermediária de Vitória, Espírito Santo, Região Sudeste, 29048-060, Brasil",Brasil,-20.2847433,-40.3126751
+"Makati City, 00 Philippines",12.053550638694736,2023-03-01,PH,00,Makati City,171698,5,186,Philippines,"Amorsolo, Skyway, Pio del Pilar, Makati 1st District, Makati, Southern Manila District, Metro Manila, 1230, Philippines",Philippines,14.5480343,121.0128136
+"Kitchener, ON Canada",12.051761119434515,2023-03-01,CA,ON,Kitchener,171391,17,187,Canada,"Kitchener, Region of Waterloo, Southwestern Ontario, Ontario, Canada",Canada,43.451291,-80.4927815
+"North York, ON Canada",12.048991843752006,2023-03-01,CA,ON,North York,170917,18,188,Canada,"North York, Toronto, Golden Horseshoe, Ontario, Canada",Canada,43.7543263,-79.44911696639593
+"Kochi, KL India",12.034940255875137,2023-03-01,IN,KL,Kochi,168532,8,189,India,"Kochi, Ernakulam district, Kerala, 682001, India",India,9.9674277,76.2454436
+"Akron, OH United States",12.022918742432122,2023-03-01,US,OH,Akron,166518,83,190,United States,"Akron, Summit County, Ohio, United States",United States,41.083064,-81.518485
+"Virginia Beach, VA United States",12.018054896191337,2023-03-01,US,VA,Virginia Beach,165710,84,191,United States,"Virginia Beach, Virginia, United States",United States,36.8529841,-75.9774183
+"Petaling Jaya, 10 Malaysia",12.016442445551643,2023-03-01,MY,10,Petaling Jaya,165443,2,192,Malaysia,"Petaling Jaya, Petaling, Selangor, Malaysia",Malaysia,3.0991752,101.6450232
+"Ufa, BA Russia",12.015480985509686,2023-03-01,RU,BA,Ufa,165284,13,193,Russia,"Уфа, городской округ Уфа, Башкортостан, Приволжский федеральный округ, 450000, Россия",Россия,54.7261409,55.947499
+"Christchurch, CAN New Zealand",12.01487581979685,2023-03-01,NZ,CAN,Christchurch,165184,2,194,New Zealand,"Christchurch, Christchurch City, Canterbury, New Zealand/Aotearoa",New Zealand/Aotearoa,-43.530955,172.6366455
+"Warren, MI United States",12.013646205940514,2023-03-01,US,MI,Warren,164981,85,195,United States,"Warren County, Missouri, United States",United States,38.7535106,-91.1453948
+"Santa Clara, CA United States",12.00940669812687,2023-03-01,US,CA,Santa Clara,164283,86,196,United States,"Santa Clara County, CAL Fire Northern Region, California, United States",United States,37.2333253,-121.6846349
+"Düsseldorf, NW Germany",12.005393616699967,2023-03-01,DE,NW,Düsseldorf,163625,7,197,Germany,"Düsseldorf, Nordrhein-Westfalen, Deutschland",Deutschland,51.2254018,6.7763137
+"Hamilton, ON Canada",12.001775382012324,2023-03-01,CA,ON,Hamilton,163034,19,198,Canada,"Hamilton, Golden Horseshoe, Ontario, Canada",Canada,43.2560802,-79.8728583
+"El Paso, TX United States",11.973711744666355,2023-03-01,US,TX,El Paso,158522,87,199,United States,"El Paso, El Paso County, Texas, United States",United States,31.7865623,-106.441207
+"Falls Church, VA United States",11.96822146534369,2023-03-01,US,VA,Falls Church,157654,88,200,United States,"Falls Church, Virginia, 22046, United States",United States,38.882334,-77.1710914
+"Buenos Aires, B Argentina",11.96801848148021,2023-03-01,AR,B,Buenos Aires,157622,1,201,Argentina,"Buenos Aires, Obrero, Carmen de Patagones, Cuartel I, Partido de Patagones, Buenos Aires, 8504, Argentina",Argentina,-40.7889286,-62.9839561
+"Silver Spring, MD United States",11.967885250924537,2023-03-01,US,MD,Silver Spring,157601,89,202,United States,"Silver Spring, Montgomery County, Maryland, United States",United States,38.9997621,-77.02403709829767
+"Mesa, AZ United States",11.966571027603147,2023-03-01,US,AZ,Mesa,157394,90,203,United States,"Mesa, Maricopa County, Arizona, United States",United States,33.4151005,-111.8314552
+"Novokuznetsk, KEM Russia",11.96539501681359,2023-03-01,RU,KEM,Novokuznetsk,157209,14,204,Russia,"Новокузнецк, Новокузнецкий городской округ, Кемеровская область, Сибирский федеральный округ, Россия",Россия,53.7575903,87.1358494
+"The Hague, ZH Netherlands",11.963344818079435,2023-03-01,NL,ZH,The Hague,156887,4,205,Netherlands,"Den Haag, Zuid-Holland, Nederland",Nederland,52.0799838,4.3113461
+"Leicester, LCE United Kingdom",11.930793339795436,2023-03-01,GB,LCE,Leicester,151862,12,206,United Kingdom,"Leicester, Leicestershire, England, LE1 5YA, United Kingdom",United Kingdom,52.6362,-1.1331969
+"Staten Island, NY United States",11.922887115130283,2023-03-01,US,NY,Staten Island,150666,91,207,United States,"Staten Island, City of New York, New York, United States",United States,40.5834557,-74.1496048
+"Kazan’, TA Russia",11.921937608238101,2023-03-01,RU,TA,Kazan’,150523,15,208,Russia,"Казань, городской округ Казань, Татарстан, Приволжский федеральный округ, Россия",Россия,55.7823547,49.1242266
+"Voronezh, VOR Russia",11.917950476249988,2023-03-01,RU,VOR,Voronezh,149924,16,209,Russia,"Воронеж, городской округ Воронеж, Воронежская область, Центральный федеральный округ, Россия",Россия,51.6605982,39.2005858
+"Kansas City, KS United States",11.915145312913364,2023-03-01,US,KS,Kansas City,149504,92,210,United States,"Kansas City, Wyandotte County, Kansas, United States",United States,39.1134562,-94.626497
+"Coventry, COV United Kingdom",11.913244018925514,2023-03-01,GB,COV,Coventry,149220,13,211,United Kingdom,"Coventry, Station Square, Cheylesmore, Coventry, West Midlands Combined Authority, England, CV1 2GT, United Kingdom",United Kingdom,52.400739,-1.5135474
+"Murfreesboro, TN United States",11.908441242224725,2023-03-01,US,TN,Murfreesboro,148505,93,212,United States,"Murfreesboro, Rutherford County, Tennessee, United States",United States,35.8460396,-86.3921096
+"Essen, NW Germany",11.907471172829116,2023-03-01,DE,NW,Essen,148361,8,213,Germany,"Essen, Nordrhein-Westfalen, Deutschland",Deutschland,51.4582235,7.0158171
+"Guadalajara, JAL Mexico",11.90465669362375,2023-03-01,MX,JAL,Guadalajara,147944,3,214,Mexico,"Guadalajara, Jalisco, México",México,20.6720375,-103.338396
+"Katy, TX United States",11.90297909057861,2023-03-01,US,TX,Katy,147696,94,215,United States,"Katy, Fort Bend County, Texas, United States",United States,29.7857853,-95.8243956
+"Buenos Aires, C Argentina",11.90044382257702,2023-03-01,AR,C,Buenos Aires,147322,2,216,Argentina,"Buenos Aires, Comuna 6, Ciudad Autónoma de Buenos Aires, Argentina",Argentina,-34.6075682,-58.4370894
+"Fresno, CA United States",11.897636693485174,2023-03-01,US,CA,Fresno,146909,95,217,United States,"Fresno, Fresno County, CAL Fire Southern Region, California, United States",United States,36.7394421,-119.7848307
+"Frederiksberg, 84 Denmark",11.884413156456073,2023-03-01,DK,84,Frederiksberg,144979,2,218,Denmark,"Frederiksberg, Frederiksberg Kommune, Region Hovedstaden, 1861, Danmark",Danmark,55.678016,12.5326186
+"Québec, QC Canada",11.875517866172999,2023-03-01,CA,QC,Québec,143695,20,219,Canada,"Québec, Québec (Agglomération), Capitale-Nationale, Québec, Canada",Canada,46.8137431,-71.2084061
+"Tulsa, OK United States",11.870949498478256,2023-03-01,US,OK,Tulsa,143040,96,220,United States,"Tulsa, Tulsa County, Oklahoma, United States",United States,36.1563122,-95.9927516
+"Davao City, DAS Philippines",11.867321814884214,2023-03-01,PH,DAS,Davao City,142522,6,221,Philippines,"United Sugar Cane Planters of Davao, Digos, Davao del Sur, Davao Region, 8002, Philippines",Philippines,6.7316182,125.35546992866949
+"Naaldwijk, ZH Netherlands",11.863744295298362,2023-03-01,NL,ZH,Naaldwijk,142013,5,222,Netherlands,"Naaldwijk, Westland, Zuid-Holland, Nederland",Nederland,51.9930016,4.2074197
+"Cambridge, MA United States",11.861665006722925,2023-03-01,US,MA,Cambridge,141718,97,223,United States,"Cambridge, Middlesex County, Massachusetts, United States",United States,42.3750997,-71.1056157
+"Wellington, WGN New Zealand",11.854534485696593,2023-03-01,NZ,WGN,Wellington,140711,3,224,New Zealand,"Wellington, Wellington City, Wellington, 6011, New Zealand/Aotearoa",New Zealand/Aotearoa,-41.2887953,174.7772114
+"Fort Lauderdale, FL United States",11.852421696136181,2023-03-01,US,FL,Fort Lauderdale,140414,98,225,United States,"Fort Lauderdale, Broward County, Florida, United States",United States,26.1223084,-80.1433786
+"Ahmedabad, GJ India",11.850111732325098,2023-03-01,IN,GJ,Ahmedabad,140090,9,226,India,"Ahmedabad, Ahmedabad City Taluka, Ahmedabad District, Gujarat, 380001, India",India,23.0216238,72.5797068
+"San Juan, 00 Philippines",11.843925614135546,2023-03-01,PH,00,San Juan,139226,7,227,Philippines,"San Juan, Eastern Manila District, Metro Manila, Philippines",Philippines,14.60474,121.0300488
+"Norfolk, VA United States",11.830607989694634,2023-03-01,US,VA,Norfolk,137384,99,228,United States,"Norfolk, Virginia, United States",United States,36.8448348,-76.2863999
+"Spokane, WA United States",11.82611445252442,2023-03-01,US,WA,Spokane,136768,100,229,United States,"Spokane, Spokane County, Washington, United States",United States,47.6571934,-117.42351
+"Durham, NC United States",11.823515631877337,2023-03-01,US,NC,Durham,136413,101,230,United States,"Durham, Durham County, North Carolina, United States",United States,35.996653,-78.9018053
+"Hanover, NI Germany",11.821108450271838,2023-03-01,DE,NI,Hanover,136085,9,231,Germany,"Hannover, Region Hannover, Niedersachsen, Deutschland",Deutschland,52.3744779,9.7385532
+"Kyiv, 30 Ukraine",11.81885012495929,2023-03-01,UA,30,Kyiv,135778,1,232,Ukraine,"Hilton Kyiv, 30, Тараса Шевченка бульвар, Афанасівський яр, Центр, Шевченківський район, Київ, 01030, Україна",Україна,50.4452763,30.5048998
+"Nuremberg, BY Germany",11.81541979232079,2023-03-01,DE,BY,Nuremberg,135313,10,233,Germany,"Nürnberg, Bayern, Deutschland",Deutschland,49.453872,11.077298
+"Boise, ID United States",11.804235946776013,2023-03-01,US,ID,Boise,133808,102,234,United States,"Boise, Ada County, Idaho, United States",United States,43.6166163,-116.200886
+"Southampton, STH United Kingdom",11.803525775221054,2023-03-01,GB,STH,Southampton,133713,14,235,United Kingdom,"Purvis Gardens, Hightown, Hedge End, Southampton, England, SO19 0TR, United Kingdom",United Kingdom,50.89556045,-1.3471152423561408
+"Baton Rouge, LA United States",11.803406117740447,2023-03-01,US,LA,Baton Rouge,133697,103,236,United States,"Baton Rouge, East Baton Rouge Parish, Louisiana, United States",United States,30.4507936,-91.1391153
+"Stockton, CA United States",11.800237468955121,2023-03-01,US,CA,Stockton,133274,104,237,United States,"Stockton, San Joaquin County, CAL Fire Southern Region, California, United States",United States,37.9577016,-121.2907796
+"Saskatoon, SK Canada",11.791041932552309,2023-03-01,CA,SK,Saskatoon,132054,21,238,Canada,"Saskatoon, Division No. 11, Saskatchewan, Canada",Canada,52.131802,-106.660767
+"Lucknow, UP India",11.790693555908197,2023-03-01,IN,UP,Lucknow,132008,10,239,India,"Lucknow, Uttar Pradesh, 226019, India",India,26.8381,80.9346001
+"Syracuse, NY United States",11.778400271297876,2023-03-01,US,NY,Syracuse,130395,105,240,United States,"City of Syracuse, Onondaga County, New York, United States",United States,43.0481221,-76.1474244
+"Cardiff, CRF United Kingdom",11.774828084434523,2023-03-01,GB,CRF,Cardiff,129930,15,241,United Kingdom,"Cardiff, Cymru / Wales, CF10 2AF, United Kingdom",United Kingdom,51.4816546,-3.1791934
+"Berkeley, CA United States",11.768164404495131,2023-03-01,US,CA,Berkeley,129067,106,242,United States,"Berkeley, Alameda County, CAL Fire Northern Region, California, United States",United States,37.8708393,-122.272863
+"Novosibirsk, NVS Russia",11.76321714820345,2023-03-01,RU,NVS,Novosibirsk,128430,17,243,Russia,"городской округ Новосибирск, Новосибирская область, Сибирский федеральный округ, Россия",Россия,55.0282171,82.9234509
+"Aurora, CO United States",11.762313594684327,2023-03-01,US,CO,Aurora,128314,107,244,United States,"Aurora, Aurora Township, Kane County, Illinois, United States",United States,41.7571701,-88.3147539
+"Curitiba, PR Brazil",11.761401424162148,2023-03-01,BR,PR,Curitiba,128197,3,245,Brazil,"Curitiba, Região Geográfica Imediata de Curitiba, Região Metropolitana de Curitiba, Região Geográfica Intermediária de Curitiba, Paraná, Região Sul, Brasil",Brasil,-25.4295963,-49.2712724
+"Jaipur, RJ India",11.761346823468706,2023-03-01,IN,RJ,Jaipur,128190,11,246,India,"Jaipur, Jaipur Municipal Corporation, Jaipur Tehsil, Jaipur District, Rajasthan, 302001, India",India,26.9154576,75.8189817
+"Orenburg, ORE Russia",11.75903526151105,2023-03-01,RU,ORE,Orenburg,127894,18,247,Russia,"Оренбург, городской округ Оренбург, Оренбургская область, Приволжский федеральный округ, 460000, Россия",Россия,51.7671248,55.0978517
+"Vancouver, WA United States",11.753696731152688,2023-03-01,US,WA,Vancouver,127213,108,248,United States,"Vancouver, Clark County, Washington, United States",United States,45.6306954,-122.6744557
+"Canberra, ACT Australia",11.751958113348225,2023-03-01,AU,ACT,Canberra,126992,6,249,Australia,"Canberra, District of Canberra Central, Australian Capital Territory, 2601, Australia",Australia,-35.2975906,149.1012676
+"Leipzig, SN Germany",11.74472742385508,2023-03-01,DE,SN,Leipzig,126077,11,250,Germany,"Leipzig, Sachsen, Deutschland",Deutschland,51.3406321,12.3747329
+"Irving, TX United States",11.74387844317592,2023-03-01,US,TX,Irving,125970,109,251,United States,"Irving, Dallas County, Texas, United States",United States,32.8295183,-96.9442177
+"Arlington, TX United States",11.740992874175678,2023-03-01,US,TX,Arlington,125607,110,252,United States,"Arlington, Tarrant County, Texas, United States",United States,32.7355816,-97.1071186
+"Malmo, M Sweden",11.738897013727485,2023-03-01,SE,M,Malmo,125344,3,253,Sweden,"Malmö, Malmö kommun, Skåne län, Sverige",Sverige,55.6052931,13.0001566
+"Spring, TX United States",11.727165497332457,2023-03-01,US,TX,Spring,123882,111,254,United States,"Spring, Harris County, Texas, 77373, United States",United States,30.0798826,-95.4172549
+"Reno, NV United States",11.71919138700764,2023-03-01,US,NV,Reno,122898,112,255,United States,"Reno, Washoe County, Nevada, United States",United States,39.5261206,-119.8126581
+"Decatur, GA United States",11.718418152284249,2023-03-01,US,GA,Decatur,122803,113,256,United States,"Decatur County, Georgia, United States",United States,30.8736613,-84.5740953
+"Markham, ON Canada",11.717888752245008,2023-03-01,CA,ON,Markham,122738,22,257,Canada,"Markham, York Region, Golden Horseshoe, Ontario, Canada",Canada,43.8563707,-79.3376825
+"Plano, TX United States",11.714183260782509,2023-03-01,US,TX,Plano,122284,114,258,United States,"Plano, Collin County, Texas, United States",United States,33.0136764,-96.6925096
+"Belfast, BFS United Kingdom",11.713635250577441,2023-03-01,GB,BFS,Belfast,122217,16,259,United Kingdom,"Belfast International Airport, British Road, Belfast, County Antrim, Ulster, Tuaisceart Éireann / Northern Ireland, BT29 4DL, United Kingdom",United Kingdom,54.652424499999995,-6.229076154679657
+"Anchorage, AK United States",11.708360660909566,2023-03-01,US,AK,Anchorage,121574,115,260,United States,"Anchorage, Alaska, 99501, United States",United States,61.2163129,-149.894852
+"Newcastle upon Tyne, NET United Kingdom",11.703264793357766,2023-03-01,GB,NET,Newcastle upon Tyne,120956,17,261,United Kingdom,"Newcastle, Neville Street, Grainger Town, Newcastle upon Tyne, North of Tyne, England, NE1 5EN, United Kingdom",United Kingdom,54.968733,-1.6171916
+"Harrow, HRW United Kingdom",11.701005410374849,2023-03-01,GB,HRW,Harrow,120683,18,262,United Kingdom,"Harrow, Sudbury Hill, London Borough of Harrow, London, Greater London, England, HA1 3RU, United Kingdom",United Kingdom,51.5647347,-0.3375826
+"Everett, MA United States",11.700582761353703,2023-03-01,US,MA,Everett,120632,116,263,United States,"Everett, Middlesex County, Massachusetts, 02149, United States",United States,42.40843,-71.0536625
+"Porto, 13 Portugal",11.698707693393164,2023-03-01,PT,13,Porto,120406,2,264,Portugal,"Porto, Portugal",Portugal,41.1494512,-8.6107884
+"Roseville, CA United States",11.686903981859931,2023-03-01,US,CA,Roseville,118993,117,265,United States,"Roseville, Placer County, CAL Fire Northern Region, California, United States",United States,38.7521235,-121.2880059
+"Brasília, DF Brazil",11.683368416317284,2023-03-01,BR,DF,Brasília,118573,4,266,Brazil,"Brasília, Plano Piloto, Região Geográfica Imediata do Distrito Federal, Região Integrada de Desenvolvimento do Distrito Federal e Entorno, Região Geográfica Intermediária do Distrito Federal, Distrito Federal, Região Centro-Oeste, 70701-000, Brasil",Brasil,-15.7934036,-47.8823172
+"Ontario, CA United States",11.681638173356264,2023-03-01,US,CA,Ontario,118368,118,267,United States,"Ontario, San Bernardino County, CAL Fire Southern Region, California, United States",United States,34.065846,-117.6484304
+"Dortmund, NW Germany",11.675885797035555,2023-03-01,DE,NW,Dortmund,117689,12,268,Germany,"Dortmund, Nordrhein-Westfalen, Deutschland",Deutschland,51.5142273,7.4652789
+"Ann Arbor, MI United States",11.673972311485327,2023-03-01,US,MI,Ann Arbor,117464,119,269,United States,"Ann Arbor, Washtenaw County, Michigan, United States",United States,42.2681569,-83.7312291
+"Tampere, 11 Finland",11.673129216510564,2023-03-01,FI,11,Tampere,117365,2,270,Finland,"Tampere, Tampereen seutukunta, Pirkanmaa, Länsi- ja Sisä-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,61.4980214,23.7603118
+"Belo Horizonte, MG Brazil",11.658825055130215,2023-03-01,BR,MG,Belo Horizonte,115698,5,271,Brazil,"Belo Horizonte, Região Geográfica Imediata de Belo Horizonte, Região Metropolitana de Belo Horizonte, Região Geográfica Intermediária de Belo Horizonte, Minas Gerais, Região Sudeste, Brasil",Brasil,-19.9225776,-43.9451356
+"Abu Dhabi, AZ United Arab Emirates",11.652626535927542,2023-03-01,AE,AZ,Abu Dhabi,114983,2,272,United Arab Emirates,"أبو ظبي, أبوظبي, أبو ظبي, الإمارات العربية المتحدة",الإمارات العربية المتحدة,24.4538352,54.3774014
+"Lahore, PB Pakistan",11.651721723831812,2023-03-01,PK,PB,Lahore,114879,1,273,Pakistan,"لاہور, Lahore Cantonment Tehsil, پنجاب, 54010, پاکستان",پاکستان,31.5656822,74.3141829
+"Waterloo, ON Canada",11.651364793947334,2023-03-01,CA,ON,Waterloo,114838,23,274,Canada,"Waterloo, Region of Waterloo, Southwestern Ontario, Ontario, Canada",Canada,43.4652699,-80.5222961
+"Richmond Hill, ON Canada",11.641837454562426,2023-03-01,CA,ON,Richmond Hill,113749,24,275,Canada,"Richmond Hill, York Region, Golden Horseshoe, Ontario, Canada",Canada,43.8801166,-79.4392925
+"Lyon, 69 France",11.638438546688523,2023-03-01,FR,69,Lyon,113363,2,276,France,"Métropole de Lyon, Rhône, Auvergne-Rhône-Alpes, France métropolitaine, France",France,45.7481616,4.8556858678641275
+"Mannheim, BW Germany",11.637785620851817,2023-03-01,DE,BW,Mannheim,113289,13,277,Germany,"Mannheim, Baden-Württemberg, Deutschland",Deutschland,49.4892913,8.4673098
+"Karachi, SD Pakistan",11.636036503798104,2023-03-01,PK,SD,Karachi,113091,2,278,Pakistan,"کراچی, سندھ, کراچی, 74400, پاکستان",پاکستان,24.8546842,67.0207055
+"Tijuana, BCN Mexico",11.62944548113096,2023-03-01,MX,BCN,Tijuana,112348,4,279,Mexico,"Tijuana, Municipio de Tijuana, Baja California, 22320, México",México,32.5317397,-117.0195295
+"Bakersfield, CA United States",11.625530674345908,2023-03-01,US,CA,Bakersfield,111909,120,280,United States,"Bakersfield, Kern County, CAL Fire Southern Region, California, United States",United States,35.3738712,-119.0194639
+"Albany, NY United States",11.624618885388685,2023-03-01,US,NY,Albany,111807,121,281,United States,"City of Albany, Albany County, New York, United States",United States,42.6511674,-73.754968
+"Sunnyvale, CA United States",11.616447291274342,2023-03-01,US,CA,Sunnyvale,110897,122,282,United States,"Sunnyvale, Santa Clara County, California, United States",United States,37.3688301,-122.036349
+"Eugene, OR United States",11.608471980481433,2023-03-01,US,OR,Eugene,110016,123,283,United States,"Eugene, Lane County, Oregon, United States",United States,44.0505054,-123.0950506
+"Lexington, KY United States",11.606652574197472,2023-03-01,US,KY,Lexington,109816,124,284,United States,"Lexington, Fayette County, Kentucky, United States",United States,38.0464066,-84.4970393
+"Des Moines, IA United States",11.597468798845478,2023-03-01,US,IA,Des Moines,108812,125,285,United States,"Des Moines, Polk County, Iowa, United States",United States,41.5910323,-93.6046655
+"Chandler, AZ United States",11.59503065963907,2023-03-01,US,AZ,Chandler,108547,126,286,United States,"Chandler, Maricopa County, Arizona, United States",United States,33.3062031,-111.8411851
+"Wichita, KS United States",11.589256678176751,2023-03-01,US,KS,Wichita,107922,127,287,United States,"Wichita, Sedgwick County, Kansas, United States",United States,37.6922361,-97.3375448
+"Hartford, CT United States",11.580724290534663,2023-03-01,US,CT,Hartford,107005,128,288,United States,"Hartford, Capitol Region COG, Connecticut, United States",United States,41.764582,-72.6908547
+"Guelph, ON Canada",11.578647660289029,2023-03-01,CA,ON,Guelph,106783,25,289,Canada,"Guelph, Southwestern Ontario, Ontario, Canada",Canada,43.5460516,-80.2493276
+"Saratov, SAR Russia",11.575430670321625,2023-03-01,RU,SAR,Saratov,106440,19,290,Russia,"городской округ Саратов, Саратовская область, Приволжский федеральный округ, 410000, Россия",Россия,51.530018,46.034683
+"Fairfax, VA United States",11.574829268285043,2023-03-01,US,VA,Fairfax,106376,129,291,United States,"Fairfax, Fairfax (city), Virginia, 20030, United States",United States,38.8462236,-77.3063733
+"Tallahassee, FL United States",11.57466946005458,2023-03-01,US,FL,Tallahassee,106359,130,292,United States,"Tallahassee, Leon County, Florida, United States",United States,30.4380832,-84.2809332
+"Thessaloniki, 54 Greece",11.57450022349908,2023-03-01,GR,54,Thessaloniki,106341,2,293,Greece,"54, Ζάκα, Αναγέννηση, Νεάπολη, Κοινότητα Νεάπολης, Δημοτική Ενότητα Νεάπολης, Δήμος Νεάπολης - Συκεών, Περιφερειακή Ενότητα Θεσσαλονίκης, Περιφέρεια Κεντρικής Μακεδονίας, Αποκεντρωμένη Διοίκηση Μακεδονίας - Θράκης, 567 27, Ελλάς",Ελλάς,40.6563742,22.9398549
+"Lincoln, NE United States",11.572391769136894,2023-03-01,US,NE,Lincoln,106117,131,294,United States,"Lincoln, Lancaster County, Nebraska, United States",United States,40.8088861,-96.7077751
+"Katowice, 24 Poland",11.569901084326506,2023-03-01,PL,24,Katowice,105853,5,295,Poland,"Katowice, Górnośląsko-Zagłębiowska Metropolia, województwo śląskie, Polska",Polska,50.2598987,19.0215852
+"Oakville, ON Canada",11.554124988217545,2023-03-01,CA,ON,Oakville,104196,26,296,Canada,"Oakville, Halton Region, Golden Horseshoe, Ontario, Canada",Canada,43.447436,-79.666672
+"Marietta, GA United States",11.550153810060348,2023-03-01,US,GA,Marietta,103783,132,297,United States,"Marietta, Cobb County, Georgia, United States",United States,33.9528472,-84.5496148
+"Patna, BR India",11.544046153628019,2023-03-01,IN,BR,Patna,103151,12,298,India,"Patna, Patna Rural, Patna District, Bihar, 800001, India",India,25.6093239,85.1235252
+"Bradford, BRD United Kingdom",11.534765231574685,2023-03-01,GB,BRD,Bradford,102198,19,299,United Kingdom,"The Parish Church of St John The Evangelist, Bradford, Bierley Lane, West Bowling, Bierley, Bradford, West Yorkshire, England, BD4 6AS, United Kingdom",United Kingdom,53.77049825,-1.7323530933151647
+"Schaumburg, IL United States",11.512605413759303,2023-03-01,US,IL,Schaumburg,99958,133,300,United States,"Schaumburg, Schaumburg Township, Cook County, Illinois, United States",United States,42.0333608,-88.083406
+"Charlottesville, VA United States",11.509489569034328,2023-03-01,US,VA,Charlottesville,99647,134,301,United States,"Charlottesville, Virginia, United States",United States,38.029306,-78.4766781
+"Rostov-on-Don, ROS Russia",11.503985623400753,2023-03-01,RU,ROS,Rostov-on-Don,99100,20,302,Russia,"Ростов-на-Дону, городской округ Ростов-на-Дону, Ростовская область, Южный федеральный округ, Россия",Россия,47.2216548,39.7096061
+"Henderson, NV United States",11.502875129116727,2023-03-01,US,NV,Henderson,98990,135,303,United States,"Henderson, Clark County, Nevada, United States",United States,36.0301134,-114.9826194
+"St. Petersburg, FL United States",11.50050869495514,2023-03-01,US,FL,St. Petersburg,98756,136,304,United States,"Saint Petersburg, Pinellas County, Florida, United States",United States,27.7703796,-82.6695085
+"Roanoke, VA United States",11.498390339992403,2023-03-01,US,VA,Roanoke,98547,137,305,United States,"Roanoke, Virginia, United States",United States,37.270973,-79.9414313
+"Reading, RDG United Kingdom",11.491946946585031,2023-03-01,GB,RDG,Reading,97914,20,306,United Kingdom,"Reading, Reading Station footbridge, Caversham, Reading, England, RG1 8FP, United Kingdom",United Kingdom,51.4591971,-0.9723236
+"Beaverton, OR United States",11.488366343469526,2023-03-01,US,OR,Beaverton,97564,138,307,United States,"Beaverton, Washington County, Oregon, United States",United States,45.4871723,-122.80378
+"Richmond, BC Canada",11.485574822947429,2023-03-01,CA,BC,Richmond,97292,27,308,Canada,"Richmond, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.163168,-123.137414
+"Angeles City, PAM Philippines",11.484186426630423,2023-03-01,PH,PAM,Angeles City,97157,8,309,Philippines,"Angeles, Guagua, Palawi - Jeepney Termial, V. Tiomico Street, Santo Rosario, San Fernando, Pampanga, Central Luzon, 2000, Philippines",Philippines,15.0275372,120.6913211
+"Regina, SK Canada",11.480867041276339,2023-03-01,CA,SK,Regina,96835,28,310,Canada,"Regina, Division No. 6, Saskatchewan, Canada",Canada,50.44876,-104.61731
+"Bellevue, WA United States",11.480774104953143,2023-03-01,US,WA,Bellevue,96826,139,311,United States,"Bellevue, King County, Washington, United States",United States,47.6144219,-122.192337
+"Gdansk, 22 Poland",11.47438212234972,2023-03-01,PL,22,Gdansk,96209,6,312,Poland,"Gdańsk, województwo pomorskie, Polska",Polska,54.3706858,18.61298210330077
+"Windsor, ON Canada",11.474174241589374,2023-03-01,CA,ON,Windsor,96189,29,313,Canada,"Windsor, Southwestern Ontario, Ontario, N9A 6P1, Canada",Canada,42.3167397,-83.0373389
+"Chesapeake, VA United States",11.47183260043467,2023-03-01,US,VA,Chesapeake,95964,140,314,United States,"Chesapeake, Virginia, United States",United States,36.7183708,-76.2466798
+"Croydon, CRY United Kingdom",11.471499121201083,2023-03-01,GB,CRY,Croydon,95932,21,315,United Kingdom,"East Croydon, Billinton Hill, Broad Green, London Borough of Croydon, London, Greater London, England, CR0 1LF, United Kingdom",United Kingdom,51.3758448,-0.0927317
+"Bloomington, IN United States",11.468795923207967,2023-03-01,US,IN,Bloomington,95673,141,316,United States,"Bloomington, Monroe County, Indiana, United States",United States,39.1670396,-86.5342881
+"Cambridge, CAM United Kingdom",11.468701858188066,2023-03-01,GB,CAM,Cambridge,95664,22,317,United Kingdom,"Cambridge, Cambridgeshire, Cambridgeshire and Peterborough, England, United Kingdom",United Kingdom,52.2055314,0.1186637
+"Porto Alegre, RS Brazil",11.468367333106018,2023-03-01,BR,RS,Porto Alegre,95632,6,318,Brazil,"Porto Alegre, Região Geográfica Imediata de Porto Alegre, Região Metropolitana de Porto Alegre, Região Geográfica Intermediária de Porto Alegre, Rio Grande do Sul, Região Sul, Brasil",Brasil,-30.0324999,-51.2303767
+"Union City, NJ United States",11.466609238092806,2023-03-01,US,NJ,Union City,95464,142,319,United States,"Union City, Hudson County, New Jersey, 07087, United States",United States,40.7795455,-74.0237512
+"Greensboro, NC United States",11.451836985588505,2023-03-01,US,NC,Greensboro,94064,143,320,United States,"Greensboro, Guilford County, North Carolina, United States",United States,36.0726355,-79.7919754
+"College Station, TX United States",11.448493604810839,2023-03-01,US,TX,College Station,93750,144,321,United States,"College Station, Brazos County, Texas, United States",United States,30.5955289,-96.3071042
+"Tempe, AZ United States",11.437425755568581,2023-03-01,US,AZ,Tempe,92718,145,322,United States,"Tempe, Maricopa County, Arizona, United States",United States,33.4255117,-111.9400164
+"Duluth, GA United States",11.433221866459347,2023-03-01,US,GA,Duluth,92329,146,323,United States,"Duluth, Gwinnett County, Georgia, United States",United States,34.0028569,-84.1441046
+"Slough, SLG United Kingdom",11.425099210603648,2023-03-01,GB,SLG,Slough,91582,23,324,United Kingdom,"Slough, Railway Terrace, Slough, England, SL2 5BY, United Kingdom",United Kingdom,51.512103,-0.591276
+"Lipetsk, LIP Russia",11.424225390205509,2023-03-01,RU,LIP,Lipetsk,91502,21,325,Russia,"Липецк, Липецкая область, Центральный федеральный округ, 398000, Россия",Россия,52.6041877,39.5936899
+"Cary, NC United States",11.422880400090177,2023-03-01,US,NC,Cary,91379,147,326,United States,"Cary, Wake County, North Carolina, United States",United States,35.7882893,-78.7812081
+"Derby, DER United Kingdom",11.421084261304648,2023-03-01,GB,DER,Derby,91215,24,327,United Kingdom,"Derby, Derbyshire, England, DE1 2AA, United Kingdom",United Kingdom,52.9212617,-1.4761491
+"Guwahati, AS India",11.41877960708,2023-03-01,IN,AS,Guwahati,91005,13,328,India,"Guwahati, Kamrup Metropolitan, Assam, 781015, India",India,26.1805978,91.753943
+"Bursa, 16 Turkey",11.415036964151103,2023-03-01,TR,16,Bursa,90665,4,329,Turkey,"Bursa, Marmara Bölgesi, 16230, Türkiye",Türkiye,40.182737,29.0675481
+"Medford, MA United States",11.409396604141373,2023-03-01,US,MA,Medford,90155,148,330,United States,"Medford, Middlesex County, Massachusetts, 02155, United States",United States,42.4184296,-71.1061639
+"Burlington, ON Canada",11.401245020567583,2023-03-01,CA,ON,Burlington,89423,30,331,Canada,"Burlington, Halton Region, Golden Horseshoe, Ontario, Canada",Canada,43.3248924,-79.7966835
+"Turin, TO Italy",11.397873696006858,2023-03-01,IT,TO,Turin,89122,3,332,Italy,"Torino, Piemonte, Italia",Italia,45.0677551,7.6824892
+"Richardson, TX United States",11.393375869866125,2023-03-01,US,TX,Richardson,88722,149,333,United States,"Richardson, Dallas County, Texas, United States",United States,32.9481789,-96.7297206
+"Cagayan de Oro, MSR Philippines",11.386488844821573,2023-03-01,PH,MSR,Cagayan de Oro,88113,9,334,Philippines,"Misamis Oriental Port Management Office, Corrales Extension, Purok 3, Poblacion, Puntod, Cagayan de Oro, Northern Mindanao, 9000, Philippines",Philippines,8.496390850000001,124.6612397788522
+"Marikina City, 00 Philippines",11.385432944454951,2023-03-01,PH,00,Marikina City,88020,10,335,Philippines,,,,
+"Poughkeepsie, NY United States",11.382429460889227,2023-03-01,US,NY,Poughkeepsie,87756,150,336,United States,"City of Poughkeepsie, Dutchess County, New York, 12601, United States",United States,41.7065539,-73.9283672
+"Scottsdale, AZ United States",11.382418066890446,2023-03-01,US,AZ,Scottsdale,87755,151,337,United States,"Scottsdale, Maricopa County, Arizona, United States",United States,33.4942189,-111.9260184
+"Columbia, SC United States",11.375523735100938,2023-03-01,US,SC,Columbia,87152,152,338,United States,"Columbia, Richland County, South Carolina, United States",United States,34.0007493,-81.0343313
+"Antwerp, VAN Belgium",11.372789452639626,2023-03-01,BE,VAN,Antwerp,86914,2,339,Belgium,"Antwerpen, Vlaanderen, België / Belgique / Belgien",België / Belgique / Belgien,51.2211097,4.3997081
+"Fort Collins, CO United States",11.371649877612274,2023-03-01,US,CO,Fort Collins,86815,153,340,United States,"Fort Collins, Larimer County, Colorado, United States",United States,40.5508527,-105.0668085
+"Bremen, HB Germany",11.367298356083847,2023-03-01,DE,HB,Bremen,86438,14,341,Germany,"Bremen, Deutschland",Deutschland,53.0758196,8.8071646
+"Frisco, TX United States",11.364680644506228,2023-03-01,US,TX,Frisco,86212,154,342,United States,"Frisco, Collin County, Texas, United States",United States,33.1506744,-96.8236116
+"Redmond, WA United States",11.363914885497246,2023-03-01,US,WA,Redmond,86146,155,343,United States,"Redmond, King County, Washington, United States",United States,47.6694141,-122.1238767
+"Valencia, V Spain",11.363357601314338,2023-03-01,ES,V,Valencia,86098,3,344,Spain,"València, Comarca de València, València / Valencia, Comunitat Valenciana, España",España,39.4697065,-0.3763353
+"Salford, SLF United Kingdom",11.358199619767072,2023-03-01,GB,SLF,Salford,85655,25,345,United Kingdom,"Beis Yaakov High School for Girls, Salford, 69, Broom Lane, Broughton Park, Salford, Greater Manchester, England, M7 4FF, United Kingdom",United Kingdom,53.5091819,-2.2610865661520845
+"Laval, QC Canada",11.357615780423071,2023-03-01,CA,QC,Laval,85605,31,346,Canada,"Laval, Laval (13), Québec, Canada",Canada,45.60558895,-73.73441730569056
+"Hoboken, NJ United States",11.35063003990524,2023-03-01,US,NJ,Hoboken,85009,156,347,United States,"Hoboken, Hudson County, New Jersey, 07030, United States",United States,40.7433066,-74.0323752
+"Bolton, BOL United Kingdom",11.350147678442452,2023-03-01,GB,BOL,Bolton,84968,26,348,United Kingdom,"Bolton, Trinity Street, Springfield, The Haulgh, Bolton, Greater Manchester, England, BL3 6DU, United Kingdom",United Kingdom,53.5735158,-2.4251259
+"Cluj-Napoca, CJ Romania",11.348981991880104,2023-03-01,RO,CJ,Cluj-Napoca,84869,2,349,Romania,"Cluj-Napoca, Zona Metropolitană Cluj, Cluj, România",România,46.769379,23.5899542
+"Woodbridge, ON Canada",11.34622131907135,2023-03-01,CA,ON,Woodbridge,84635,32,350,Canada,"Woodbridge, Vaughan, York Region, Golden Horseshoe, Ontario, L4L 9L9, Canada",Canada,43.7848982,-79.5923855
+"Fort Wayne, IN United States",11.33201491224167,2023-03-01,US,IN,Fort Wayne,83441,157,351,United States,"Fort Wayne, Allen County, Indiana, United States",United States,41.0799898,-85.1386015
+"Overland Park, KS United States",11.321813384486683,2023-03-01,US,KS,Overland Park,82594,158,352,United States,"Overland Park, Johnson County, Kansas, United States",United States,38.9742502,-94.6851702
+"Norwich, NFK United Kingdom",11.31791980396755,2023-03-01,GB,NFK,Norwich,82273,27,353,United Kingdom,"Norwich, Norfolk, England, United Kingdom",United Kingdom,52.6285576,1.2923954
+"New Haven, CT United States",11.31754298444141,2023-03-01,US,CT,New Haven,82242,159,354,United States,"New Haven, South Central COG, Connecticut, United States",United States,41.3082138,-72.9250518
+"Tyumen, TYU Russia",11.31689841552015,2023-03-01,RU,TYU,Tyumen,82189,22,355,Russia,"Тюмень, городской округ Тюмень, Тюменская область, Уральский федеральный округ, Россия",Россия,57.153534,65.542274
+"Trenton, NJ United States",11.315059720840287,2023-03-01,US,NJ,Trenton,82038,160,356,United States,"Trenton, Mercer County, New Jersey, United States",United States,40.2205944,-74.7597219
+"Bonn, NW Germany",11.313205428599607,2023-03-01,DE,NW,Bonn,81886,15,357,Germany,"Bonn, Nordrhein-Westfalen, Deutschland",Deutschland,50.735851,7.10066
+"Stoke-on-Trent, STE United Kingdom",11.312900116782279,2023-03-01,GB,STE,Stoke-on-Trent,81861,28,358,United Kingdom,"Stoke-on-Trent, Station Road, Shelton, Stoke-on-Trent, England, ST4 2AA, United Kingdom",United Kingdom,53.0079887,-2.1810781
+"Round Rock, TX United States",11.31227699148339,2023-03-01,US,TX,Round Rock,81810,161,359,United States,"Round Rock, Williamson County, Texas, United States",United States,30.5085915,-97.6788056
+"Chula Vista, CA United States",11.307277961272769,2023-03-01,US,CA,Chula Vista,81402,162,360,United States,"Chula Vista, San Diego County, California, United States",United States,32.6400541,-117.0841955
+"Indore, MP India",11.307167406348357,2023-03-01,IN,MP,Indore,81393,14,361,India,"Indore, Indore Tahsil, Indore District, Madhya Pradesh, 452001, India",India,22.7203616,75.8681996
+"Sterlitamak, BA Russia",11.306307117238175,2023-03-01,RU,BA,Sterlitamak,81323,23,362,Russia,"Стерлитамак, городской округ Стерлитамак, Башкортостан, Приволжский федеральный округ, Россия",Россия,53.632374,55.952259
+"Lansing, MI United States",11.303031252239691,2023-03-01,US,MI,Lansing,81057,163,363,United States,"Lansing, Ingham County, Michigan, United States",United States,42.7337712,-84.5553805
+"Antalya, 07 Turkey",11.302858540667586,2023-03-01,TR,07,Antalya,81043,5,364,Turkey,"Antalya, Muratpaşa, Antalya, Akdeniz Bölgesi, 07386, Türkiye",Türkiye,36.8872942,30.7074549
+"Glendale, CA United States",11.301858694881467,2023-03-01,US,CA,Glendale,80962,164,365,United States,"Glendale, Los Angeles County, CAL Fire Contract Counties, California, United States",United States,34.1469416,-118.2478471
+"Midvale, UT United States",11.294906261729011,2023-03-01,US,UT,Midvale,80401,165,366,United States,"Midvale, Salt Lake County, Utah, 84047, United States",United States,40.6149174,-111.9106607
+"Schenectady, NY United States",11.292889579855432,2023-03-01,US,NY,Schenectady,80239,166,367,United States,"City of Schenectady, Schenectady County, New York, United States",United States,42.8142432,-73.9395687
+"Brighton, BNH United Kingdom",11.287303845780478,2023-03-01,GB,BNH,Brighton,79792,29,368,United Kingdom,"Brighton, Brighton and Hove, England, United Kingdom",United Kingdom,50.83891575,-0.12693054250074665
+"Naples, NA Italy",11.28627577432673,2023-03-01,IT,NA,Naples,79710,4,369,Italy,"Napoli, Campania, Italia",Italia,40.8358846,14.2487679
+"Lodz, 10 Poland",11.285748791541852,2023-03-01,PL,10,Lodz,79668,7,370,Poland,"Łódź, województwo łódzkie, Polska",Polska,51.7687323,19.4569911
+"Woodbridge, VA United States",11.278493437886162,2023-03-01,US,VA,Woodbridge,79092,167,371,United States,"Woodbridge, Prince William County, Virginia, 22191, United States",United States,38.6361522,-77.26783643292558
+"Sarasota, FL United States",11.276823312491628,2023-03-01,US,FL,Sarasota,78960,168,372,United States,"Sarasota, Sarasota County, Florida, United States",United States,27.3365805,-82.5308545
+"Gilbert, AZ United States",11.274592130815032,2023-03-01,US,AZ,Gilbert,78784,169,373,United States,"Gilbert, Maricopa County, Arizona, United States",United States,33.3527632,-111.789037
+"Pasadena, CA United States",11.272750193847424,2023-03-01,US,CA,Pasadena,78639,170,374,United States,"Pasadena, Los Angeles County, California, United States",United States,34.1476452,-118.1444779
+"Zapopan, JAL Mexico",11.271592484455809,2023-03-01,MX,JAL,Zapopan,78548,5,375,Mexico,"Zapopan, Jalisco, México",México,20.7211203,-103.3913671
+"Wilmington, DE United States",11.26834119542117,2023-03-01,US,DE,Wilmington,78293,171,376,United States,"Wilmington, New Castle County, Delaware, United States",United States,39.7459468,-75.546589
+"Littleton, CO United States",11.267255079074408,2023-03-01,US,CO,Littleton,78208,172,377,United States,"Littleton, Arapahoe County, Colorado, United States",United States,39.613321,-105.016649
+"Fortaleza, CE Brazil",11.266103786301441,2023-03-01,BR,CE,Fortaleza,78118,7,378,Brazil,"Fortaleza, Região Geográfica Imediata de Fortaleza, Região Geográfica Intermediária de Fortaleza, Ceará, Região Nordeste, Brasil",Brasil,-3.7304512,-38.5217989
+"Dresden, SN Germany",11.265770943694516,2023-03-01,DE,SN,Dresden,78092,16,379,Germany,"Dresden, Sachsen, Deutschland",Deutschland,51.0493286,13.7381437
+"Karlsruhe, BW Germany",11.260404594945342,2023-03-01,DE,BW,Karlsruhe,77674,17,380,Germany,"Karlsruhe, Baden-Württemberg, Deutschland",Deutschland,49.0068705,8.4034195
+"Mountain View, CA United States",11.258768428876687,2023-03-01,US,CA,Mountain View,77547,173,381,United States,"Mountain View, Santa Clara County, CAL Fire Northern Region, California, United States",United States,37.3893889,-122.0832101
+"Paranaque City, 00 Philippines",11.25771058265595,2023-03-01,PH,00,Paranaque City,77465,11,382,Philippines,,,,
+"Boulder, CO United States",11.257555681985695,2023-03-01,US,CO,Boulder,77453,174,383,United States,"Boulder, Boulder County, Colorado, United States",United States,40.0154155,-105.270241
+"Reseda, CA United States",11.256884168342939,2023-03-01,US,CA,Reseda,77401,175,384,United States,"Reseda, Reseda Neighborhood Council District, Los Angeles, Los Angeles County, CAL Fire Contract Counties, California, 91335, United States",United States,34.2006552,-118.536528
+"Las Pinas, 00 Philippines",11.256276835098621,2023-03-01,PH,00,Las Pinas,77354,12,385,Philippines,"Las Piñas, Southern Manila District, Metro Manila, Philippines",Philippines,14.4804237,120.98087
+"Marseille, 13 France",11.249415544489432,2023-03-01,FR,13,Marseille,76825,3,386,France,,,,
+"Denton, TX United States",11.247317946836759,2023-03-01,US,TX,Denton,76664,176,387,United States,"Denton County, Texas, United States",United States,33.1838787,-97.1413417
+"Campinas, SP Brazil",11.246952697680598,2023-03-01,BR,SP,Campinas,76636,8,388,Brazil,"Campinas, Região Imediata de Campinas, Região Metropolitana de Campinas, Região Geográfica Intermediária de Campinas, São Paulo, Região Sudeste, Brasil",Brasil,-22.90556,-47.06083
+"Huntsville, AL United States",11.24688746057632,2023-03-01,US,AL,Huntsville,76631,177,389,United States,"Huntsville, Madison County, Alabama, United States",United States,34.729847,-86.5859011
+"Revere, MA United States",11.242139840178178,2023-03-01,US,MA,Revere,76268,178,390,United States,"Revere, Suffolk County, Massachusetts, 02151, United States",United States,42.4084302,-71.0119948
+"Milton, ON Canada",11.241667770932589,2023-03-01,CA,ON,Milton,76232,33,391,Canada,"Milton, Halton Region, Golden Horseshoe, Ontario, Canada",Canada,43.513671,-79.882817
+"Wolverhampton, WLV United Kingdom",11.237619820919823,2023-03-01,GB,WLV,Wolverhampton,75924,30,392,United Kingdom,"Wolverhampton, Broad Gauge Way, Heath Town, Park Village, Wolverhampton, West Midlands Combined Authority, England, WV10 0BA, United Kingdom",United Kingdom,52.5879884,-2.120242
+"Olympia, WA United States",11.235959106958513,2023-03-01,US,WA,Olympia,75798,179,393,United States,"Olympia, Thurston County, Washington, United States",United States,47.0451022,-122.8950075
+"Chandigarh, CH India",11.235721636806074,2023-03-01,IN,CH,Chandigarh,75780,15,394,India,"Chandigarh, India",India,30.72984395,76.78414567016054
+"McKinney, TX United States",11.235074904431738,2023-03-01,US,TX,McKinney,75731,180,395,United States,"McKinney, Collin County, Texas, United States",United States,33.1976496,-96.6154471
+"Lubbock, TX United States",11.234440964872489,2023-03-01,US,TX,Lubbock,75683,181,396,United States,"Lubbock, Lubbock County, Texas, United States",United States,33.5634402,-101.8792389
+"Kissimmee, FL United States",11.233661196516683,2023-03-01,US,FL,Kissimmee,75624,182,397,United States,"Kissimmee, Osceola County, Florida, United States",United States,28.2918995,-81.4075838
+"Barrie, ON Canada",11.232205765518422,2023-03-01,CA,ON,Barrie,75514,34,398,Canada,"Barrie, Central Ontario, Ontario, Canada",Canada,44.3893113,-79.6901736
+"Bridgeport, CT United States",11.23129173105265,2023-03-01,US,CT,Bridgeport,75445,183,399,United States,"Bridgeport, Greater Bridgeport COG, Connecticut, United States",United States,41.1670412,-73.2048348
+"Pskov, PSK Russia",11.229129166444068,2023-03-01,RU,PSK,Pskov,75282,24,400,Russia,"городской округ Псков, Псковская область, Северо-Западный федеральный округ, Россия",Россия,57.8173923,28.3343465
+"Puebla City, PUE Mexico",11.2240159728804,2023-03-01,MX,PUE,Puebla City,74898,6,401,Mexico,"City Express Puebla Angelópolis, 1755, Circuito Juan Pablo II, Municipio de Puebla, Puebla, 72410, México",México,19.0339111,-98.2254785
+"West Lafayette, IN United States",11.22171718274189,2023-03-01,US,IN,West Lafayette,74726,184,402,United States,"West Lafayette, Tippecanoe County, Indiana, United States",United States,40.4258686,-86.9080655
+"Columbia, MO United States",11.220003019048102,2023-03-01,US,MO,Columbia,74598,185,403,United States,"Columbia, Boone County, Missouri, United States",United States,38.951883,-92.3337366
+"Fairfield, CA United States",11.21923873391915,2023-03-01,US,CA,Fairfield,74541,186,404,United States,"Fairfield, Solano County, California, United States",United States,38.2493581,-122.039966
+"Alpharetta, GA United States",11.21633718304745,2023-03-01,US,GA,Alpharetta,74325,187,405,United States,"Alpharetta, Fulton County, Georgia, United States",United States,34.0709576,-84.2747329
+"Chattanooga, TN United States",11.215219992329114,2023-03-01,US,TN,Chattanooga,74242,188,406,United States,"Chattanooga, Hamilton County, East Tennessee, Tennessee, United States",United States,35.0457219,-85.3094883
+"Oulu, 14 Finland",11.214977545228537,2023-03-01,FI,14,Oulu,74224,3,407,Finland,"Oulu, Oulun seutukunta, Pohjois-Pohjanmaa, Pohjois-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,65.0118734,25.4716809
+"Oshawa, ON Canada",11.2082464256735,2023-03-01,CA,ON,Oshawa,73726,35,408,Canada,"Oshawa, Durham Region, Golden Horseshoe, Ontario, Canada",Canada,43.8975558,-78.8635324
+"Panorama City, CA United States",11.207486670929189,2023-03-01,US,CA,Panorama City,73670,189,409,United States,"Panorama City, Panorama City Neighborhood Council District, Los Angeles, Los Angeles County, CAL Fire Contract Counties, California, 91402, United States",United States,34.2242902,-118.4453745
+"Cambridge, ON Canada",11.206427478260807,2023-03-01,CA,ON,Cambridge,73592,36,410,Canada,"Cambridge, Region of Waterloo, Southwestern Ontario, Ontario, Canada",Canada,43.3600536,-80.3123023
+"Worcester, MA United States",11.20401975606682,2023-03-01,US,MA,Worcester,73415,190,411,United States,"Worcester, Worcester County, Massachusetts, United States",United States,42.2625621,-71.8018877
+"Athens, GA United States",11.201196571359894,2023-03-01,US,GA,Athens,73208,191,412,United States,"Athens-Clarke County Unified Government, Athens-Clarke County, Georgia, United States",United States,33.9597677,-83.376398
+"Aarhus, 82 Denmark",11.19534760016878,2023-03-01,DK,82,Aarhus,72781,3,413,Denmark,"Aarhus, Aarhus Kommune, Region Midtjylland, 8000, Danmark",Danmark,56.1496278,10.2134046
+"Shah Alam, 10 Malaysia",11.190927962103327,2023-03-01,MY,10,Shah Alam,72460,3,414,Malaysia,"Shah Alam, Petaling, Selangor, Malaysia",Malaysia,3.0733644,101.5195149
+"Gustavo Adolfo Madero, CMX Mexico",11.188150547181156,2023-03-01,MX,CMX,Gustavo Adolfo Madero,72259,7,415,Mexico,"Aeropuerto Internacional de la Ciudad de México, Primera Cerrada 661, Gustavo A. Madero, Ciudad de México, 07990, México",México,19.434325299999998,-99.07325169426676
+"Lakeland, FL United States",11.184754675788312,2023-03-01,US,FL,Lakeland,72014,192,416,United States,"Lakeland, Polk County, Florida, United States",United States,28.0394654,-81.9498042
+"Bochum, NW Germany",11.182321973525834,2023-03-01,DE,NW,Bochum,71839,18,417,Germany,"Bochum, Nordrhein-Westfalen, Deutschland",Deutschland,51.4818111,7.2196635
+"Gatineau, QC Canada",11.178766550554732,2023-03-01,CA,QC,Gatineau,71584,37,418,Canada,"Gatineau, Outaouais, Québec, Canada",Canada,45.4277659,-75.710976
+"Cheboksary, CU Russia",11.177718427646736,2023-03-01,RU,CU,Cheboksary,71509,25,419,Russia,"Чебоксары, городской округ Чебоксары, Чувашия, Приволжский федеральный округ, Россия",Россия,56.1307195,47.2449597
+"Elk Grove, CA United States",11.17668320190307,2023-03-01,US,CA,Elk Grove,71435,193,420,United States,"Elk Grove, Sacramento County, CAL Fire Northern Region, California, 95624, United States",United States,38.4087993,-121.3716178
+"West Valley City, UT United States",11.175310575770139,2023-03-01,US,UT,West Valley City,71337,194,421,United States,"West Valley City, Salt Lake County, Utah, United States",United States,40.6967254,-111.986821
+"Kingston, ON Canada",11.175282543364675,2023-03-01,CA,ON,Kingston,71335,38,422,Canada,"Kingston, Eastern Ontario, Ontario, K7L 2Z3, Canada",Canada,44.230687,-76.481323
+"Palatine, IL United States",11.16704914827372,2023-03-01,US,IL,Palatine,70750,195,423,United States,"Palatine, Palatine Township, Cook County, Illinois, United States",United States,42.1105779,-88.0336888
+"Ludhiana, PB India",11.166709916066024,2023-03-01,IN,PB,Ludhiana,70726,16,424,India,"Ludhiana, Ludhiana (West) Tahsil, Ludhiana, Punjab, 141008, India",India,30.9090157,75.851601
+"Bacolod City, NEC Philippines",11.163864319508603,2023-03-01,PH,NEC,Bacolod City,70525,13,425,Philippines,"Bacolod City Police Station 9, Araneta Street, Taloc, Sum-ag, Bacolod-2, Bacolod, Negros Occidental, Western Visayas, 6100, Philippines",Philippines,10.601140000000001,122.91964896504815
+"Sharjah, SH United Arab Emirates",11.162757873639936,2023-03-01,AE,SH,Sharjah,70447,3,426,United Arab Emirates,"مدينة الشارقة, الشارقة, الإمارات العربية المتحدة",الإمارات العربية المتحدة,25.3575436,55.3882729
+"Toulouse, 31 France",11.155621751969083,2023-03-01,FR,31,Toulouse,69946,4,427,France,,,,
+"Plymouth, PLY United Kingdom",11.155078405801317,2023-03-01,GB,PLY,Plymouth,69908,31,428,United Kingdom,"Plymouth, Central Park Avenue, Pennycomequick, Plymouth, England, PL4 6NP, United Kingdom",United Kingdom,50.3780005,-4.1433202
+"Everett, WA United States",11.154634930954094,2023-03-01,US,WA,Everett,69877,196,429,United States,"Everett, Snohomish County, Washington, United States",United States,47.9673056,-122.201399
+"Trondheim, 50 Norway",11.153675780659027,2023-03-01,NO,50,Trondheim,69810,2,430,Norway,"Trondheim, Trøndelag, Norge",Norge,63.4304475,10.3952118
+"Greenville, SC United States",11.152873396388559,2023-03-01,US,SC,Greenville,69754,197,431,United States,"Greenville, Greenville County, South Carolina, United States",United States,34.851354,-82.3984882
+"North Hollywood, CA United States",11.14995934444309,2023-03-01,US,CA,North Hollywood,69551,198,432,United States,"North Hollywood, Los Angeles, Los Angeles County, CAL Fire Contract Counties, California, 91601, United States",United States,34.1649502,-118.3747521
+"Champaign, IL United States",11.149786819103003,2023-03-01,US,IL,Champaign,69539,199,433,United States,"Champaign, Champaign County, Illinois, United States",United States,40.1164841,-88.2430932
+"Nepean, ON Canada",11.14837674692692,2023-03-01,CA,ON,Nepean,69441,39,434,Canada,"Nepean, Ottawa, Eastern Ontario, Ontario, Canada",Canada,45.3446891,-75.7639408
+"Hollywood, FL United States",11.147743005961724,2023-03-01,US,FL,Hollywood,69397,200,435,United States,"Hollywood, Broward County, Florida, United States",United States,26.0112014,-80.1494901
+"Bradenton, FL United States",11.147137696514825,2023-03-01,US,FL,Bradenton,69355,201,436,United States,"Bradenton, Manatee County, Florida, United States",United States,27.4989278,-82.5748194
+"Bellingham, WA United States",11.145478424049585,2023-03-01,US,WA,Bellingham,69240,202,437,United States,"Bellingham, Whatcom County, Washington, United States",United States,48.7544012,-122.478836
+"Garland, TX United States",11.145001776175004,2023-03-01,US,TX,Garland,69207,203,438,United States,"Garland, Dallas County, Texas, United States",United States,32.912624,-96.6388833
+"Angarsk, IRK Russia",11.143527062898457,2023-03-01,RU,IRK,Angarsk,69105,26,439,Russia,"Ангарск, Ангарский городской округ, Иркутская область, Сибирский федеральный округ, Россия",Россия,52.5311117,103.8826109
+"Somerville, MA United States",11.143223175305586,2023-03-01,US,MA,Somerville,69084,204,440,United States,"Somerville, Middlesex County, Massachusetts, United States",United States,42.3875968,-71.0994968
+"Pensacola, FL United States",11.143179755252751,2023-03-01,US,FL,Pensacola,69081,205,441,United States,"Pensacola, Escambia County, Florida, United States",United States,30.421309,-87.2169149
+"Irkutsk, IRK Russia",11.139278740248583,2023-03-01,RU,IRK,Irkutsk,68812,27,442,Russia,"Иркутск, городской округ Иркутск, Иркутская область, Сибирский федеральный округ, Россия",Россия,52.2891225,104.279829
+"Milton Keynes, MIK United Kingdom",11.138377459496786,2023-03-01,GB,MIK,Milton Keynes,68750,32,443,United Kingdom,"Milton Keynes, City of Milton Keynes, England, United Kingdom",United Kingdom,52.0406502,-0.7594092
+"Barnaul, ALT Russia",11.137358907207927,2023-03-01,RU,ALT,Barnaul,68680,28,444,Russia,"Барнаул, городской округ Барнаул, Алтайский край, Сибирский федеральный округ, 656000, Россия",Россия,53.3475493,83.7788448
+"Springfield, MO United States",11.137184194028285,2023-03-01,US,MO,Springfield,68668,206,445,United States,"Springfield, Greene County, Missouri, United States",United States,37.1968298,-93.2946576
+"Wuppertal, NW Germany",11.135508309607221,2023-03-01,DE,NW,Wuppertal,68553,19,446,Germany,"Wuppertal, Nordrhein-Westfalen, Deutschland",Deutschland,51.264018,7.1780374
+"Ocala, FL United States",11.134297010815624,2023-03-01,US,FL,Ocala,68470,207,447,United States,"Ocala, Marion County, Florida, United States",United States,29.1871986,-82.1400923
+"Rockville, MD United States",11.133405842815316,2023-03-01,US,MD,Rockville,68409,208,448,United States,"Rockville, Montgomery County, Maryland, United States",United States,39.0817985,-77.1516844
+"Toledo, OH United States",11.128262484491326,2023-03-01,US,OH,Toledo,68058,209,449,United States,"Toledo, Lucas County, Ohio, United States",United States,41.6529143,-83.5378173
+"Santa Cruz, CA United States",11.126704004428769,2023-03-01,US,CA,Santa Cruz,67952,210,450,United States,"Santa Cruz County, CAL Fire Northern Region, California, United States",United States,37.050096,-121.9905908
+"Winston-Salem, NC United States",11.125452522732143,2023-03-01,US,NC,Winston-Salem,67867,211,451,United States,"Winston-Salem, Forsyth County, North Carolina, United States",United States,36.0998131,-80.2440518
+"Brockton, MA United States",11.12480408117969,2023-03-01,US,MA,Brockton,67823,212,452,United States,"Brockton, Plymouth County, Massachusetts, United States",United States,42.0834335,-71.0183787
+"Edison, NJ United States",11.124125715130965,2023-03-01,US,NJ,Edison,67777,213,453,United States,"Edison, Middlesex County, New Jersey, United States",United States,40.518157,-74.4113926
+"Lahug, CEB Philippines",11.121259706373495,2023-03-01,PH,CEB,Lahug,67583,14,454,Philippines,,,,
+"Bacoor, CAV Philippines",11.120682557031186,2023-03-01,PH,CAV,Bacoor,67544,15,455,Philippines,"Bacoor, Cavite, Calabarzon, 4102, Philippines",Philippines,14.458816,120.959579
+"Dartmouth, NS Canada",11.119764351318228,2023-03-01,CA,NS,Dartmouth,67482,40,456,Canada,"Dartmouth, Halifax Regional Municipality, Halifax County, Nova Scotia, Canada",Canada,44.6799707,-63.5720232
+"Mandaluyong City, 00 Philippines",11.110580484198307,2023-03-01,PH,00,Mandaluyong City,66865,16,457,Philippines,,,,
+"Corona, CA United States",11.11020658253009,2023-03-01,US,CA,Corona,66840,214,458,United States,"Corona, Riverside County, CAL Fire Southern Region, California, United States",United States,33.8752945,-117.5664449
+"Fayetteville, NC United States",11.105543520905284,2023-03-01,US,NC,Fayetteville,66529,215,459,United States,"Fayetteville, Cumberland County, North Carolina, United States",United States,35.0525759,-78.878292
+"Salem, OR United States",11.100979400762375,2023-03-01,US,OR,Salem,66226,216,460,United States,"Salem, Marion County, Oregon, United States",United States,44.9391565,-123.033121
+"Aberdeen, ABE United Kingdom",11.100511267773857,2023-03-01,GB,ABE,Aberdeen,66195,33,461,United Kingdom,"Aberdeen, Guild Street, City Centre, Aberdeen City, Alba / Scotland, AB11 6LX, United Kingdom",United Kingdom,57.1426487,-2.0976346
+"Coquitlam, BC Canada",11.098348973993602,2023-03-01,CA,BC,Coquitlam,66052,41,462,Canada,"Coquitlam, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.2842958,-122.793281
+"Santa Barbara, CA United States",11.097849318442707,2023-03-01,US,CA,Santa Barbara,66019,217,463,United States,"Santa Barbara, Santa Barbara County, CAL Fire Southern Region, California, United States",United States,34.4221319,-119.702667
+"Hamilton, WKO New Zealand",11.097410021008562,2023-03-01,NZ,WKO,Hamilton,65990,4,464,New Zealand,"Hamilton City, Waikato, New Zealand/Aotearoa",New Zealand/Aotearoa,-37.7878809,175.281788
+"East Los Angeles, CA United States",11.096682483690186,2023-03-01,US,CA,East Los Angeles,65942,218,465,United States,"East Los Angeles, Los Angeles County, CAL Fire Contract Counties, California, United States",United States,34.0239015,-118.172015
+"Allentown, PA United States",11.093614950040012,2023-03-01,US,PA,Allentown,65740,219,466,United States,"Allentown, Lehigh County, Pennsylvania, United States",United States,40.6022059,-75.4712794
+"Oxford, OXF United Kingdom",11.092473614553741,2023-03-01,GB,OXF,Oxford,65665,34,467,United Kingdom,"Oxford, Oxfordshire, England, United Kingdom",United Kingdom,51.7520131,-1.2578499
+"North Vancouver, BC Canada",11.092169038293106,2023-03-01,CA,BC,North Vancouver,65645,42,468,Canada,"North Vancouver, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.3206294,-123.0737925
+"Bern, BE Switzerland",11.091955779701022,2023-03-01,CH,BE,Bern,65631,2,469,Switzerland,"Bern, Verwaltungskreis Bern-Mittelland, Verwaltungsregion Bern-Mittelland, Bern/Berne, Schweiz/Suisse/Svizzera/Svizra",Schweiz/Suisse/Svizzera/Svizra,46.9482713,7.4514512
+"Florence, FI Italy",11.090431179994203,2023-03-01,IT,FI,Florence,65531,5,470,Italy,"Firenze, Toscana, Italia",Italia,43.7698712,11.2555757
+"Langley, BC Canada",11.089561116974233,2023-03-01,CA,BC,Langley,65474,43,471,Canada,"City of Langley, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.1039289,-122.657047
+"Kirkland, WA United States",11.086961687384719,2023-03-01,US,WA,Kirkland,65304,220,472,United States,"Kirkland, King County, Washington, United States",United States,47.6859573,-122.1920249
+"Duisburg, NW Germany",11.085904693896348,2023-03-01,DE,NW,Duisburg,65235,20,473,Germany,"Duisburg, Nordrhein-Westfalen, Deutschland",Deutschland,51.434999,6.759562
+"Piscataway, NJ United States",11.085429448791242,2023-03-01,US,NJ,Piscataway,65204,221,474,United States,"Piscataway Township, Middlesex County, New Jersey, United States",United States,40.5462553,-74.4660408
+"Batangas, BTG Philippines",11.079323193612769,2023-03-01,PH,BTG,Batangas,64807,17,475,Philippines,"Batangas, Calabarzon, 4200, Philippines",Philippines,13.7558718,121.0584755
+"Davis, CA United States",11.078165419805039,2023-03-01,US,CA,Davis,64732,222,476,United States,"Davis, Yolo County, California, United States",United States,38.545379,-121.744583
+"Little Rock, AR United States",11.073427762117856,2023-03-01,US,AR,Little Rock,64426,223,477,United States,"Little Rock, Pulaski County, Arkansas, United States",United States,34.7465071,-92.2896267
+"Livonia, MI United States",11.072107752919068,2023-03-01,US,MI,Livonia,64341,224,478,United States,"Livonia, Wayne County, Michigan, United States",United States,42.36837,-83.3527097
+"San Mateo, CA United States",11.071750274227986,2023-03-01,US,CA,San Mateo,64318,225,479,United States,"San Mateo County, CAL Fire Northern Region, California, United States",United States,37.496904,-122.3330573
+"Bergen, 46 Norway",11.06925992304676,2023-03-01,NO,46,Bergen,64158,3,480,Norway,"Bergen, Vestland, Norge",Norge,60.3943055,5.3259192
+"Portsmouth, POR United Kingdom",11.069213169678562,2023-03-01,GB,POR,Portsmouth,64155,35,481,United Kingdom,"Portsmouth, Winchester, Hampshire, England, United Kingdom",United Kingdom,50.8221133,-1.0677602492961795
+"Modesto, CA United States",11.067871976127341,2023-03-01,US,CA,Modesto,64069,226,482,United States,"Modesto, Stanislaus County, CAL Fire Southern Region, California, United States",United States,37.6390972,-120.9968782
+"Bologna, BO Italy",11.065356290839253,2023-03-01,IT,BO,Bologna,63908,6,483,Italy,"Bologna, Emilia-Romagna, Italia",Italia,44.4938203,11.3426327
+"Gurgaon, HR India",11.059440645817386,2023-03-01,IN,HR,Gurgaon,63531,17,484,India,"Gurgaon, Gurugram, Haryana, India",India,28.42826235,77.00270014657752
+"North Bergen, NJ United States",11.058464421523198,2023-03-01,US,NJ,North Bergen,63469,227,485,United States,"North Bergen, Hudson County, New Jersey, United States",United States,40.8042674,-74.012084
+"Fort Myers, FL United States",11.058401406572878,2023-03-01,US,FL,Fort Myers,63465,228,486,United States,"Fort Myers, Lee County, Florida, United States",United States,26.640628,-81.8723084
+"Graz, 6 Austria",11.058086272244264,2023-03-01,AT,6,Graz,63445,2,487,Austria,"Graz, Steiermark, Österreich",Österreich,47.0708678,15.4382786
+"Salvador, BA Brazil",11.053347301208076,2023-03-01,BR,BA,Salvador,63145,9,488,Brazil,"Salvador, Região Geográfica Imediata de Salvador, Região Metropolitana de Salvador, Região Geográfica Intermediária de Salvador, Bahia, Região Nordeste, Brasil",Brasil,-12.9822499,-38.4812772
+"Kelowna, BC Canada",11.052127334803886,2023-03-01,CA,BC,Kelowna,63068,44,489,Canada,"Kelowna, Westbank First Nation #9, Regional District of Central Okanagan, British Columbia, Canada",Canada,49.8879177,-119.495902
+"Ryazan, RYA Russia",11.049269645680628,2023-03-01,RU,RYA,Ryazan,62888,29,490,Russia,"Рязань, городской округ Рязань, Рязанская область, Центральный федеральный округ, Россия",Россия,54.6295687,39.7425039
+"Thornhill, ON Canada",11.048888002702997,2023-03-01,CA,ON,Thornhill,62864,45,491,Canada,"Thornhill, Vaughan, York Region, Golden Horseshoe, Ontario, L4J 4E5, Canada",Canada,43.8161477,-79.4245925
+"Garden Grove, CA United States",11.048410744067487,2023-03-01,US,CA,Garden Grove,62834,229,492,United States,"Garden Grove, Orange County, CAL Fire Contract Counties, California, United States",United States,33.7746292,-117.9463717
+"Hull, KHL United Kingdom",11.047152872252308,2023-03-01,GB,KHL,Hull,62755,36,493,United Kingdom,"Hull, Kingston upon Hull, England, HU1 3RA, United Kingdom",United Kingdom,53.7435722,-0.3394758
+"Eindhoven, NB Netherlands",11.047041338907707,2023-03-01,NL,NB,Eindhoven,62748,6,494,Netherlands,"Eindhoven, Noord-Brabant, Nederland",Nederland,51.4392648,5.478633
+"York, YOR United Kingdom",11.04633998718296,2023-03-01,GB,YOR,York,62704,37,495,United Kingdom,"York, England, YO1 8SG, United Kingdom",United Kingdom,53.9590555,-1.0815361
+"Margate, FL United States",11.03920292915574,2023-03-01,US,FL,Margate,62258,230,496,United States,"Margate, Broward County, Florida, 33063, United States",United States,26.2445263,-80.206436
+"Charleston, SC United States",11.039106566833333,2023-03-01,US,SC,Charleston,62252,231,497,United States,"Charleston, Charleston County, South Carolina, United States",United States,32.7884363,-79.9399309
+"Bhubaneswar, OR India",11.03878529201209,2023-03-01,IN,OR,Bhubaneswar,62232,18,498,India,"Bhubaneswar, Bhubaneswar Municipal Corporation, Bhubaneswar (M.Corp.), Khordha, Odisha, 751001, India",India,20.2602964,85.8394521
+"Torrance, CA United States",11.036211370833005,2023-03-01,US,CA,Torrance,62072,232,499,United States,"Torrance, Los Angeles County, CAL Fire Contract Counties, California, United States",United States,33.8358492,-118.3406288
+"Mérida, YUC Mexico",11.034260433845368,2023-03-01,MX,YUC,Mérida,61951,8,500,Mexico,"Mérida, Yucatán, México",México,20.9670759,-89.6237402
+"Wilmington, NC United States",11.031949863173123,2023-03-01,US,NC,Wilmington,61808,233,501,United States,"Wilmington, New Hanover County, North Carolina, United States",United States,34.2257282,-77.9447107
+"Chapel Hill, NC United States",11.030994992857726,2023-03-01,US,NC,Chapel Hill,61749,234,502,United States,"Chapel Hill, Orange County, North Carolina, United States",United States,35.9131542,-79.05578
+"West Jordan, UT United States",11.030314698685258,2023-03-01,US,UT,West Jordan,61707,235,503,United States,"West Jordan, Salt Lake County, Utah, United States",United States,40.6061337,-111.9395211
+"General Trias, CAV Philippines",11.030023002306708,2023-03-01,PH,CAV,General Trias,61689,18,504,Philippines,"General Trias, Cavite, Calabarzon, 4107, Philippines",Philippines,14.3861637,120.8802798
+"Oceanside, CA United States",11.029990586345086,2023-03-01,US,CA,Oceanside,61687,236,505,United States,"Oceanside, San Diego County, CAL Fire Southern Region, California, United States",United States,33.1958696,-117.3794834
+"Lausanne, VD Switzerland",11.028855365179414,2023-03-01,CH,VD,Lausanne,61617,3,506,Switzerland,"Lausanne, District de Lausanne, Vaud, Schweiz/Suisse/Svizzera/Svizra",Schweiz/Suisse/Svizzera/Svizra,46.5218269,6.6327025
+"Ilford, RDB United Kingdom",11.027686363081715,2023-03-01,GB,RDB,Ilford,61545,38,507,United Kingdom,"Ilford, York Place, London Borough of Redbridge, London, Greater London, England, IG1 3AA, United Kingdom",United Kingdom,51.5589375,0.0689113
+"West Palm Beach, FL United States",11.026434666219032,2023-03-01,US,FL,West Palm Beach,61468,237,508,United States,"West Palm Beach, Palm Beach County, Florida, United States",United States,26.715364,-80.0532942
+"Arlington Heights, IL United States",11.026353333004943,2023-03-01,US,IL,Arlington Heights,61463,238,509,United States,"Arlington Heights, Wheeling Township, Cook County, Illinois, United States",United States,42.0811563,-87.9802164
+"West Bloomfield, MI United States",11.025246544044485,2023-03-01,US,MI,West Bloomfield,61395,239,510,United States,"West Bloomfield Township, Oakland County, Michigan, United States",United States,42.5685582,-83.3733531
+"Huntington Beach, CA United States",11.0241385287448,2023-03-01,US,CA,Huntington Beach,61327,240,511,United States,"Huntington Beach, Orange County, CAL Fire Contract Counties, California, United States",United States,33.6783336,-118.0000166
+"Maple, ON Canada",11.02394286912669,2023-03-01,CA,ON,Maple,61315,46,512,Canada,"Maple, 30, Station Street, Maple, Vaughan, York Region, Golden Horseshoe, Ontario, L6A 1P5, Canada",Canada,43.8594952,-79.5068973
+"Amersfoort, UT Netherlands",11.023469866940431,2023-03-01,NL,UT,Amersfoort,61286,7,513,Netherlands,"Amersfoort, Utrecht, Nederland",Nederland,52.1562499,5.3896944
+"Naples, FL United States",11.022653820151987,2023-03-01,US,FL,Naples,61236,241,514,United States,"Naples, Collier County, Florida, United States",United States,26.1421976,-81.7942944
+"Querétaro City, QUE Mexico",11.021788082873664,2023-03-01,MX,QUE,Querétaro City,61183,9,515,Mexico,"City Express Querétaro, Lateral Carretera México Querétaro, Cimatario, Delegación Centro Histórico, Santiago de Querétaro, Municipio de Querétaro, Querétaro, 76096, México",México,20.5771714,-100.3880453
+"Walsall, WLL United Kingdom",11.018350415789994,2023-03-01,GB,WLL,Walsall,60973,39,516,United Kingdom,"Walsall, Station Street, New Mills, Caldmore, Walsall, West Midlands Combined Authority, England, WS2 9JZ, United Kingdom",United Kingdom,52.5841365,-1.9852679
+"Lille, 59 France",11.015789048327752,2023-03-01,FR,59,Lille,60817,5,517,France,,,,
+"Cumming, GA United States",11.014044880972106,2023-03-01,US,GA,Cumming,60711,242,518,United States,"Cumming, Forsyth County, Georgia, United States",United States,34.2073196,-84.1401926
+"Ithaca, NY United States",11.012924377287385,2023-03-01,US,NY,Ithaca,60643,243,519,United States,"City of Ithaca, Ulysses, Tompkins County, New York, United States",United States,42.4396039,-76.4968019
+"Boca Raton, FL United States",11.012495617386358,2023-03-01,US,FL,Boca Raton,60617,244,520,United States,"Boca Raton, Palm Beach County, Florida, United States",United States,26.3586885,-80.0830984
+"Fredericksburg, VA United States",11.009439506507624,2023-03-01,US,VA,Fredericksburg,60432,245,521,United States,"Fredericksburg, Virginia, 22401, United States",United States,38.3031837,-77.4605399
+"Concepción, BI Chile",11.005477463942288,2023-03-01,CL,BI,Concepción,60193,2,522,Chile,"Concepción, Provincia de Concepción, Región del Biobío, Chile",Chile,-36.8270795,-73.0502399
+"State College, PA United States",11.00537779616812,2023-03-01,US,PA,State College,60187,246,523,United States,"State College, Centre County, Pennsylvania, United States",United States,40.7944504,-77.8616386
+"Corpus Christi, TX United States",11.00258305776964,2023-03-01,US,TX,Corpus Christi,60019,247,524,United States,"Corpus Christi, Nueces County, Texas, United States",United States,27.7635302,-97.4033191
+"Bielefeld, NW Germany",11.000815683693476,2023-03-01,DE,NW,Bielefeld,59913,21,525,Germany,"Bielefeld, Nordrhein-Westfalen, Deutschland",Deutschland,52.0191005,8.531007
+"Cabanatuan City, NUE Philippines",10.994521195680687,2023-03-01,PH,NUE,Cabanatuan City,59537,19,526,Philippines,"Cabanatuan City Batching Plant, Ciudad de Real, Cabanatuan, Nueva Ecija, Central Luzon, Philippines",Philippines,15.49738935,120.98202271588312
+"Swindon, SWD United Kingdom",10.99410127109297,2023-03-01,GB,SWD,Swindon,59512,40,527,United Kingdom,"Swindon, England, SN1 1LF, United Kingdom",United Kingdom,51.5613683,-1.7856853
+"Brno, 642 Czechia",10.98979106473664,2023-03-01,CZ,642,Brno,59256,2,528,Czechia,"Brno, okres Brno-město, Jihomoravský kraj, Jihovýchod, Česko",Česko,49.1922443,16.6113382
+"Antioch, CA United States",10.989588567267166,2023-03-01,US,CA,Antioch,59244,248,529,United States,"Antioch, Contra Costa County, CAL Fire Northern Region, California, United States",United States,38.0049214,-121.805789
+"Kent, WA United States",10.988203736012126,2023-03-01,US,WA,Kent,59162,249,530,United States,"Kent, King County, Washington, United States",United States,47.3826903,-122.2270272
+"Troy, MI United States",10.984292222554274,2023-03-01,US,MI,Troy,58931,250,531,United States,"Troy, Oakland County, Michigan, United States",United States,42.6055893,-83.1499304
+"Sandy, UT United States",10.983630324920576,2023-03-01,US,UT,Sandy,58892,251,532,United States,"Sandy, Salt Lake County, Utah, United States",United States,40.5710454,-111.8953815
+"Iasi, IS Romania",10.982305213876058,2023-03-01,RO,IS,Iasi,58814,3,533,Romania,"Iași, Zona Metropolitană Iași, Iași, România",România,47.1615416,27.5837224
+"Bothell, WA United States",10.98220320948978,2023-03-01,US,WA,Bothell,58808,252,534,United States,"Bothell, King County, Washington, United States",United States,47.7598697,-122.2068288
+"Santa Rosa, CA United States",10.981114514795102,2023-03-01,US,CA,Santa Rosa,58744,253,535,United States,"Santa Rosa, Sonoma County, CAL Fire Northern Region, California, United States",United States,38.4404925,-122.7141049
+"Savannah, GA United States",10.977772995046502,2023-03-01,US,GA,Savannah,58548,254,536,United States,"Savannah, Chatham County, Georgia, United States",United States,32.0564572,-81.0951271
+"Lancaster, PA United States",10.976525590084808,2023-03-01,US,PA,Lancaster,58475,255,537,United States,"Lancaster, Lancaster County, Pennsylvania, United States",United States,40.03813,-76.3056686
+"Harrisburg, PA United States",10.973803242049124,2023-03-01,US,PA,Harrisburg,58316,256,538,United States,"Harrisburg, Dauphin County, Pennsylvania, United States",United States,40.2663107,-76.8861122
+"Ogden, UT United States",10.970626373827352,2023-03-01,US,UT,Ogden,58131,257,539,United States,"Ogden, Weber County, Utah, United States",United States,41.2230048,-111.9738429
+"Lanham, MD United States",10.969352795244081,2023-03-01,US,MD,Lanham,58057,258,540,United States,"Lanham, Glenn Dale, Prince George's County, Maryland, 20706, United States",United States,38.965365000000006,-76.84179265424164
+"Hillsboro, OR United States",10.965020832962818,2023-03-01,US,OR,Hillsboro,57806,259,541,United States,"Hillsboro, Washington County, Oregon, United States",United States,45.5228939,-122.989827
+"Recife, PE Brazil",10.964813256418221,2023-03-01,BR,PE,Recife,57794,10,542,Brazil,"Recife, Região Geográfica Imediata do Recife, Região Metropolitana do Recife, Região Geográfica Intermediária do Recife, Pernambuco, Região Nordeste, Brasil",Brasil,-8.0584933,-34.8848193
+"Gold Coast, QLD Australia",10.964328743517239,2023-03-01,AU,QLD,Gold Coast,57766,7,543,Australia,"Gold Coast City, Queensland, Australia",Australia,-28.0023731,153.4145987
+"Turku, 19 Finland",10.963653494818272,2023-03-01,FI,19,Turku,57727,4,544,Finland,"Turku, Turun seutukunta, Varsinais-Suomi, Lounais-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,60.4517531,22.2670522
+"Columbus, GA United States",10.960704765837852,2023-03-01,US,GA,Columbus,57557,260,545,United States,"Columbus, Muscogee County, Georgia, United States",United States,32.4610708,-84.9880449
+"Edmond, OK United States",10.95835691825632,2023-03-01,US,OK,Edmond,57422,261,546,United States,"Edmond, Oklahoma County, Oklahoma, United States",United States,35.6571367,-97.4649038
+"Northampton, NTH United Kingdom",10.953837037955589,2023-03-01,GB,NTH,Northampton,57163,41,547,United Kingdom,,,,
+"Sioux Falls, SD United States",10.949173635394832,2023-03-01,US,SD,Sioux Falls,56897,262,548,United States,"Sioux Falls, Sioux Falls Township, Minnehaha County, South Dakota, United States",United States,43.5488256,-96.7307737
+"Reston, VA United States",10.948241857301557,2023-03-01,US,VA,Reston,56844,263,549,United States,"Reston, Fairfax County, Virginia, United States",United States,38.955696,-77.34188283719988
+"Hialeah, FL United States",10.947731648720744,2023-03-01,US,FL,Hialeah,56815,264,550,United States,"Hialeah, Miami-Dade County, Florida, United States",United States,25.8575963,-80.2781057
+"Evansville, IN United States",10.947450042861481,2023-03-01,US,IN,Evansville,56799,265,551,United States,"Evansville, Vanderburgh County, Indiana, United States",United States,37.9747645,-87.5558483
+"West Haven, CT United States",10.94577637281795,2023-03-01,US,CT,West Haven,56704,266,552,United States,"West Haven, South Central COG, Connecticut, 06516, United States",United States,41.2706527,-72.9470471
+"Uppsala, C Sweden",10.943887931455823,2023-03-01,SE,C,Uppsala,56597,4,553,Sweden,"Uppsala, Uppsala kommun, Uppsala län, 753 20, Sverige",Sverige,59.8586126,17.6387436
+"Kalamazoo, MI United States",10.943287118573286,2023-03-01,US,MI,Kalamazoo,56563,267,554,United States,"Kalamazoo, Kalamazoo County, Michigan, United States",United States,42.291707,-85.5872286
+"Almere Stad, FL Netherlands",10.94238522187658,2023-03-01,NL,FL,Almere Stad,56512,8,555,Netherlands,"Almere Stad, Almere, Flevoland, Nederland, 1315 JA, Nederland",Nederland,52.3722582,5.2176582
+"Cape Coral, FL United States",10.942066711088758,2023-03-01,US,FL,Cape Coral,56494,268,556,United States,"Cape Coral, Lee County, Florida, United States",United States,26.6059432,-81.9806771
+"Canton, MI United States",10.941411675702279,2023-03-01,US,MI,Canton,56457,269,557,United States,"Canton, Madison County, Mississippi, 39046, United States",United States,32.612602,-90.0367512
+"Bloomfield, NJ United States",10.939124542042725,2023-03-01,US,NJ,Bloomfield,56328,270,558,United States,"Bloomfield, Essex County, New Jersey, 07003, United States",United States,40.806767,-74.1854226
+"Springfield, VA United States",10.937579097686422,2023-03-01,US,VA,Springfield,56241,271,559,United States,"Springfield, Fairfax County, Virginia, United States",United States,38.7767435,-77.1807019310668
+"Seville, SE Spain",10.937525763878996,2023-03-01,ES,SE,Seville,56238,4,560,Spain,"Sevilla, Andalucía, España",España,37.3886303,-5.9953403
+"Málaga, MA Spain",10.935425707936245,2023-03-01,ES,MA,Málaga,56120,5,561,Spain,"Málaga, Málaga-Costa del Sol, Málaga, Andalucía, España",España,36.7213028,-4.4216366
+"East Lansing, MI United States",10.930836537091798,2023-03-01,US,MI,East Lansing,55863,272,562,United States,"East Lansing, Ingham County, Michigan, United States",United States,42.7320307,-84.4721678
+"Kaluga, KLU Russia",10.926172265858327,2023-03-01,RU,KLU,Kaluga,55603,30,563,Russia,"Калуга, городской округ Калуга, Калужская область, Центральный федеральный округ, Россия",Россия,54.5101087,36.2598115
+"Concord, NC United States",10.926136302397198,2023-03-01,US,NC,Concord,55601,273,564,United States,"Concord, Cabarrus County, North Carolina, United States",United States,35.4094178,-80.5800049
+"Wiesbaden, HE Germany",10.924534617586627,2023-03-01,DE,HE,Wiesbaden,55512,22,565,Germany,"Wiesbaden, Hessen, Deutschland",Deutschland,50.0820384,8.2416556
+"Secaucus, NJ United States",10.921865448493632,2023-03-01,US,NJ,Secaucus,55364,274,566,United States,"Secaucus, Hudson County, New Jersey, United States",United States,40.7899291,-74.0566735
+"Orange, CA United States",10.920763241257452,2023-03-01,US,CA,Orange,55303,275,567,United States,"Orange County, CAL Fire Contract Counties, California, United States",United States,33.7500378,-117.8704931
+"Mainz, RP Germany",10.918102100465982,2023-03-01,DE,RP,Mainz,55156,23,568,Germany,"Mainz, Rheinland-Pfalz, Deutschland",Deutschland,50.0012314,8.2762513
+"Adana, 01 Turkey",10.91608796454769,2023-03-01,TR,01,Adana,55045,6,569,Turkey,"Adana, Seyhan, Adana, Akdeniz Bölgesi, 01010, Türkiye",Türkiye,36.9863599,35.3252861
+"George Town, 07 Malaysia",10.914615625171118,2023-03-01,MY,07,George Town,54964,4,570,Malaysia,"Bandaraya George Town, Timur Laut, Pulau Pinang, Malaysia",Malaysia,5.4141619,100.3287352
+"Córdoba, X Argentina",10.913560024017496,2023-03-01,AR,X,Córdoba,54906,3,571,Argentina,"Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5000, Argentina",Argentina,-31.4166867,-64.1834193
+"Gloucester, GLS United Kingdom",10.909911450209336,2023-03-01,GB,GLS,Gloucester,54706,42,572,United Kingdom,"Gloucester, Gloucestershire, England, United Kingdom",United Kingdom,51.8653705,-2.2458192
+"Bhopal, MP India",10.909801787057871,2023-03-01,IN,MP,Bhopal,54700,19,573,India,"Bhopal, Huzur Tahsil, Bhopal, Madhya Pradesh, 462001, India",India,23.2584857,77.401989
+"Peoria, AZ United States",10.907917358643626,2023-03-01,US,AZ,Peoria,54597,276,574,United States,"Peoria, Maricopa County, Arizona, United States",United States,33.5806115,-112.237294
+"Asheville, NC United States",10.903163093344213,2023-03-01,US,NC,Asheville,54338,277,575,United States,"Asheville, Buncombe County, North Carolina, United States",United States,35.6009498,-82.5540161
+"Provo, UT United States",10.900971099687215,2023-03-01,US,UT,Provo,54219,278,576,United States,"Provo, Utah County, Utah, United States",United States,40.2337289,-111.6587085
+"Ghent, VOV Belgium",10.89812725082126,2023-03-01,BE,VOV,Ghent,54065,3,577,Belgium,"Gent, Oost-Vlaanderen, Vlaanderen, België / Belgique / Belgien",België / Belgique / Belgien,51.0538286,3.7250121
+"Newport News, VA United States",10.895405102533275,2023-03-01,US,VA,Newport News,53918,279,578,United States,"Newport News, Virginia, 23607, United States",United States,36.9775016,-76.42977
+"Islamabad, IS Pakistan",10.89347474333262,2023-03-01,PK,IS,Islamabad,53814,3,579,Pakistan,"اسلام آباد, وفاقی دارالحکومت اسلام آباد, 44000, پاکستان",پاکستان,33.6938118,73.0651511
+"Ajax, ON Canada",10.891615108028965,2023-03-01,CA,ON,Ajax,53714,47,580,Canada,"Ajax, Durham Region, Golden Horseshoe, Ontario, Canada",Canada,43.8505287,-79.0208814
+"Columbus, IN United States",10.888053565157241,2023-03-01,US,IN,Columbus,53523,280,581,United States,"Columbus, Bartholomew County, Indiana, 47201, United States",United States,39.2014405,-85.9213796
+"Krasnoyarsk, KYA Russia",10.885640928509986,2023-03-01,RU,KYA,Krasnoyarsk,53394,31,582,Russia,"Красноярск, Красноярский кадастровый район, Красноярский край, Сибирский федеральный округ, 660000, Россия",Россия,56.0090968,92.8725147
+"St. John's, NL Canada",10.883616560433461,2023-03-01,CA,NL,St. John's,53286,48,583,Canada,"St. John's, Newfoundland, Newfoundland and Labrador, Canada",Canada,47.5614705,-52.7126162
+"Melbourne, FL United States",10.882828198121395,2023-03-01,US,FL,Melbourne,53244,281,584,United States,"Melbourne, Brevard County, Florida, United States",United States,28.106471,-80.6371513
+"Tarlac City, TAR Philippines",10.882508922311338,2023-03-01,PH,TAR,Tarlac City,53227,20,585,Philippines,"Tarlac City, Tarlac, Central Luzon, 2300, Philippines",Philippines,15.4861218,120.5893473
+"Münster, NW Germany",10.881794878160589,2023-03-01,DE,NW,Münster,53189,24,586,Germany,"Münster, Nordrhein-Westfalen, Deutschland",Deutschland,51.9625101,7.6251879
+"Santa Monica, CA United States",10.88156928456649,2023-03-01,US,CA,Santa Monica,53177,282,587,United States,"Santa Monica, Los Angeles County, CAL Fire Contract Counties, California, United States",United States,34.0194704,-118.491227
+"Montgomery, AL United States",10.879367075821941,2023-03-01,US,AL,Montgomery,53060,283,588,United States,"Montgomery, Montgomery County, Alabama, United States",United States,32.3669656,-86.3006485
+"Baguio City, BEN Philippines",10.878198124539677,2023-03-01,PH,BEN,Baguio City,52998,21,589,Philippines,,,,
+"Talavera, NUE Philippines",10.877556506129638,2023-03-01,PH,NUE,Talavera,52964,22,590,Philippines,"Talavera, Nueva Ecija, Central Luzon, 3133, Philippines",Philippines,15.5843049,120.917903
+"Pompano Beach, FL United States",10.876668884613583,2023-03-01,US,FL,Pompano Beach,52917,284,591,United States,"Pompano Beach, Broward County, Florida, United States",United States,26.2378597,-80.1247667
+"Dorchester, MA United States",10.876649990486822,2023-03-01,US,MA,Dorchester,52916,285,592,United States,"Dorchester County, Maryland, United States",United States,38.3930694,-76.0995677
+"Herndon, VA United States",10.872048101843964,2023-03-01,US,VA,Herndon,52673,286,593,United States,"Herndon, Fairfax County, Virginia, 20170, United States",United States,38.9695316,-77.3859479
+"Guadalupe, NLE Mexico",10.869520376305097,2023-03-01,MX,NLE,Guadalupe,52540,10,594,Mexico,"Guadalupe, Nuevo León, México",México,25.676639799999997,-100.20007207261435
+"Frederick, MD United States",10.86767280951953,2023-03-01,US,MD,Frederick,52443,287,595,United States,"Frederick, Frederick County, Maryland, United States",United States,39.415779,-77.4127562
+"Geneva, GE Switzerland",10.865057530609043,2023-03-01,CH,GE,Geneva,52306,4,596,Switzerland,"Genève, Schweiz/Suisse/Svizzera/Svizra",Schweiz/Suisse/Svizzera/Svizra,46.2017559,6.1466014
+"Centreville, VA United States",10.863450612866469,2023-03-01,US,VA,Centreville,52222,288,597,United States,"Centreville, Fairfax County, Virginia, United States",United States,38.84487,-77.43540260778344
+"Lynnwood, WA United States",10.857651936838364,2023-03-01,US,WA,Lynnwood,51920,289,598,United States,"Lynnwood, Snohomish County, Washington, 98037, United States",United States,47.8278656,-122.3053932
+"Blacksburg, VA United States",10.856727188188485,2023-03-01,US,VA,Blacksburg,51872,290,599,United States,"Blacksburg, Montgomery County, Virginia, United States",United States,37.2296566,-80.4136767
+"Fullerton, CA United States",10.85445020594156,2023-03-01,US,CA,Fullerton,51754,291,600,United States,"Fullerton, Orange County, CAL Fire Southern Region, California, United States",United States,33.8708215,-117.9294165
+"Pomona, CA United States",10.85400578295951,2023-03-01,US,CA,Pomona,51731,292,601,United States,"Pomona, Los Angeles County, California, United States",United States,34.0553813,-117.7517496
+"Abbotsford, BC Canada",10.852148664440733,2023-03-01,CA,BC,Abbotsford,51635,49,602,Canada,"Abbotsford, Fraser Valley Regional District, British Columbia, Canada",Canada,49.0521162,-122.329479
+"Olathe, KS United States",10.85145135486515,2023-03-01,US,KS,Olathe,51599,293,603,United States,"Olathe, Johnson County, Kansas, United States",United States,38.8838856,-94.81887
+"Laurel, MD United States",10.849453584720033,2023-03-01,US,MD,Laurel,51496,294,604,United States,"Laurel, Prince George's County, Maryland, 20707, United States",United States,39.1044123,-76.8669233
+"Florianópolis, SC Brazil",10.845446031158861,2023-03-01,BR,SC,Florianópolis,51290,11,605,Brazil,"Florianópolis, Região Geográfica Imediata de Florianópolis, Região Geográfica Intermediária de Florianópolis, Santa Catarina, Região Sul, Brasil",Brasil,-27.5973002,-48.5496098
+"Greensburg, PA United States",10.843904883186518,2023-03-01,US,PA,Greensburg,51211,295,606,United States,"Greensburg, Westmoreland County, Pennsylvania, 15601, United States",United States,40.3014581,-79.5389289
+"Oryol, ORL Russia",10.843631520432442,2023-03-01,RU,ORL,Oryol,51197,32,607,Russia,"городской округ Орёл, Орловская область, Центральный федеральный округ, Россия",Россия,52.9687747,36.0694937
+"Gaithersburg, MD United States",10.843299479451629,2023-03-01,US,MD,Gaithersburg,51180,296,608,United States,"Gaithersburg, Montgomery County, Maryland, United States",United States,39.1399187,-77.1929215
+"Clifton, NJ United States",10.843025951129974,2023-03-01,US,NJ,Clifton,51166,297,609,United States,"Clifton, Passaic County, New Jersey, United States",United States,40.8584328,-74.1637553
+"Naperville, IL United States",10.842107129893346,2023-03-01,US,IL,Naperville,51119,298,610,United States,"Naperville, DuPage County, Illinois, United States",United States,41.7728699,-88.1479278
+"Chino, CA United States",10.84009058572216,2023-03-01,US,CA,Chino,51016,299,611,United States,"Chino, San Bernardino County, CAL Fire Southern Region, California, United States",United States,34.0133561,-117.690075
+"South Jordan, UT United States",10.839718157189832,2023-03-01,US,UT,South Jordan,50997,300,612,United States,"South Jordan, Salt Lake County, Utah, 84095, United States",United States,40.5584882,-111.9367107
+"Darmstadt, HE Germany",10.834548663313733,2023-03-01,DE,HE,Darmstadt,50734,25,613,Germany,"Darmstadt, Hessen, Deutschland",Deutschland,49.8851869,8.6736295
+"Meridian, ID United States",10.831627800767432,2023-03-01,US,ID,Meridian,50586,301,614,United States,"Meridian, Ada County, Idaho, United States",United States,43.6086295,-116.392326
+"Ypsilanti, MI United States",10.831094019308606,2023-03-01,US,MI,Ypsilanti,50559,302,615,United States,"Ypsilanti, Washtenaw County, Michigan, 48197, United States",United States,42.2410562,-83.613055
+"Clarksville, TN United States",10.831094019308606,2023-03-01,US,TN,Clarksville,50559,303,616,United States,"Clarksville, Montgomery County, Tennessee, United States",United States,36.5277607,-87.3588703
+"Espoo, 18 Finland",10.827607555524617,2023-03-01,FI,18,Espoo,50383,5,617,Finland,"Espoo, Helsingin seutukunta, Uusimaa, Etelä-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,60.2047672,24.6568435
+"Kota Kinabalu, 12 Malaysia",10.827250299248984,2023-03-01,MY,12,Kota Kinabalu,50365,5,618,Malaysia,"Kota Kinabalu, Kota Kinabalu District, Sabah, 88000, Malaysia",Malaysia,5.9780066,116.0728988
+"Manassas, VA United States",10.827151038739697,2023-03-01,US,VA,Manassas,50360,304,619,United States,"Manassas, Virginia, United States",United States,38.7509488,-77.4752667
+"Augsburg, BY Germany",10.826515538062948,2023-03-01,DE,BY,Augsburg,50328,26,620,Germany,"Augsburg, Bayern, Deutschland",Deutschland,48.3668041,10.8986971
+"Renton, WA United States",10.826058522367434,2023-03-01,US,WA,Renton,50305,305,621,United States,"Renton, King County, Washington, United States",United States,47.4799078,-122.2034496
+"Hampton, VA United States",10.826038647381097,2023-03-01,US,VA,Hampton,50304,306,622,United States,"Hampton, Virginia, United States",United States,37.0300969,-76.3452057
+"Glendale, AZ United States",10.825859754726151,2023-03-01,US,AZ,Glendale,50295,307,623,United States,"Glendale, Maricopa County, Arizona, United States",United States,33.5386858,-112.185994
+"Preston, LAN United Kingdom",10.82404915126093,2023-03-01,GB,LAN,Preston,50204,43,624,United Kingdom,"Preston, Lancashire, England, United Kingdom",United Kingdom,53.7593363,-2.6992717
+"Kearny, NJ United States",10.82355115816278,2023-03-01,US,NJ,Kearny,50179,308,625,United States,"Kearny, Hudson County, New Jersey, 07032, United States",United States,40.7684342,-74.1454214
+"Coimbatore, TN India",10.822594315669765,2023-03-01,IN,TN,Coimbatore,50131,20,626,India,"Coimbatore, Coimbatore North, Coimbatore District, Tamil Nadu, 641001, India",India,11.0018115,76.9628425
+"Royal Oak, MI United States",10.82093761213013,2023-03-01,US,MI,Royal Oak,50048,309,627,United States,"Royal Oak, Oakland County, Michigan, United States",United States,42.4894801,-83.1446485
+"Luton, LUT United Kingdom",10.820837723006973,2023-03-01,GB,LUT,Luton,50043,44,628,United Kingdom,"Luton, England, LU1 2YN, United Kingdom",United Kingdom,51.8784385,-0.4152837
+"Walnut Creek, CA United States",10.819298169173406,2023-03-01,US,CA,Walnut Creek,49966,310,629,United States,"Walnut Creek, Contra Costa County, CAL Fire Northern Region, California, United States",United States,37.9020731,-122.0618702
+"Maple Heights, OH United States",10.817696118205959,2023-03-01,US,OH,Maple Heights,49886,311,630,United States,"Maple Heights, Cuyahoga County, Ohio, 44137, United States",United States,41.4153313,-81.565956
+"Round Lake, IL United States",10.817475635347607,2023-03-01,US,IL,Round Lake,49875,312,631,United States,"Round Lake, Lake County, Illinois, United States",United States,42.353355,-88.0934145
+"Rockford, IL United States",10.816392559306074,2023-03-01,US,IL,Rockford,49821,313,632,United States,"Rockford, Rockford Township, Winnebago County, Illinois, United States",United States,42.2713945,-89.093966
+"Reading, PA United States",10.815448926249054,2023-03-01,US,PA,Reading,49774,314,633,United States,"Reading, Berks County, Pennsylvania, United States",United States,40.335345,-75.9279495
+"Palo Alto, CA United States",10.814363651708785,2023-03-01,US,CA,Palo Alto,49720,315,634,United States,"Palo Alto, Santa Clara County, CAL Fire Northern Region, California, United States",United States,37.4443293,-122.1598465
+"Fayetteville, AR United States",10.814122319554127,2023-03-01,US,AR,Fayetteville,49708,316,635,United States,"Fayetteville, Washington County, Arkansas, United States",United States,36.0625843,-94.1574328
+"St. Catharines, ON Canada",10.813820572436036,2023-03-01,CA,ON,St. Catharines,49693,50,636,Canada,"St. Catharines, Niagara Region, Golden Horseshoe, Ontario, Canada",Canada,43.1579812,-79.2441003
+"Aachen, NW Germany",10.81106039379056,2023-03-01,DE,NW,Aachen,49556,27,637,Germany,"Aachen, Städteregion Aachen, Nordrhein-Westfalen, Deutschland",Deutschland,50.776351,6.083862
+"Cork, CO Ireland",10.8104549569494,2023-03-01,IE,CO,Cork,49526,2,638,Ireland,"Cork, County Cork, Munster, Éire / Ireland",Éire / Ireland,51.897077,-8.4654674
+"San Pablo City, LAG Philippines",10.808697114399466,2023-03-01,PH,LAG,San Pablo City,49439,23,639,Philippines,"San Pablo City (Host) Lions Club, Dagatan Boulevard, V-C, San Pablo, Laguna, Calabarzon, 4000, Philippines",Philippines,14.07477645,121.3260380832028
+"Swansea, SWA United Kingdom",10.806693044861628,2023-03-01,GB,SWA,Swansea,49340,45,640,United Kingdom,"Swansea, Cymru / Wales, SA1 3BN, United Kingdom",United Kingdom,51.6195955,-3.9459248
+"Kuching, 13 Malaysia",10.802835563679972,2023-03-01,MY,13,Kuching,49150,6,641,Malaysia,"Kuching, Kuching Division, Sarawak, 93000, Malaysia",Malaysia,1.5574127,110.3439862
+"Fargo, ND United States",10.802510042843764,2023-03-01,US,ND,Fargo,49134,317,642,United States,"Fargo, Cass County, North Dakota, United States",United States,46.877229,-96.789821
+"Huddersfield, KIR United Kingdom",10.802082635874594,2023-03-01,GB,KIR,Huddersfield,49113,46,643,United Kingdom,"Huddersfield, Kirklees, West Yorkshire, England, HD1 2AA, United Kingdom",United Kingdom,53.6466645,-1.7822482
+"Urbana, IL United States",10.801186523719151,2023-03-01,US,IL,Urbana,49069,318,644,United States,"Urbana, Champaign County, Illinois, United States",United States,40.1117174,-88.207301
+"Ipswich, SFK United Kingdom",10.80108464196303,2023-03-01,GB,SFK,Ipswich,49064,47,645,United Kingdom,"Ipswich, Suffolk, England, United Kingdom",United Kingdom,52.0579495,1.1526345
+"Port Saint Lucie, FL United States",10.800758550573029,2023-03-01,US,FL,Port Saint Lucie,49048,319,646,United States,"Port Saint Lucie, Saint Lucie County, Florida, United States",United States,27.2939333,-80.3503283
+"Sunderland, SND United Kingdom",10.798186858166806,2023-03-01,GB,SND,Sunderland,48922,48,647,United Kingdom,"Sunderland, St. Thomas Street, Ashbrooke, Sunderland, North East, England, SR1 1SB, United Kingdom",United Kingdom,54.9061115,-1.3824404
+"Green Bay, WI United States",10.79427584399786,2023-03-01,US,WI,Green Bay,48731,320,648,United States,"Green Bay, Brown County, Wisconsin, United States",United States,44.5126379,-88.0125794
+"York, PA United States",10.792242634215762,2023-03-01,US,PA,York,48632,321,649,United States,"York County, Pennsylvania, United States",United States,39.9067499,-76.7008946
+"Cypress, TX United States",10.79170797381519,2023-03-01,US,TX,Cypress,48606,322,650,United States,"Cypress, Harris County, Texas, 77433, United States",United States,29.9691116,-95.6971686
+"Dearborn, MI United States",10.79127592393757,2023-03-01,US,MI,Dearborn,48585,323,651,United States,"Dearborn, Wayne County, Michigan, United States",United States,42.3222599,-83.1763145
+"Evanston, IL United States",10.790678976585008,2023-03-01,US,IL,Evanston,48556,324,652,United States,"Evanston, Evanston Township, Cook County, Illinois, United States",United States,42.0447388,-87.6930459
+"Hobart, TAS Australia",10.7892778389619,2023-03-01,AU,TAS,Hobart,48488,8,653,Australia,"Hobart, City of Hobart, Tasmania, 7000, Australia",Australia,-42.8825088,147.3281233
+"Tula, TUL Russia",10.789215978827643,2023-03-01,RU,TUL,Tula,48485,33,654,Russia,"Тула, городской округ Тула, Тульская область, Центральный федеральный округ, Россия",Россия,54.1930321,37.61754
+"Surat, GJ India",10.788328896136694,2023-03-01,IN,GJ,Surat,48442,21,655,India,"Surat, Gujarat, India",India,21.19177615,72.9544157804841
+"Waltham, MA United States",10.788205054571177,2023-03-01,US,MA,Waltham,48436,325,656,United States,"Waltham, Middlesex County, Massachusetts, United States",United States,42.3756401,-71.2358004
+"Rochester, MN United States",10.78808119766703,2023-03-01,US,MN,Rochester,48430,326,657,United States,"Rochester, Olmsted County, Minnesota, United States",United States,44.0234387,-92.4630182
+"Timișoara, TM Romania",10.786262865072466,2023-03-01,RO,TM,Timișoara,48342,4,658,Romania,"Timișoara, Timiș, România",România,45.7538355,21.2257474
+"Barnsley, BNS United Kingdom",10.785787073542922,2023-03-01,GB,BNS,Barnsley,48319,49,659,United Kingdom,"TLC Homecare, Stocks Lane, TLC Homecare, Keresforth Hill, Barnsley, South Yorkshire Mayoral Combined Authority, England, S75 2BL, United Kingdom",United Kingdom,53.55361955,-1.497111913911556
+"Brookline, MA United States",10.785228246650878,2023-03-01,US,MA,Brookline,48292,327,660,United States,"Brookline, Norfolk County, Massachusetts, United States",United States,42.3317642,-71.1211635
+"Odense, 83 Denmark",10.784855521821017,2023-03-01,DK,83,Odense,48274,4,661,Denmark,"Odense, Odense Kommune, Region Syddanmark, 5000, Danmark",Danmark,55.3997225,10.3852104
+"Oxnard, CA United States",10.782512459217795,2023-03-01,US,CA,Oxnard,48161,328,662,United States,"Oxnard, Ventura County, CAL Fire Contract Counties, California, United States",United States,34.1976308,-119.1803818
+"Lancaster, CA United States",10.781785616900187,2023-03-01,US,CA,Lancaster,48126,329,663,United States,"Lancaster, Los Angeles County, CAL Fire Southern Region, California, United States",United States,34.6981064,-118.1366153
+"Novi, MI United States",10.781536292153415,2023-03-01,US,MI,Novi,48114,330,664,United States,"Novi, Oakland County, Michigan, United States",United States,42.48059,-83.4754913
+"El Cajon, CA United States",10.781432388492796,2023-03-01,US,CA,El Cajon,48109,331,665,United States,"El Cajon, San Diego County, CAL Fire Southern Region, California, United States",United States,32.7947731,-116.962526
+"Winter Park, FL United States",10.779893350711369,2023-03-01,US,FL,Winter Park,48035,332,666,United States,"Winter Park, Orange County, Florida, United States",United States,28.5977707,-81.3510264
+"Ludwigshafen am Rhein, RP Germany",10.77881044592198,2023-03-01,DE,RP,Ludwigshafen am Rhein,47983,28,667,Germany,"Ludwigshafen am Rhein, Rheinland-Pfalz, Deutschland",Deutschland,49.4704113,8.4381568
+"Aurora, IL United States",10.778351940641137,2023-03-01,US,IL,Aurora,47961,333,668,United States,"Aurora, Aurora Township, Kane County, Illinois, United States",United States,41.7571701,-88.3147539
+"Imus, CAV Philippines",10.774718155003685,2023-03-01,PH,CAV,Imus,47787,24,669,Philippines,"Imus, Cavite, Calabarzon, 4103, Philippines",Philippines,14.4290116,120.9365911
+"San Leandro, CA United States",10.774571691572204,2023-03-01,US,CA,San Leandro,47780,334,670,United States,"San Leandro, Alameda County, California, United States",United States,37.7249296,-122.1560768
+"Brantford, ON Canada",10.773378261575965,2023-03-01,CA,ON,Brantford,47723,51,671,Canada,"Brantford, Southwestern Ontario, Ontario, Canada",Canada,43.1408157,-80.2631733
+"Rancho Cucamonga, CA United States",10.771595935483736,2023-03-01,US,CA,Rancho Cucamonga,47638,335,672,United States,"Rancho Cucamonga, San Bernardino County, CAL Fire Southern Region, California, United States",United States,34.1033192,-117.5751735
+"Saint Augustine, FL United States",10.77132306414088,2023-03-01,US,FL,Saint Augustine,47625,336,673,United States,"Saint Augustine, Saint Johns County, Florida, 32084, United States",United States,29.8946952,-81.3145395
+"Szczecin, 32 Poland",10.768716542159835,2023-03-01,PL,32,Szczecin,47501,8,674,Poland,"32, Szczecin, gmina Dmosin, powiat brzeziński, województwo łódzkie, 90-061, Polska",Polska,51.9190536,19.7140403
+"Grand Prairie, TX United States",10.768084910001393,2023-03-01,US,TX,Grand Prairie,47471,337,675,United States,"Grand Prairie, Dallas County, Texas, United States",United States,32.7459645,-96.9977846
+"Farmington Hills, MI United States",10.765153129746336,2023-03-01,US,MI,Farmington Hills,47332,338,676,United States,"Farmington Hills, Oakland County, Michigan, United States",United States,42.4853125,-83.3771553
+"Appleton, WI United States",10.764117571984855,2023-03-01,US,WI,Appleton,47283,339,677,United States,"Appleton, Outagamie County, Wisconsin, United States",United States,44.2613967,-88.4069744
+"Carlsbad, CA United States",10.763821501264086,2023-03-01,US,CA,Carlsbad,47269,340,678,United States,"Carlsbad, San Diego County, CAL Fire Southern Region, California, United States",United States,33.1580933,-117.3505966
+"Belgorod, BEL Russia",10.758051805772519,2023-03-01,RU,BEL,Belgorod,46997,34,679,Russia,"Белгород, Белгородский район, Белгородская область, Центральный федеральный округ, Россия",Россия,50.5955595,36.5873394
+"Iloilo City, ILI Philippines",10.75577295443437,2023-03-01,PH,ILI,Iloilo City,46890,25,680,Philippines,"Iloilo River, Villa de Arevalo, Oton, Iloilo, Western Visayas, 5020, Philippines",Philippines,10.6997852,122.5142094
+"Westland, MI United States",10.754620905152855,2023-03-01,US,MI,Westland,46836,341,681,United States,"Westland, Wayne County, Michigan, United States",United States,42.3238056,-83.4005321
+"Allen, TX United States",10.753638481905739,2023-03-01,US,TX,Allen,46790,342,682,United States,"Allen, Collin County, Texas, United States",United States,33.1031744,-96.6705503
+"Cedar Rapids, IA United States",10.752034632323763,2023-03-01,US,IA,Cedar Rapids,46715,343,683,United States,"Cedar Rapids, Linn County, Iowa, United States",United States,41.9758872,-91.6704053
+"Apex, NC United States",10.750792555754964,2023-03-01,US,NC,Apex,46657,344,684,United States,"Apex, Wake County, North Carolina, 27502, United States",United States,35.7325352,-78.8505516
+"Quincy, MA United States",10.749398737647702,2023-03-01,US,MA,Quincy,46592,345,685,United States,"Quincy, Norfolk County, Massachusetts, United States",United States,42.2509914,-71.0037374
+"Culiacán, SIN Mexico",10.747573116161046,2023-03-01,MX,SIN,Culiacán,46507,11,686,Mexico,"Culiacán, Culiacán Rosales, Culiacán, Sinaloa, 80220, México",México,24.7978965,-107.393395
+"San Luis Obispo, CA United States",10.747315112676567,2023-03-01,US,CA,San Luis Obispo,46495,346,687,United States,"San Luis Obispo County, California, United States",United States,35.3540209,-120.3757163
+"Norman, OK United States",10.745528763777509,2023-03-01,US,OK,Norman,46412,347,688,United States,"Norman, Cleveland County, Oklahoma, United States",United States,35.2225717,-97.4394816
+"Columbia, MD United States",10.74542105042418,2023-03-01,US,MD,Columbia,46407,348,689,United States,"Columbia, Howard County, Maryland, United States",United States,39.1938429,-76.86460919353361
+"Lublin, 06 Poland",10.743070011325619,2023-03-01,PL,06,Lublin,46298,9,690,Poland,"Lublin, województwo lubelskie, Polska",Polska,51.250559,22.5701022
+"Mobile, AL United States",10.742746040739314,2023-03-01,US,AL,Mobile,46283,349,691,United States,"Mobile, Mobile County, Alabama, United States",United States,30.6867339,-88.0848929
+"Watford, HRT United Kingdom",10.741665380134448,2023-03-01,GB,HRT,Watford,46233,50,692,United Kingdom,"Watford, Hertfordshire, England, United Kingdom",United Kingdom,51.6553875,-0.3957425
+"Malden, MA United States",10.741059699698878,2023-03-01,US,MA,Malden,46205,350,693,United States,"Malden, Middlesex County, Massachusetts, 02148, United States",United States,42.4250964,-71.066163
+"Goiânia, GO Brazil",10.73960890204718,2023-03-01,BR,GO,Goiânia,46138,12,695,Brazil,"Goiânia, Região Geográfica Imediata de Goiânia, Região Geográfica Intermediária de Goiânia, Goiás, Região Centro-Oeste, Brasil",Brasil,-16.680882,-49.2532691
+"New Westminster, BC Canada",10.733980715911525,2023-03-01,CA,BC,New Westminster,45879,52,701,Canada,"New Westminster, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.2067726,-122.9108818
+"Kanata, ON Canada",10.730028616266605,2023-03-01,CA,ON,Kanata,45698,53,704,Canada,"Kanata, Ottawa, Eastern Ontario, Ontario, Canada",Canada,45.3128048,-75.8940505
+"Nagpur, MH India",10.729350167917552,2023-03-01,IN,MH,Nagpur,45667,22,705,India,"Nagpur Urban Taluka, Nagpur, Maharashtra, India",India,21.1498134,79.0820556
+"Gillingham, KEN United Kingdom",10.724434104027946,2023-03-01,GB,KEN,Gillingham,45443,51,707,United Kingdom,"Premier Inn Gillingham Business Park, Will Adams Way, Rainham Mark, Hale, Gillingham, Kent, England, ME8 6BY, United Kingdom",United Kingdom,51.3702311,0.5693389980515183
+"Ciudad Juárez, CHH Mexico",10.723817893264371,2023-03-01,MX,CHH,Ciudad Juárez,45415,12,708,Mexico,"Ciudad Juárez, Municipio de Juárez, Chihuahua, 32390, México",México,31.7097961,-106.455581
+"Chita, ZAB Russia",10.71843192346452,2023-03-01,RU,ZAB,Chita,45171,35,714,Russia,"Чита, городской округ Чита, Забайкальский край, Дальневосточный федеральный округ, 672000, Россия",Россия,52.033409,113.500893
+"Lipa City, BTG Philippines",10.715439468861323,2023-03-01,PH,BTG,Lipa City,45036,26,715,Philippines,"Lot 4 Block 14 Crimson St., Sunnyvale 1, Summerhills Subd., Bugtong, Lipa City, Lipa, Batangas, Calabarzon, Philippines",Philippines,13.99993485,121.17047153278304
+"Bournemouth, ENG United Kingdom",10.71499537968092,2023-03-01,GB,ENG,Bournemouth,45016,52,716,United Kingdom,"Bournemouth, Bournemouth, Christchurch and Poole, England, BH2 6EG, United Kingdom",United Kingdom,50.720097,-1.8799272
+"Stockport, SKP United Kingdom",10.714706615920985,2023-03-01,GB,SKP,Stockport,45003,53,717,United Kingdom,"Stockport, Station Road, Shaw Heath, Stockport, Greater Manchester, England, SK3 9DY, United Kingdom",United Kingdom,53.4054501,-2.1630435
+"Mexicali, BCN Mexico",10.714662183325226,2023-03-01,MX,BCN,Mexicali,45001,13,718,Mexico,"Mexicali, Municipio de Mexicali, Baja California, 21000, México",México,32.6405247,-115.474899
+"Whitby, ON Canada",10.708243189657656,2023-03-01,CA,ON,Whitby,44713,54,723,Canada,"Whitby, Durham Region, Golden Horseshoe, Ontario, Canada",Canada,43.87982,-78.9421751
+"Sutton Coldfield, BIR United Kingdom",10.688324731580726,2023-03-01,GB,BIR,Sutton Coldfield,43831,54,734,United Kingdom,"Sutton Coldfield, Birmingham, West Midlands Combined Authority, England, United Kingdom",United Kingdom,52.5623089,-1.8239794
+"Fredericton, NB Canada",10.684164725581436,2023-03-01,CA,NB,Fredericton,43649,55,736,Canada,"Fredericton, Kingsclear Parish, York County / Comté d'York, New Brunswick / Nouveau-Brunswick, Canada",Canada,45.94780155,-66.65347069241668
+"Newport, NWP United Kingdom",10.682995898744117,2023-03-01,GB,NWP,Newport,43598,55,738,United Kingdom,"Newport, Queensway, City Centre, Stow Hill, Newport, Gwent, Cymru / Wales, NP20 4AX, United Kingdom",United Kingdom,51.5887675,-3.000425
+"Moncton, NB Canada",10.67968828823136,2023-03-01,CA,NB,Moncton,43454,56,742,Canada,"Moncton, Westmorland County, New Brunswick / Nouveau-Brunswick, Canada",Canada,46.097995,-64.80011
+"Colchester, ESS United Kingdom",10.67690049281473,2023-03-01,GB,ESS,Colchester,43333,56,745,United Kingdom,"Colchester, Essex, England, United Kingdom",United Kingdom,51.8896903,0.8994651
+"Padova, PD Italy",10.676531276241942,2023-03-01,IT,PD,Padova,43317,7,746,Italy,"Padova, Veneto, Italia",Italia,45.4077172,11.8734455
+"Strasbourg, 67 France",10.675954102300329,2023-03-01,FR,67,Strasbourg,43292,6,747,France,,,,
+"Rotherham, ROT United Kingdom",10.667978173164208,2023-03-01,GB,ROT,Rotherham,42948,57,752,United Kingdom,"Rotherham Masborough, Midland Road, Masbrough, Rotherham, South Yorkshire Mayoral Combined Authority, England, S61 1TE, United Kingdom",United Kingdom,53.4309765,-1.3717391
+"Nanaimo, BC Canada",10.662328836291437,2023-03-01,CA,BC,Nanaimo,42706,57,754,Canada,"Nanaimo, Regional District of Nanaimo, British Columbia, Canada",Canada,49.163877,-123.938122
+"Nasugbu, BTG Philippines",10.657823901408495,2023-03-01,PH,BTG,Nasugbu,42514,27,756,Philippines,"Nasugbu, Batangas, Calabarzon, 4231, Philippines",Philippines,14.0734578,120.6322736
+"Newmarket, ON Canada",10.654832883999834,2023-03-01,CA,ON,Newmarket,42387,58,758,Canada,"Newmarket, York Region, Golden Horseshoe, Ontario, Canada",Canada,44.056258,-79.461708
+"Arnhem, GE Netherlands",10.644090674252368,2023-03-01,NL,GE,Arnhem,41934,9,764,Netherlands,"Arnhem, Gelderland, Nederland",Nederland,51.984257,5.9108573
+"Johor Bahru, 01 Malaysia",10.643255879980666,2023-03-01,MY,01,Johor Bahru,41899,7,766,Malaysia,"Johor Bahru, Iskandar Malaysia, Johor, 80350, Malaysia",Malaysia,1.503555,103.7495586
+"Exeter, DEV United Kingdom",10.641058234397995,2023-03-01,GB,DEV,Exeter,41807,58,769,United Kingdom,"Exeter, Devon, England, United Kingdom",United Kingdom,50.7255794,-3.5269497
+"Bath, BAS United Kingdom",10.631156925467801,2023-03-01,GB,BAS,Bath,41395,59,776,United Kingdom,"Bath, Bath and North East Somerset, West of England, England, United Kingdom",United Kingdom,51.3813864,-2.3596963
+"Carmona, CAV Philippines",10.621059017006598,2023-03-01,PH,CAV,Carmona,40979,28,781,Philippines,"Carmona, Cavite, Calabarzon, 4116, Philippines",Philippines,14.3134763,121.0573969
+"Hermosillo, SON Mexico",10.618176044083802,2023-03-01,MX,SON,Hermosillo,40861,14,784,Mexico,"Hermosillo, Sonora, 83140, México",México,29.0948207,-110.9692202
+"Chiang Mai, 50 Thailand",10.615431953178978,2023-03-01,TH,50,Chiang Mai,40749,2,785,Thailand,"ไก่ย่างรสวิเศษ, 428/8 ม.เชียงใหม่แลนด์ ซอย.7 ถ.ช้างคลาน ต.ช้างคลาน อ.เมือง จ.เชียงใหม่ Amphoe Muang Chiang Mai, Chiang Mai, Thailand 50100, ถนน เชียงใหม่แลนด์ ซอย 7, Chiang Mai Land, เชียงใหม่, ป่าแดด, อำเภอสารภี, 50100, ประเทศไทย",ประเทศไทย,18.7648492,98.9946263
+"Peterborough, PTE United Kingdom",10.612138919632038,2023-03-01,GB,PTE,Peterborough,40615,60,788,United Kingdom,"Peterborough, City of Peterborough, Cambridgeshire and Peterborough, England, PE1 1XH, United Kingdom",United Kingdom,52.5725769,-0.2427336
+"Bordeaux, 33 France",10.606882049547623,2023-03-01,FR,33,Bordeaux,40402,7,794,France,,,,
+"Groningen, GR Netherlands",10.60512360049198,2023-03-01,NL,GR,Groningen,40331,10,796,Netherlands,"Groningen, Nederland",Nederland,53.2190652,6.5680077
+"Oldham, OLD United Kingdom",10.603411717375097,2023-03-01,GB,OLD,Oldham,40262,61,798,United Kingdom,"Oldham Werneth, Railway Road, Werneth, Chadderton, Oldham, Greater Manchester, England, OL9 6HA, United Kingdom",United Kingdom,53.5389311,-2.1283381
+"Lund, M Sweden",10.60194560541465,2023-03-01,SE,M,Lund,40203,5,800,Sweden,"Lund, Lunds kommun, Skåne län, Sverige",Sverige,55.7029296,13.1929449
+"Middlesbrough, MDB United Kingdom",10.597259537864915,2023-03-01,GB,MDB,Middlesbrough,40015,62,805,United Kingdom,"Middlesbrough, Tees Valley, England, United Kingdom",United Kingdom,54.5760419,-1.2344047
+"Dasmarinas, CAV Philippines",10.593680373269637,2023-03-01,PH,CAV,Dasmarinas,39872,29,807,Philippines,"Dasmariñas, Cavite, Calabarzon, Philippines",Philippines,14.3270819,120.9370871
+"Kosekoy, 41 Turkey",10.592225024607373,2023-03-01,TR,41,Kosekoy,39814,7,808,Turkey,"Köseköy, Köseköy Mahallesi, Kartepe, Kocaeli, Marmara Bölgesi, 41250, Türkiye",Türkiye,40.7383047,30.0027503
+"Orleans, ON Canada",10.581521095286025,2023-03-01,CA,ON,Orleans,39390,59,816,Canada,"Orléans, Ottawa, Eastern Ontario, Ontario, Canada",Canada,45.40683715,-75.52745676171389
+"St Helens, SHN United Kingdom",10.578903459065758,2023-03-01,GB,SHN,St Helens,39287,63,817,United Kingdom,"St Helens, Liverpool City Region, England, United Kingdom",United Kingdom,53.4486075,-2.7359820790816323
+"Manaus, AM Brazil",10.578776214794761,2023-03-01,BR,AM,Manaus,39282,13,818,Brazil,"Manaus, Região Geográfica Imediata de Manaus, Região Geográfica Intermediária de Manaus, Amazonas, Região Norte, 69000-000, Brasil",Brasil,-3.1316333,-59.9825041
+"Dundee, DND United Kingdom",10.575232326835637,2023-03-01,GB,DND,Dundee,39143,64,820,United Kingdom,"Dundee, Dundee City, Alba / Scotland, DD1 1SA, United Kingdom",United Kingdom,56.4605938,-2.97019
+"Wembley, BEN United Kingdom",10.57203461622784,2023-03-01,GB,BEN,Wembley,39018,65,822,United Kingdom,"Wembley Stadium, Atlantic Crescent, London Borough of Brent, London, Greater London, England, HA9 0PY, United Kingdom",United Kingdom,51.55606945,-0.27960339379401444
+"Taguig, 00 Philippines",10.566149752083353,2023-03-01,PH,00,Taguig,38789,30,827,Philippines,"Taguig, Southern Manila District, Metro Manila, Philippines",Philippines,14.5270538,121.0744942
+"Gelsenkirchen, NW Germany",10.563827410119956,2023-03-01,DE,NW,Gelsenkirchen,38699,29,830,Germany,"Gelsenkirchen, Nordrhein-Westfalen, Deutschland",Deutschland,51.5110321,7.0960124
+"Nijmegen, GE Netherlands",10.560800280086857,2023-03-01,NL,GE,Nijmegen,38582,11,833,Netherlands,"Nijmegen, Gelderland, Nederland",Nederland,51.842574850000005,5.838960628748229
+"Zaragoza, Z Spain",10.55984107226706,2023-03-01,ES,Z,Zaragoza,38545,6,836,Spain,"Zaragoza, Aragón, España",España,41.6521342,-0.8809428
+"Iztapalapa, CMX Mexico",10.557270009573797,2023-03-01,MX,CMX,Iztapalapa,38446,15,837,Mexico,"Iztapalapa, Ciudad de México, México",México,19.3591195,-99.0929294
+"Lethbridge, AB Canada",10.556593683558889,2023-03-01,CA,AB,Lethbridge,38420,60,838,Canada,"Lethbridge, Alberta, Canada",Canada,49.6945782,-112.8331033
+"Kassel, HE Germany",10.555734610523901,2023-03-01,DE,HE,Kassel,38387,30,839,Germany,"Kassel, Hessen, Deutschland",Deutschland,51.3154546,9.4924096
+"Ecatepec, MEX Mexico",10.553205175168737,2023-03-01,MX,MEX,Ecatepec,38290,16,841,Mexico,"Ecatepec de Morelos, Estado de México, México",México,19.5994083,-99.0487281
+"Delft, ZH Netherlands",10.548704199338523,2023-03-01,NL,ZH,Delft,38118,12,845,Netherlands,"Delft, Zuid-Holland, Nederland",Nederland,51.999457199999995,4.362724538543995
+"Bedford, BDF United Kingdom",10.54069910076577,2023-03-01,GB,BDF,Bedford,37814,66,850,United Kingdom,"Bedford, Central Bedfordshire, England, MK40 1SU, United Kingdom",United Kingdom,52.1363806,-0.4675041
+"Brasov, BV Romania",10.540011470154983,2023-03-01,RO,BV,Brasov,37788,5,851,Romania,"Brașov, Zona Metropolitană Brașov, Brașov, România",România,45.6523093,25.6102746
+"Thunder Bay, ON Canada",10.539588077716799,2023-03-01,CA,ON,Thunder Bay,37772,61,852,Canada,"Thunder Bay District, Northwestern Ontario, Ontario, Canada",Canada,49.809661,-88.4811791
+"Trivandrum, KL India",10.533854664973365,2023-03-01,IN,KL,Trivandrum,37556,23,856,India,"Thiruvananthapuram, Kerala, 695001, India",India,8.4882267,76.947551
+"Wakefield, WKF United Kingdom",10.533375393456883,2023-03-01,GB,WKF,Wakefield,37538,67,857,United Kingdom,"Netherton, Wakefield, West Yorkshire, England, WF4 4NA, United Kingdom",United Kingdom,53.6431036,-1.5826839
+"Wigan, WGN United Kingdom",10.530494930591528,2023-03-01,GB,WGN,Wigan,37430,68,859,United Kingdom,"Holy Family Catholic Primary School, New Springs, Wigan, Longfield Street, New Springs, Aspull, Wigan, Greater Manchester, England, WN2 1EL, United Kingdom",United Kingdom,53.55693865,-2.6042755130312267
+"Thrissur, KL India",10.529773516588858,2023-03-01,IN,KL,Thrissur,37403,24,860,India,"Thrissur, Kerala, 680001, India",India,10.5256264,76.2132542
+"Rawalpindi, PB Pakistan",10.527579359655915,2023-03-01,PK,PB,Rawalpindi,37321,4,862,Pakistan,"راولپنڈی, راولپنڈی چھاؤنی, ضلع راولپنڈی, پنجاب, 23451, پاکستان",پاکستان,33.5914237,73.0535122
+"Osaka, 27 Japan",10.524037158179487,2023-03-01,JP,27,Osaka,37189,2,863,Japan,"大阪, Bデッキ, グランフロント大阪, 北区, 大阪市, 大阪府, 530-0011, 日本",日本,34.7021912,135.4955866
+"Amadora, 11 Portugal",10.522207479208133,2023-03-01,PT,11,Amadora,37121,3,864,Portugal,"Amadora, Lisboa, Portugal",Portugal,38.7595162,-9.223677009460125
+"Red Deer, AB Canada",10.520752110257845,2023-03-01,CA,AB,Red Deer,37067,62,870,Canada,"City of Red Deer, Alberta, Canada",Canada,52.2690628,-113.8141464
+"Maple Ridge, BC Canada",10.518267704021968,2023-03-01,CA,BC,Maple Ridge,36975,63,871,Canada,"Maple Ridge, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.2197345,-122.599707
+"Braunschweig, NI Germany",10.517429174915097,2023-03-01,DE,NI,Braunschweig,36944,31,872,Germany,"Braunschweig, Niedersachsen, Deutschland",Deutschland,52.2646577,10.5236066
+"Lincoln, LIN United Kingdom",10.50687412588845,2023-03-01,GB,LIN,Lincoln,36556,69,875,United Kingdom,"Lincoln, Lincolnshire, England, United Kingdom",United Kingdom,53.2336301,-0.5392172
+"Rosario, S Argentina",10.506162829931998,2023-03-01,AR,S,Rosario,36530,4,878,Argentina,"Rosario, Municipio de Rosario, Gran Rosario, Departamento Rosario, Santa Fe, S2000, Argentina",Argentina,-32.9595004,-60.6615415
+"Haarlem, NH Netherlands",10.50525930200491,2023-03-01,NL,NH,Haarlem,36497,13,880,Netherlands,"Haarlem, Noord-Holland, Nederland",Nederland,52.383705750000004,4.643559696559635
+"Ipoh, 08 Malaysia",10.502131727439028,2023-03-01,MY,08,Ipoh,36383,8,881,Malaysia,"Ipoh, Kinta, Perak, 30450, Malaysia",Malaysia,4.5986817,101.0900236
+"Santo André, SP Brazil",10.500866948606694,2023-03-01,BR,SP,Santo André,36337,14,882,Brazil,"Santo André, Região Imediata de São Paulo, Região Metropolitana de São Paulo, Região Geográfica Intermediária de São Paulo, São Paulo, Região Sudeste, Brasil",Brasil,-23.6533349,-46.5279079
+"Montpellier, 34 France",10.498663515870101,2023-03-01,FR,34,Montpellier,36257,8,886,France,,,,
+"Amstelveen, NH Netherlands",10.49615119451775,2023-03-01,NL,NH,Amstelveen,36166,14,889,Netherlands,"Amstelveen, Noord-Holland, Nederland",Nederland,52.3025582,4.8467875
+"Peterborough, ON Canada",10.49107975408703,2023-03-01,CA,ON,Peterborough,35983,64,891,Canada,"Peterborough, Central Ontario, Ontario, Canada",Canada,44.3048009,-78.3199496
+"Doncaster, DNC United Kingdom",10.49044053668967,2023-03-01,GB,DNC,Doncaster,35960,70,892,United Kingdom,"Doncaster, Food Mall, City Centre, Hexthorpe, Doncaster, South Yorkshire Mayoral Combined Authority, England, DN1 1PE, United Kingdom",United Kingdom,53.5219538,-1.1399149
+"Ploieşti, PH Romania",10.487126739641525,2023-03-01,RO,PH,Ploieşti,35841,6,894,Romania,"Ploiești, Prahova, România",România,44.9417468,26.0236504
+"Chiyoda-ku, 13 Japan",10.473421354781692,2023-03-01,JP,13,Chiyoda-ku,35353,3,904,Japan,"千代田区, 東京都, 日本",日本,35.6938097,139.7532163
+"Nantes, 44 France",10.463903020642116,2023-03-01,FR,44,Nantes,35018,9,907,France,,,,
+"Kamloops, BC Canada",10.462045638444781,2023-03-01,CA,BC,Kamloops,34953,65,908,Canada,"Kamloops, Thompson-Nicola Regional District, British Columbia, Canada",Canada,50.6758269,-120.339415
+"Genoa, GE Italy",10.45757379496002,2023-03-01,IT,GE,Genoa,34797,8,911,Italy,"Genova, Liguria, Italia",Italia,44.40726,8.9338624
+"Pickering, ON Canada",10.449989152754588,2023-03-01,CA,ON,Pickering,34534,66,918,Canada,"Pickering, Durham Region, Golden Horseshoe, Ontario, Canada",Canada,43.835765,-79.090576
+"Dehradun, UT India",10.449583790384038,2023-03-01,IN,UT,Dehradun,34520,25,919,India,"Dehradun, Uttarakhand, 248001, India",India,30.3255646,78.0436813
+"Chihuahua City, CHH Mexico",10.449149291137577,2023-03-01,MX,CHH,Chihuahua City,34505,17,920,Mexico,"Chihuahua, Municipio de Chihuahua, Chihuahua, 31100, México",México,28.6523808,-106.0902046
+"Linköping, E Sweden",10.44287147821008,2023-03-01,SE,E,Linköping,34289,6,929,Sweden,"Linköping, Linköpings kommun, Östergötlands län, 582 19, Sverige",Sverige,58.4098135,15.6245252
+"Tilburg, NB Netherlands",10.437580383240466,2023-03-01,NL,NB,Tilburg,34108,15,939,Netherlands,"Tilburg, Noord-Brabant, Nederland",Nederland,51.58561845,5.0660616131367675
+"Sherwood Park, AB Canada",10.436319256564733,2023-03-01,CA,AB,Sherwood Park,34065,67,940,Canada,"Sherwood Park, Strathcona County, Alberta, Canada",Canada,53.5256963,-113.2966313
+"Greater Sudbury, ON Canada",10.434586281141675,2023-03-01,CA,ON,Greater Sudbury,34006,68,943,Canada,"Greater Sudbury, Sudbury District, Northeastern Ontario, Ontario, Canada",Canada,46.49272,-80.991211
+"Mönchengladbach, NW Germany",10.427890584715806,2023-03-01,DE,NW,Mönchengladbach,33779,32,952,Germany,"Mönchengladbach, Nordrhein-Westfalen, Deutschland",Deutschland,51.1946983,6.4353641
+"Konya, 42 Turkey",10.426587537177507,2023-03-01,TR,42,Konya,33735,8,953,Turkey,"Konya, Selçuklu, Konya, İç Anadolu Bölgesi, 42200, Türkiye",Türkiye,37.872734,32.4924376
+"Newcastle, NSW Australia",10.422430144404066,2023-03-01,AU,NSW,Newcastle,33595,9,958,Australia,"Newcastle, Newcastle-Maitland, Newcastle City Council, New South Wales, 2300, Australia",Australia,-32.9192953,151.7795348
+"Port Coquitlam, BC Canada",10.41529269641562,2023-03-01,CA,BC,Port Coquitlam,33356,69,963,Canada,"Port Coquitlam, Metro Vancouver Regional District, British Columbia, Canada",Canada,49.2621643,-122.780542
+"Offenbach, HE Germany",10.414393173102289,2023-03-01,DE,HE,Offenbach,33326,33,964,Germany,"Offenbach am Main, Hessen, Deutschland",Deutschland,50.1055002,8.7610698
+"Kiel, SH Germany",10.410305154904579,2023-03-01,DE,SH,Kiel,33190,34,969,Germany,"Kiel, Schleswig-Holstein, Deutschland",Deutschland,54.3227085,10.135555
+"Longueuil, QC Canada",10.409672424652523,2023-03-01,CA,QC,Longueuil,33169,70,971,Canada,"Longueuil, Longueuil (agglomeration), Montérégie, Québec, Canada",Canada,45.5333387,-73.4200318
+"Hamm, NW Germany",10.40867732468349,2023-03-01,DE,NW,Hamm,33136,35,974,Germany,"Hamm, Nordrhein-Westfalen, Deutschland",Deutschland,51.6804093,7.815197
+"Lviv, 46 Ukraine",10.407862414806656,2023-03-01,UA,46,Lviv,33109,2,977,Ukraine,"Львів, Львівська міська громада, Львівський район, Львівська область, Україна",Україна,49.841952,24.0315921
+"New Delhi, DL India",10.406895734974256,2023-03-01,IN,DL,New Delhi,33077,26,978,India,"New Delhi, Delhi, India",India,28.6138954,77.2090057
+"Vantaa, 18 Finland",10.405050409022934,2023-03-01,FI,18,Vantaa,33016,6,983,Finland,"Vantaa, Helsingin seutukunta, Uusimaa, Etelä-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,60.2921321,25.0411832
+"Stavanger, 11 Norway",10.402625136506927,2023-03-01,NO,11,Stavanger,32936,4,986,Norway,"Stavanger, Rogaland, 4006, Norge",Norge,58.9699675,5.7318101
+"Subang Jaya, 10 Malaysia",10.402200108418317,2023-03-01,MY,10,Subang Jaya,32922,9,987,Malaysia,"Subang Jaya, Petaling, Selangor, Malaysia",Malaysia,3.051487,101.5823339
+"Calamba, LAG Philippines",10.393416350589133,2023-03-01,PH,LAG,Calamba,32634,31,990,Philippines,"Calamba, Laguna, Calabarzon, Philippines",Philippines,14.2060217,121.1556496
+"Limerick, LK Ireland",10.391331099910195,2023-03-01,IE,LK,Limerick,32566,3,992,Ireland,"Limerick, County Limerick, Munster, Éire / Ireland",Éire / Ireland,52.661252,-8.6301239
+"Enschede, OV Netherlands",10.383905513880693,2023-03-01,NL,OV,Enschede,32325,16,1000,Netherlands,"Enschede, Overijssel, Nederland",Nederland,52.2209855,6.8940537
+"Bydgoszcz, 04 Poland",10.381955260193992,2023-03-01,PL,04,Bydgoszcz,32262,10,1002,Poland,"Bydgoszcz, województwo kujawsko-pomorskie, Polska",Polska,53.1219648,18.0002529
+"Toluca, MEX Mexico",10.37695392954475,2023-03-01,MX,MEX,Toluca,32101,18,1006,Mexico,"Toluca, Estado de México, 50000, México",México,19.292545,-99.6569007
+"Belém, PA Brazil",10.359297171745961,2023-03-01,BR,PA,Belém,31539,15,1019,Brazil,"Belém, Região Geográfica Imediata de Belém, Região Geográfica Intermediária de Belém, Pará, Região Norte, Brasil",Brasil,-1.45056,-48.4682453
+"Gouda, ZH Netherlands",10.35666287680037,2023-03-01,NL,ZH,Gouda,31456,17,1021,Netherlands,"Gouda, Zuidplas, Zuid-Holland, Nederland",Nederland,52.018119350000006,4.711122134697802
+"City of Muntinlupa, RIZ Philippines",10.352490962658775,2023-03-01,PH,RIZ,City of Muntinlupa,31325,32,1029,Philippines,,,,
+"Verona, VR Italy",10.349838653116635,2023-03-01,IT,VR,Verona,31242,9,1034,Italy,"Verona, Veneto, Italia",Italia,45.4384958,10.9924122
+"Gdynia, 22 Poland",10.349070407240182,2023-03-01,PL,22,Gdynia,31218,11,1035,Poland,"Gdynia, województwo pomorskie, Polska",Polska,54.5164982,18.5402738
+"Basel, BS Switzerland",10.343289673048742,2023-03-01,CH,BS,Basel,31038,5,1040,Switzerland,"Basel, Basel-Stadt, Schweiz/Suisse/Svizzera/Svizra",Schweiz/Suisse/Svizzera/Svizra,47.5581077,7.5878261
+"Leiden, ZH Netherlands",10.336892029333534,2023-03-01,NL,ZH,Leiden,30840,18,1044,Netherlands,"Leiden, Zuid-Holland, Nederland",Nederland,52.1594747,4.4908843
+"Brescia, BS Italy",10.326956285083867,2023-03-01,IT,BS,Brescia,30535,10,1059,Italy,"Brescia, Lombardia, Italia",Italia,45.5398022,10.2200214
+"Juarez, ROO Mexico",10.321638520451476,2023-03-01,MX,ROO,Juarez,30373,19,1064,Mexico,"Juárez, Lázaro Cárdenas, Quintana Roo, México",México,20.8227773,-87.3297254
+"São José dos Campos, SP Brazil",10.31503413096016,2023-03-01,BR,SP,São José dos Campos,30173,16,1070,Brazil,"São José dos Campos, Região Imediata de São José dos Campos, Região Metropolitana do Vale do Paraíba e Litoral Norte, Região Geográfica Intermediária de São José dos Campos, São Paulo, Região Sudeste, Brasil",Brasil,-23.1867782,-45.8854538
+"Breda, NB Netherlands",10.313807523370475,2023-03-01,NL,NB,Breda,30136,19,1072,Netherlands,"Breda, Noord-Brabant, Nederland",Nederland,51.5887845,4.7760237
+"Puchong Batu Dua Belas, 10 Malaysia",10.313708002728152,2023-03-01,MY,10,Puchong Batu Dua Belas,30133,10,1073,Malaysia,"Masjid Jamek Batu Dua Belas Puchong, Jalan Puchong, Subang Jaya, Petaling, Selangor, 47160, Malaysia",Malaysia,3.0197111000000003,101.61364975221574
+"Veracruz, VER Mexico",10.307151038697665,2023-03-01,MX,VER,Veracruz,29936,20,1076,Mexico,"Municipio de Veracruz, Veracruz, México",México,19.1798858,-96.135648
+"Guarulhos, SP Brazil",10.297756887883558,2023-03-01,BR,SP,Guarulhos,29656,17,1081,Brazil,"Guarulhos, Região Imediata de São Paulo, Região Metropolitana de São Paulo, Região Geográfica Intermediária de São Paulo, São Paulo, Região Sudeste, Brasil",Brasil,-23.4428948,-46.5243855
+"Catania, CT Italy",10.29667762976868,2023-03-01,IT,CT,Catania,29624,11,1082,Italy,"Catania, Sicilia, Italia",Italia,37.5023612,15.0873718
+"Yokohama, 14 Japan",10.293432848986255,2023-03-01,JP,14,Yokohama,29528,4,1087,Japan,"横浜市, 神奈川県, 231-0017, 日本",日本,35.4443947,139.6367727
+"León, GUA Mexico",10.291908226035034,2023-03-01,MX,GUA,León,29483,21,1089,Mexico,"León, Guanajuato, 37370, México",México,21.1218598,-101.6825081
+"Leuven, VBR Belgium",10.27718675788064,2023-03-01,BE,VBR,Leuven,29052,4,1104,Belgium,"Leuven, Vlaams-Brabant, Vlaanderen, België / Belgique / Belgien",België / Belgique / Belgien,50.879202,4.7011675
+"La Plata, B Argentina",10.271562271425733,2023-03-01,AR,B,La Plata,28889,5,1110,Argentina,"La Plata, Partido de La Plata, Buenos Aires, Argentina",Argentina,-34.9206797,-57.9537638
+"Umeå, AC Sweden",10.266740811834984,2023-03-01,SE,AC,Umeå,28750,7,1116,Sweden,"Umeå, Umeå kommun, Västerbottens län, Sverige",Sverige,63.8256568,20.2630745
+"Västerås, U Sweden",10.262908722142885,2023-03-01,SE,U,Västerås,28640,8,1119,Sweden,"Västerås, Västerås kommun, Västmanlands län, 721 01, Sverige",Sverige,59.6110992,16.5463679
+"Palermo, PA Italy",10.25333423688128,2023-03-01,IT,PA,Palermo,28367,12,1133,Italy,"Palermo, Sicilia, Italia",Italia,38.1112268,13.3524434
+"Osasco, SP Brazil",10.251464780771665,2023-03-01,BR,SP,Osasco,28314,18,1136,Brazil,"Osasco, Região Imediata de São Paulo, Região Metropolitana de São Paulo, Região Geográfica Intermediária de São Paulo, São Paulo, Região Sudeste, Brasil",Brasil,-23.5324859,-46.7916801
+"Mersin, 33 Turkey",10.248565510629197,2023-03-01,TR,33,Mersin,28232,9,1139,Turkey,"Mersin, Akdeniz, Mersin, Akdeniz Bölgesi, 33010, Türkiye",Türkiye,36.7978381,34.6298391
+"Brdo, 522 Czechia",10.246154845820252,2023-03-01,CZ,522,Brdo,28164,3,1142,Czechia,"Brdo, Stará Paka, okres Jičín, Královéhradecký kraj, Severovýchod, Česko",Česko,50.4934545,15.4675238
+"Rennes, 35 France",10.242421043498677,2023-03-01,FR,35,Rennes,28059,10,1145,France,,,,
+"Granada, GR Spain",10.236202740279628,2023-03-01,ES,GR,Granada,27885,7,1149,Spain,"Granada, Comarca de la Vega de Granada, Granada, Andalucía, España",España,37.1734995,-3.5995337
+"Bari, BA Italy",10.23174758973532,2023-03-01,IT,BA,Bari,27761,13,1156,Italy,"Bari, Puglia, Italia",Italia,41.1257843,16.8620293
+"Bilbao, BI Spain",10.22662122471816,2023-03-01,ES,BI,Bilbao,27619,8,1160,Spain,"Bilbao, Bizkaia, Euskadi, España",España,43.2630018,-2.9350039
+"Galway, G Ireland",10.221650332241495,2023-03-01,IE,G,Galway,27482,4,1165,Ireland,"Cathair na Gaillimhe, County Galway, Connacht, Éire / Ireland",Éire / Ireland,53.2744122,-9.0490601
+"Dnipro, 12 Ukraine",10.21982996548112,2023-03-01,UA,12,Dnipro,27432,3,1168,Ukraine,"Дніпро, 12, Кольцова бульвар, Борщагівка, Святошинський район, Київ, 03194, Україна",Україна,50.42139725,30.382336324605976
+"Kajang, 10 Malaysia",10.215813455900669,2023-03-01,MY,10,Kajang,27322,11,1175,Malaysia,"Majlis Perbandaran Kajang, Hulu Langat, Selangor, Malaysia",Malaysia,2.9948437,101.7896595
+"Valby, 84 Denmark",10.211707276205457,2023-03-01,DK,84,Valby,27210,5,1182,Denmark,"Valby, København, Københavns Kommune, Region Hovedstaden, 1805, Danmark",Danmark,55.6618019,12.5169523
+"Linz, 4 Austria",10.205257424305527,2023-03-01,AT,4,Linz,27035,3,1186,Austria,"4, Linz, Tiffnerwinkl, Himmelberg, Bezirk Feldkirchen, Kärnten, 9562, Österreich",Österreich,46.73087865,14.050667295500519
+"Raipur, CT India",10.204702639270494,2023-03-01,IN,CT,Raipur,27020,27,1187,India,"Raipur, Raipur Tahsil, Raipur, Chhattisgarh, 493332, India",India,21.2380912,81.6336993
+"Umeda, 27 Japan",10.202888193567093,2023-03-01,JP,27,Umeda,26971,5,1190,Japan,"阪急梅田駅9号線, 国道176号, 芝田一丁目, 北区, 大阪市, 大阪府, 530-0012, 日本",日本,34.7053631,135.4979778
+"Zoetermeer, ZH Netherlands",10.200699075204039,2023-03-01,NL,ZH,Zoetermeer,26912,20,1191,Netherlands,"Zoetermeer, Zuid-Holland, Nederland",Nederland,52.06228915,4.487754536970652
+"São Bernardo do Campo, SP Brazil",10.194364515884429,2023-03-01,BR,SP,São Bernardo do Campo,26742,19,1200,Brazil,"São Bernardo do Campo, Região Imediata de São Paulo, Região Metropolitana de São Paulo, Região Geográfica Intermediária de São Paulo, São Paulo, Região Sudeste, Brasil",Brasil,-23.7080345,-46.5506747
+"Jyväskylä, 08 Finland",10.192680982311837,2023-03-01,FI,08,Jyväskylä,26697,7,1201,Finland,"Jyväskylä, Jyväskylän seutukunta, Keski-Suomi, Länsi- ja Sisä-Suomen aluehallintovirasto, Manner-Suomi, Suomi / Finland",Suomi / Finland,62.2417066,25.7495727
+"Kayseri, 38 Turkey",10.189718572720594,2023-03-01,TR,38,Kayseri,26618,10,1207,Turkey,"Kayseri, Melikgazi, Kayseri, İç Anadolu Bölgesi, 38015, Türkiye",Türkiye,38.7219011,35.4873214
+"Apeldoorn, GE Netherlands",10.189605903011726,2023-03-01,NL,GE,Apeldoorn,26615,21,1208,Netherlands,"Apeldoorn, Gelderland, Nederland",Nederland,52.17957375,5.930077460807249
+"Tauranga, BOP New Zealand",10.186257580626888,2023-03-01,NZ,BOP,Tauranga,26526,5,1213,New Zealand,"Tauranga, Tauranga City, Bay of Plenty, 3110, New Zealand/Aotearoa",New Zealand/Aotearoa,-37.6859006,176.167505
+"Noida, UP India",10.180967762503313,2023-03-01,IN,UP,Noida,26386,28,1223,India,"Noida, Gautam Buddha Nagar, Uttar Pradesh, 201301, India",India,28.5707841,77.3271074
+"Helsingborg, M Sweden",10.179413289289307,2023-03-01,SE,M,Helsingborg,26345,9,1228,Sweden,"Helsingborg, Helsingborgs kommun, Skåne län, 252 68, Sverige",Sverige,56.0442098,12.703706
+"Liège, WLG Belgium",10.178274337002176,2023-03-01,BE,WLG,Liège,26315,5,1229,Belgium,"Liège, Wallonie, 4000, België / Belgique / Belgien",België / Belgique / Belgien,50.6450944,5.5736112
+"Natal, RN Brazil",10.176106747310863,2023-03-01,BR,RN,Natal,26258,20,1230,Brazil,"Natal, Região Geográfica Imediata de Natal, Região Geográfica Intermediária de Natal, Rio Grande do Norte, Região Nordeste, Brasil",Brasil,-5.805398,-35.2080905
+"Dunedin, OTA New Zealand",10.174201476757755,2023-03-01,NZ,OTA,Dunedin,26208,6,1231,New Zealand,"Dunedin, Dunedin City, Otago, 9016, New Zealand/Aotearoa",New Zealand/Aotearoa,-45.8740984,170.5035755
+"Torreón, COA Mexico",10.16327156794533,2023-03-01,MX,COA,Torreón,25923,22,1245,Mexico,"Torreón, Coahuila, 27289, México",México,25.542698,-103.410512
+"Bronshoj, 84 Denmark",10.161225748614838,2023-03-01,DK,84,Bronshoj,25870,6,1248,Denmark,"Brønshøj, København, Københavns Kommune, Region Hovedstaden, 2700, Danmark",Danmark,55.704111,12.4985492
+"Maringá, PR Brazil",10.158556036634712,2023-03-01,BR,PR,Maringá,25801,21,1252,Brazil,"Maringá, Região Geográfica Imediata de Maringá, Região Geográfica Intermediária de Maringá, Paraná, Região Sul, Brasil",Brasil,-23.425269,-51.9382078
+"Ostrava, 806 Czechia",10.154285180632154,2023-03-01,CZ,806,Ostrava,25691,4,1258,Czechia,"Ostrava, okres Ostrava-město, Moravskoslezský kraj, Moravskoslezsko, Česko",Česko,49.8349139,18.2820084
+"Cuauhtemoc, CMX Mexico",10.152103899823368,2023-03-01,MX,CMX,Cuauhtemoc,25635,23,1263,Mexico,"Cuauhtémoc, Ciudad de México, México",México,19.4416128,-99.1518637
+"Seri Kembangan, 10 Malaysia",10.145923797230747,2023-03-01,MY,10,Seri Kembangan,25477,12,1270,Malaysia,"Seri Kembangan, Petaling, Selangor, 43300, Malaysia",Malaysia,3.0340649,101.7055684
+"Bergamo, BG Italy",10.142661920922865,2023-03-01,IT,BG,Bergamo,25394,14,1277,Italy,"Bergamo, Lombardia, Italia",Italia,45.6944947,9.6698727
+"Cainta, RIZ Philippines",10.140494560509492,2023-03-01,PH,RIZ,Cainta,25339,33,1278,Philippines,"Cainta, Rizal, Calabarzon, Philippines",Philippines,14.5780161,121.1163072
+"Ribeirão Preto, SP Brazil",10.1388363162887,2023-03-01,BR,SP,Ribeirão Preto,25297,22,1280,Brazil,"Ribeirão Preto, Região Imediata de Ribeirão Preto, Região Metropolitana de Ribeirão Preto, Região Geográfica Intermediária de Ribeirão Preto, São Paulo, Região Sudeste, Brasil",Brasil,-21.178333,-47.8066671
+"Wollongong, NSW Australia",10.135789041635103,2023-03-01,AU,NSW,Wollongong,25220,10,1282,Australia,"Wollongong, Wollongong City Council, New South Wales, 2500, Australia",Australia,-34.4278083,150.893054
+"Rzeszów, 18 Poland",10.135233992657605,2023-03-01,PL,18,Rzeszów,25206,12,1284,Poland,"Rzeszów, województwo podkarpackie, Polska",Polska,50.0374531,22.0047174
+"Townsville, QLD Australia",10.120492299890929,2023-03-01,AU,QLD,Townsville,24837,11,1298,Australia,"Townsville, Townsville City, Queensland, 4810, Australia",Australia,-19.2569391,146.8239537
+"Venice, VE Italy",10.113870026547724,2023-03-01,IT,VE,Venice,24673,15,1307,Italy,"Venezia, Veneto, Italia",Italia,45.4371908,12.3345898
+"João Pessoa, PB Brazil",10.112532179470836,2023-03-01,BR,PB,João Pessoa,24640,23,1309,Brazil,"João Pessoa, Região Geográfica Imediata de João Pessoa, Região Metropolitana de João Pessoa, Região Geográfica Intermediária de João Pessoa, Paraíba, Região Nordeste, Brasil",Brasil,-7.1215981,-34.882028
+"Joinville, SC Brazil",10.111639286031101,2023-03-01,BR,SC,Joinville,24618,24,1311,Brazil,"Joinville, Região Geográfica Imediata de Joinville, Região Geográfica Intermediária de Joinville, Santa Catarina, Região Sul, Brasil",Brasil,-26.3044898,-48.8486726
+"Sorocaba, SP Brazil",10.105203156436717,2023-03-01,BR,SP,Sorocaba,24460,25,1322,Brazil,"Sorocaba, Região Imediata de Sorocaba, Região Metropolitana de Sorocaba, Região Geográfica Intermediária de Sorocaba, São Paulo, Região Sudeste, Brasil",Brasil,-23.5003451,-47.4582864
+"Maastricht, LI Netherlands",10.100451386066952,2023-03-01,NL,LI,Maastricht,24344,22,1326,Netherlands,"Maastricht, Limburg, Nederland",Nederland,50.85798545,5.6969881818221095
+"Debrecen, HB Hungary",10.0915012118666,2023-03-01,HU,HB,Debrecen,24127,2,1336,Hungary,"Debrecen, Debreceni járás, Hajdú-Bihar vármegye, Észak-Alföld, Alföld és Észak, Magyarország",Magyarország,47.531399,21.6259782
+"Tekirdağ, 59 Turkey",10.088472226749566,2023-03-01,TR,59,Tekirdağ,24054,11,1339,Turkey,"Tekirdağ, Süleymanpaşa, Tekirdağ, Marmara Bölgesi, 59200, Türkiye",Türkiye,40.9781214,27.5107799
+"Cavite City, CAV Philippines",10.082386592528753,2023-03-01,PH,CAV,Cavite City,23908,34,1345,Philippines,"Cavite City, Cavite, Calabarzon, Philippines",Philippines,14.4833969,120.9088359
+"Bialystok, 20 Poland",10.081675578048475,2023-03-01,PL,20,Bialystok,23891,13,1347,Poland,"Białystok, powiat białostocki, województwo podlaskie, Polska",Polska,53.127505049999996,23.147050870161664
+"Phuket, 83 Thailand",10.073694354466978,2023-03-01,TH,83,Phuket,23701,3,1356,Thailand,"ภูเก็ต, อำเภอเมืองภูเก็ต, จังหวัดภูเก็ต, 83000, ประเทศไทย",ประเทศไทย,7.8847901,98.3891503
+"Tlalnepantla, MEX Mexico",10.069806751852576,2023-03-01,MX,MEX,Tlalnepantla,23609,24,1362,Mexico,"Tlalnepantla, Tlalnepantla de Baz, Estado de México, 54000, México",México,19.5370001,-99.1955083
+"Eskişehir, 26 Turkey",10.066031481721408,2023-03-01,TR,26,Eskişehir,23520,12,1368,Turkey,"Eskişehir, Odunpazarı, Eskişehir, İç Anadolu Bölgesi, 26120, Türkiye",Türkiye,39.7743941,30.519116
+"Kozhikode, KL India",10.065436319522146,2023-03-01,IN,KL,Kozhikode,23506,29,1370,India,"Kozhikode, Kozhikode district, Kerala, 673001, India",India,11.2450558,75.7754716
+"Palmerston North, MWT New Zealand",10.065393794379148,2023-03-01,NZ,MWT,Palmerston North,23505,7,1371,New Zealand,"Palmerston North City, Manawatū-Whanganui, New Zealand/Aotearoa",New Zealand/Aotearoa,-40.356317,175.6112388
+"San Jose del Monte, BUL Philippines",10.064585472878456,2023-03-01,PH,BUL,San Jose del Monte,23486,35,1374,Philippines,"San Jose del Monte, Bulacan, Central Luzon, 3023, Philippines",Philippines,14.81026,121.04739
+"Samsun, 55 Turkey",10.064074617184076,2023-03-01,TR,55,Samsun,23474,13,1378,Turkey,"Samsun, Pazar Mahallesi, İlkadım, Samsun, Karadeniz Bölgesi, 55030, Türkiye",Türkiye,41.2946149,36.3320596
+"Aguascalientes, AGU Mexico",10.063094747044966,2023-03-01,MX,AGU,Aguascalientes,23451,25,1380,Mexico,"Aguascalientes, Municipio de Aguascalientes, Aguascalientes, 20000, México",México,21.880487,-102.2967195
+"Solna, AB Sweden",10.056165720177834,2023-03-01,SE,AB,Solna,23289,10,1390,Sweden,"Solna kommun, Stockholms län, Sverige",Sverige,59.361367,18.0013693
+"Örebro, T Sweden",10.055650543933236,2023-03-01,SE,T,Örebro,23277,11,1391,Sweden,"Örebro, Örebro kommun, Örebro län, 703 62, Sverige",Sverige,59.2747287,15.2151181
+"Odesa, 51 Ukraine",10.053845334124684,2023-03-01,UA,51,Odesa,23235,4,1396,Ukraine,"Одеса, Одеська міська громада, Одеський район, Одеська область, Україна",Україна,46.4843023,30.7322878
+"Alicante, A Spain",10.05039779785075,2023-03-01,ES,A,Alicante,23155,9,1406,Spain,"Alacant / Alicante, l'Alacantí, Alacant / Alicante, Comunitat Valenciana, España",España,38.3436365,-0.4881708
+"San Luis Potosí City, SLP Mexico",10.041247492240613,2023-03-01,MX,SLP,San Luis Potosí City,22944,26,1419,Mexico,,,,
+"Braga, 03 Portugal",10.036925190765844,2023-03-01,PT,03,Braga,22845,4,1423,Portugal,"Braga, Portugal",Portugal,41.5510583,-8.4280045
+"Campo Grande, MS Brazil",10.03464738523415,2023-03-01,BR,MS,Campo Grande,22793,26,1429,Brazil,"Campo Grande, Região Geográfica Imediata de Campo Grande, Região Geográfica Intermediária de Campo Grande, Mato Grosso do Sul, Região Centro-Oeste, Brasil",Brasil,-20.4640173,-54.6162947
+"Navi Mumbai, MH India",10.030912840791366,2023-03-01,IN,MH,Navi Mumbai,22708,30,1434,India,"Navi Mumbai, Thane, Maharashtra, India",India,19.0308262,73.0198537
+"Uberlândia, MG Brazil",10.026810768568128,2023-03-01,BR,MG,Uberlândia,22615,27,1436,Brazil,"Uberlândia, Região Geográfica Imediata de Uberlândia, Região Geográfica Intermediária de Uberlândia, Minas Gerais, Região Sudeste, Brasil",Brasil,-18.9188041,-48.2767837
+"Da Nang, DN Vietnam",10.026324462495191,2023-03-01,VN,DN,Da Nang,22604,3,1437,Vietnam,"Phòng vé cáp treo Bà Nà Hills, Hoà Ninh, Hòa Vang, Đà Nẵng, 베트남, 602, Hòa Vang, Thành phố Đà Nẵng, Việt Nam",Việt Nam,16.0255198,108.0308928
+"Sevastopol, 40 Ukraine",10.022869309556208,2023-03-01,UA,40,Sevastopol,22526,5,1441,Ukraine,"40, Александра Толмачева улица, ТСН Родник, Балаклавский округ, Балаклавский район, 290026, Україна",Україна,44.54523105,33.56080490000001
+"Geelong, VIC Australia",10.021137245969499,2023-03-01,AU,VIC,Geelong,22487,12,1442,Australia,"Geelong, City of Greater Geelong, Victoria, 3218, Australia",Australia,-38.1493084,144.3598004
+"Morelia, MIC Mexico",10.017708696626151,2023-03-01,MX,MIC,Morelia,22410,27,1448,Mexico,"Morelia, Michoacán, 58000, México",México,19.7027116,-101.1923818
+"Torun, 04 Poland",10.016548344820142,2023-03-01,PL,04,Torun,22384,14,1450,Poland,"Toruń, województwo kujawsko-pomorskie, Polska",Polska,53.0102721,18.6048094
+"Szeged, CS Hungary",10.013596775216158,2023-03-01,HU,CS,Szeged,22318,3,1456,Hungary,"Szeged, Szegedi járás, Csongrád-Csanád vármegye, Dél-Alföld, Alföld és Észak, Magyarország",Magyarország,46.2546312,20.1486016
+"Thane, MH India",10.00928797142234,2023-03-01,IN,MH,Thane,22222,31,1462,India,"Thane, Maharashtra, India",India,19.1943294,72.9701779
+"Central Coast, NSW Australia",10.003287637613305,2023-03-01,AU,NSW,Central Coast,22089,13,1468,Australia,"Central Coast Council, New South Wales, Australia",Australia,-33.3117096,151.312067495083
+"Nice, 06 France",9.994287576862567,2023-03-01,FR,06,Nice,21891,11,1484,France,,,,
+"Mohali, PB India",9.989022840642392,2023-03-01,IN,PB,Mohali,21776,32,1490,India,"S.A.S. Nagar (Mohali) Tahsil, Sahibzada Ajit Singh Nagar, Punjab, India",India,30.7041168,76.7176885
+"Grenoble, 38 France",9.987966559114067,2023-03-01,FR,38,Grenoble,21753,12,1491,France,,,,
+"Valladolid, VA Spain",9.986955157777391,2023-03-01,ES,VA,Valladolid,21731,10,1494,Spain,"Valladolid, Castilla y León, España",España,41.6521328,-4.728562
+"Mar del Plata, B Argentina",9.986633133622798,2023-03-01,AR,B,Mar del Plata,21724,6,1495,Argentina,"Mar del Plata, Partido de General Pueyrredón, Buenos Aires, Argentina",Argentina,-37.9977225,-57.5482703
+"Zwolle, OV Netherlands",9.984698807960951,2023-03-01,NL,OV,Zwolle,21682,23,1500,Netherlands,"Zwolle, Overijssel, Nederland",Nederland,52.5089759,6.0943765
+"Cagliari, CA Italy",9.979012377622373,2023-03-01,IT,CA,Cagliari,21559,16,1505,Italy,"Cagliari - Casteddu, Cagliari, Sardigna/Sardegna, Italia",Italia,39.2171994,9.113311
+"Kanpur, UP India",9.977249036098181,2023-03-01,IN,UP,Kanpur,21521,33,1509,India,"Kanpur, Kanpur Nagar, Uttar Pradesh, India",India,26.4609135,80.3217588
+"A Coruña, C Spain",9.971566673346722,2023-03-01,ES,C,A Coruña,21399,11,1515,Spain,"A Coruña, Galicia, España",España,43.3709703,-8.3959425
+"Centro, TAB Mexico",9.970865787866076,2023-03-01,MX,TAB,Centro,21384,28,1517,Mexico,"Centro, Tabasco, México",México,18.027158800000002,-92.77479118046158
+"Palma, PM Spain",9.96430039193264,2023-03-01,ES,PM,Palma,21244,12,1527,Spain,"Farmacia Palma Sagues Sc, Avenida de Pamplona, Etxabakoitz, Pamplona/Iruña, Iruñerria / Comarca de Pamplona, Navarra - Nafarroa, 31010, España",España,42.8042191,-1.6752432
+"Gaziantep, 27 Turkey",9.963688555226884,2023-03-01,TR,27,Gaziantep,21231,14,1528,Turkey,"Gaziantep, Şahinbey, Gaziantep, Güneydoğu Anadolu Bölgesi, 27400, Türkiye",Türkiye,37.0628317,37.3792617
+"Londrina, PR Brazil",9.963029235244443,2023-03-01,BR,PR,Londrina,21217,28,1529,Brazil,"Londrina, Região Geográfica Imediata de Londrina, Região Geográfica Intermediária de Londrina, Paraná, Região Sul, Brasil",Brasil,-23.3112878,-51.1595023
+"Maceió, AL Brazil",9.962793658433535,2023-03-01,BR,AL,Maceió,21212,29,1530,Brazil,"Maceió, Região Geográfica Imediata de Maceió, Região Geográfica Intermediária de Maceió, Alagoas, Região Nordeste, Brasil",Brasil,-9.6476843,-35.7339264
+"Sunshine Coast, QLD Australia",9.961048663060659,2023-03-01,AU,QLD,Sunshine Coast,21175,14,1535,Australia,"Sunshine Coast Regional, Queensland, Australia",Australia,-26.6544338,153.0933668
+"Imphal, MN India",9.948938815440046,2023-03-01,IN,MN,Imphal,20920,34,1548,India,"Imphal, Imphal West, Manipur, 795001, India",India,24.7991162,93.9364419
+"Niterói, RJ Brazil",9.948221883876299,2023-03-01,BR,RJ,Niterói,20905,30,1550,Brazil,"Niterói, Região Geográfica Imediata do Rio de Janeiro, Região Metropolitana do Rio de Janeiro, Região Geográfica Intermediária do Rio de Janeiro, Rio de Janeiro, Região Sudeste, Brasil",Brasil,-22.8884,-43.1147
+"Ciudad Nezahualcoyotl, MEX Mexico",9.94578046472638,2023-03-01,MX,MEX,Ciudad Nezahualcoyotl,20854,29,1556,Mexico,"Nezahualcóyotl, Estado de México, México",México,19.4079028,-99.0181547
+"Lower Hutt, WGN New Zealand",9.94467747936099,2023-03-01,NZ,WGN,Lower Hutt,20831,8,1557,New Zealand,"Lower Hutt, Lower Hutt City, Wellington, 5040, New Zealand/Aotearoa",New Zealand/Aotearoa,-41.2125751,174.9057626
+"Santos, SP Brazil",9.94097599694712,2023-03-01,BR,SP,Santos,20754,31,1563,Brazil,"Santos, Região Imediata de Santos, Região Metropolitana da Baixada Santista, Região Geográfica Intermediária de São Paulo, São Paulo, Região Sudeste, Brasil",Brasil,-23.9335988,-46.3286399
+"Vila Nova de Gaia, 13 Portugal",9.9400123272185,2023-03-01,PT,13,Vila Nova de Gaia,20734,5,1566,Portugal,"Vila Nova de Gaia, Porto, Portugal",Portugal,41.1300103,-8.6058415
+"Cuautitlán Izcalli, MEX Mexico",9.937502431123406,2023-03-01,MX,MEX,Cuautitlán Izcalli,20682,30,1569,Mexico,"Cuautitlán Izcalli, Estado de México, 54700, México",México,19.6531356,-99.2145002
+"Norrköping, E Sweden",9.93721242193775,2023-03-01,SE,E,Norrköping,20676,12,1570,Sweden,"Norrköping, Norrköpings kommun, Östergötlands län, 602 26, Sverige",Sverige,58.5909124,16.1903511
+"Slagelse, 85 Denmark",9.935664284231349,2023-03-01,DK,85,Slagelse,20644,7,1574,Denmark,"Slagelse, Slagelse Kommune, Region Sjælland, 4200, Danmark",Danmark,55.4061196,11.3525415
+"Nancy, 54 France",9.932560800021836,2023-03-01,FR,54,Nancy,20580,13,1584,France,,,,
+"Coimbra, 06 Portugal",9.931199991102664,2023-03-01,PT,06,Coimbra,20552,6,1589,Portugal,"Coimbra, Portugal",Portugal,40.2111931,-8.4294632
+"Vigo, PO Spain",9.928570332903591,2023-03-01,ES,PO,Vigo,20498,13,1594,Spain,"Vigo, Pontevedra, Galicia, 36202, España",España,42.2376602,-8.7247205
+"'s-Hertogenbosch, NB Netherlands",9.927594627879362,2023-03-01,NL,NB,'s-Hertogenbosch,20478,24,1597,Netherlands,"'s-Hertogenbosch, Noord-Brabant, Nederland",Nederland,51.6889387,5.303116
+"Peshawar, KP Pakistan",9.923437227843749,2023-03-01,PK,KP,Peshawar,20393,5,1604,Pakistan,"پشاور‎, Walled City Peshawar, خیبر پختونخوا, 25210, پاکستان",پاکستان,34.0123846,71.5787458
+"Villeurbanne, 69 France",9.923339198238729,2023-03-01,FR,69,Villeurbanne,20391,14,1605,France,,,,
+"Viña del Mar, VS Chile",9.911902051137146,2023-03-01,CL,VS,Viña del Mar,20159,3,1621,Chile,"Viña del Mar, Provincia de Valparaíso, Región de Valparaíso, Chile",Chile,-33.0244535,-71.5517636
+"Zabrze, 24 Poland",9.909171369004426,2023-03-01,PL,24,Zabrze,20104,15,1625,Poland,"Zabrze, Górnośląsko-Zagłębiowska Metropolia, województwo śląskie, Polska",Polska,50.3086154,18.7863749
+"Yevpatoriya, 43 Ukraine",9.90733016025358,2023-03-01,UA,43,Yevpatoriya,20067,6,1628,Ukraine,"Евпатория, Республика Крым, Україна",Україна,45.1907635,33.3679049
+"Tuxtla Gutiérrez, CHP Mexico",9.906881785604144,2023-03-01,MX,CHP,Tuxtla Gutiérrez,20058,31,1630,Mexico,"Tuxtla Gutiérrez, Chiapas, 29019, México",México,16.753801,-93.115959
