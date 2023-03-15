@@ -16,11 +16,11 @@ def add_metadata_to_tsne(
         l_cols_to_fill: iter = None,
         l_cols_labels: iter = None,
 ) -> pd.DataFrame:
-    """append metadata to raw tsne array, assuming we haven't changed
-    the order of the array (df_v_sub)
+    """append metadata to raw tsne array.
+    ASSUMES that df_v_sub & tsne_array have kept the same ORDER (not sorting or shuffling!)
     """
     if l_ix_sub is None:
-        l_ix_sub = ['subreddit_name', 'subreddit_id' ,]
+        l_ix_sub = ['subreddit_name', 'subreddit_id']
     if l_cols_to_fill is None:
         l_cols_to_fill = [
             'primary_topic',
