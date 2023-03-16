@@ -135,7 +135,7 @@ EXTRAS_REQUIRE = {
 
         # compression / visualization
         "umap-learn == 0.5.1",
-        "openTSNE == 0.6.0",
+        "openTSNE == 0.6.2",
 
         # clustering
         # hdbscan needs to be installed separately, because it needs to be
