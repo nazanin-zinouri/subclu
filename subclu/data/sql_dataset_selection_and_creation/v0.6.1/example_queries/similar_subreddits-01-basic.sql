@@ -9,7 +9,8 @@ FROM `reddit-employee-datasets.david_bermejo.cau_similar_subreddits_by_text` AS 
 
 WHERE pt = "2022-11-22"
     AND s.subreddit_name IN (
-        'aww'
+        'askfrance'
+        , 'aww'
         , 'formula1', 'uxdesign', 'absoluteunits'
         , 'wallstreetbets', 'de', 'france', 'fire', 'mexico'
         , 'me_irl', 'ich_iel'

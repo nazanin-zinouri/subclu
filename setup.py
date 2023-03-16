@@ -85,6 +85,9 @@ EXTRAS_REQUIRE = {
 
         # visualize sets
         "matplotlib-venn == 0.11.6",
+
+        # visualize geo-location data
+        "geopy == 2.3.0",
     ],
 
     "cpu_eda": [
@@ -132,7 +135,7 @@ EXTRAS_REQUIRE = {
 
         # compression / visualization
         "umap-learn == 0.5.1",
-        "openTSNE == 0.6.0",
+        "openTSNE == 0.6.2",
 
         # clustering
         # hdbscan needs to be installed separately, because it needs to be

@@ -14,7 +14,7 @@
 # ETA: 6 seconds
 python select_data/__main__.py --query-name "_0a1_countrycode_name_mapping.sql" --no-log-query
 
-# ETA: 18 seconds
+# ETA: 18 seconds to 1:15
 python select_data/__main__.py --query-name "_0b1_select_candidate_subs.sql" --no-log-query
 
 # ETA: 5 to 9 seconds
@@ -28,7 +28,7 @@ python select_data/__main__.py --query-name "_0b2_geo_relevance_baseline.sql" --
 
 
 # ETA: ~35 seconds early in the morning (no load)
-#  ~20 seconds on BQ UI early in the morning
+#  This new query uses the pre-computed `community_score` table
 python select_data/__main__.py --query-name "_0b4_subreddit_relevance_standardized.sql" --no-log-query
 
 # Example to run query with non-default values
@@ -48,7 +48,7 @@ python select_data/__main__.py --query-name "_0c1_select_geo_subreddits_for_mode
 #  --no-log-query
 
 
-# ETA: ~22 seconds
+# ETA: ~22 to 31 seconds
 # Select subreddits (seeds) for topic model
 python select_data/__main__.py --query-name "_01_select_subreddits.sql" --no-log-query
 
@@ -60,7 +60,7 @@ python select_data/__main__.py --query-name "_01_select_subreddits.sql" --no-log
 
 # Get posts
 # ETA: ~3 minutes -> 28 days
-#     ~3 minutes -> 90 days (~3 minutes after getting image & video labels from fact table)
+#     ~3 to 9 minutes -> 90 days (~3 minutes after getting image & video labels from FACT table!)
 python select_data/__main__.py --query-name "_02_select_posts.sql" --no-log-query
 
 
@@ -74,7 +74,7 @@ python select_data/__main__.py --query-name "_02_select_posts.sql" --no-log-quer
 python select_data/__main__.py --query-name "_03_select_comments.sql" --no-log-query
 
 # Merge posts + comments into single text field
-# ETA: ~1 minute
+# ETA: ~1 to 2 minutes
 python select_data/__main__.py --query-name "_04_combine_post_and_comment_text.sql" --no-log-query
 
 

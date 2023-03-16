@@ -17,6 +17,9 @@ WITH clean_name_lookup AS (
     UNION ALL SELECT 'VN', 'Vietnam'
     -- Kosovo's extension appears to be temporary
     UNION ALL SELECT 'XK', 'Kosovo'
+
+    -- CD is different from CG
+    UNION ALL SELECT 'CD', 'Congo, Democratic Republic'
 )
 
 SELECT
@@ -44,6 +47,6 @@ WHERE 1=1
         OR cl.country_code IS NOT NULL
     )
 
-ORDER BY 3
+ORDER BY country_name ASC
 )
 ;
