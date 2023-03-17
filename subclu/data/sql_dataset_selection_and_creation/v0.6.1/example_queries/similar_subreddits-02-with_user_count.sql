@@ -2,8 +2,9 @@
 SELECT
     s.subreddit_id AS subreddit_id_seed
     , s.subreddit_name AS subreddit_name_seed
-    , n.*
+    , n.* EXCEPT(subreddit_id)
     , asr.users_l7
+    , n.subreddit_id
 FROM `reddit-employee-datasets.david_bermejo.cau_similar_subreddits_by_text` AS s
     -- We need to UNNEST & join the field with nested JSON
     LEFT JOIN UNNEST(similar_subreddit) AS n
@@ -15,16 +16,21 @@ FROM `reddit-employee-datasets.david_bermejo.cau_similar_subreddits_by_text` AS 
 
 WHERE s.pt = "2022-11-22"
     AND s.subreddit_name IN (
-        'birding'
-        , 'aww'
-        , 'gardening'
-        , 'cat'
-        , 'cryptocurrency'
-        -- , 'formula1', 'uxdesign', 'absoluteunits'
+        'kpop'
+        -- , 'kpopde'
+        -- , 'aww'
+        -- , 'cats'
+        -- , 'cryptocurrency'
+        , 'formula1'
+        -- , 'uxdesign', 'absoluteunits'
         -- , 'wallstreetbets', 'de', 'france', 'fire', 'mexico'
         -- , 'me_irl', 'ich_iel'
         -- , 'bollywood', 'bollyarm'
     )
-    AND distance_rank <= 20
-ORDER BY subreddit_name_seed, users_l7 DESC, distance_rank
+    AND distance_rank <= 250
+    AND users_l7 >= 10
+-- Big subs first
+-- ORDER BY subreddit_name_seed, users_l7 DESC, distance_rank
+-- Most similar subs first:
+ORDER BY subreddit_name_seed, distance_rank
 ;
