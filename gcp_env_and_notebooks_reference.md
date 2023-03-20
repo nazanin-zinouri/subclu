@@ -600,7 +600,9 @@ sudo du -sh .[^.]*  | sort -hr
 ```
 
 # Download data from a bucket to local (VM or laptop)
-The CLI tool `gsutil` is the fastest way to download/upload data to GCS. We can also use regular expressions to download only specific files.
+The CLI tool `gsutil` is the fastest way to download/upload data to GCS. We can also use regular expressions to download only specific files. For more docs, see:
+- https://cloud.google.com/storage/docs/downloading-objects#gsutil
+- https://cloud.google.com/storage/docs/gsutil/commands/cp
 
 ```bash
 gsutil cp gs://BUCKET_NAME/OBJECT_NAME SAVE_TO_LOCATION
