@@ -598,3 +598,14 @@ sudo du -sh .[^.]*  | sort -hr
 4.0K    .bashrc
 4.0K    .bash_logout
 ```
+
+# Download data from a bucket to local (VM or laptop)
+The CLI tool `gsutil` is the fastest way to download/upload data to GCS. We can also use regular expressions to download only specific files.
+
+```bash
+gsutil cp gs://BUCKET_NAME/OBJECT_NAME SAVE_TO_LOCATION
+```
+
+For example, here is how to download the image files to compare the TSNE projections. This saves us time because it avoids downloading the large parquet & gzip files with the actual data.
+
+`gsutil cp -r "gs://i18n-subreddit-clustering/data/models/projections/manual_v061_2023-03-18_07_57/full_multiscale/*.png" ./manual_v061_2023-03-18_07_57/full_multiscale/`
