@@ -556,6 +556,232 @@ def counts_describe(
                                 )
 
 
+# Subreddit Name annotations!
+def sub_name_annotations(
+    df_coordinates: pd.DataFrame,
+    x: str,
+    y: str,
+    text_col: str,
+    l_targets: list,
+    df_ann: pd.DataFrame,
+    df_counterparts: pd.DataFrame,
+    rank_col: str = 'combined_rank',
+    ann_max_rank: int = 3,
+    counter_max_rank: int = 2,
+    verbose: bool = False,
+    opacity_target: float = 0.99,
+    opacity_ann: float = 0.8,
+    opacity_counter: float = 0.68,
+    font_target_kwargs: dict = None,
+    font_ann_kwargs: dict = None,
+    font_counter_kwargs: dict = None,
+) -> list:
+    """Return a list of annotations for a plotly scatter plot
+    We'll apply 3 layers of annotations:
+    - the target subreddits
+    - the nearest 3 subreddits (overall/global)
+    - the top subreddit PER country
+    """
+    # Set default values for font formatting
+    if font_target_kwargs is None:
+        font_target_kwargs = {
+            'color': '#ffffff',
+            'size': 17
+        }
+    if font_ann_kwargs is None:
+        # this dict has slightly different configs w/ the key=the rank
+        #. we want closer subs to be easier to view
+        font_ann_kwargs = {
+            1: {
+                'font': {
+                    'color': '#d3d4d5',
+                    'size': 14,
+                },
+                'opacity': 0.80,
+            },
+            2: {
+                'font': {
+                    'color': '#c3c4c5',
+                    'size': 13,
+                },
+                'opacity': 0.75,
+            },
+            3: {
+                'font': {
+                    'color': '#b3b4b5',
+                    'size': 12,
+                },
+                'opacity': 0.70,
+            },
+        }
+    if font_counter_kwargs is None:
+        font_counter_kwargs = {
+            1: {
+                'font': {
+                    'color': '#a3a4a5',
+                    'size': 9.5,
+                },
+                'opacity': 0.65,
+            },
+            2: {
+                'font': {
+                    'color': '#939495',
+                    'size': 9,
+                },
+                'opacity': 0.6,
+            },
+            3: {
+                'font': {
+                    'color': '#939495',
+                    'size': 8,
+                },
+                'opacity': 0.55,
+            },
+        }
+        
+    d_rename_annot_ = {
+        c_x_: 'x',
+        c_y_: 'y',
+        'subreddit_name': 'text',
+    }
+    
+    # only highlight ANNs that also aren't targets
+    df_ann_picks = df_ann[(
+        (df_ann[rank_col] <= ann_max_rank) &
+        (~df_ann[text_col].isin(l_subs_target))
+    )]
+    # if sub is already a top nearest neighbor, don't plot again as a country-specific sub
+    # sort by sub size & drop duplicates so that we don't plot the same sub twice
+    #  if it's relevant to multiple countries
+    df_counterpart_picks = (
+        df_counterparts
+        .sort_values(by=[rank_col], ascending=True)
+        .drop_duplicates(subset=[text_col], keep='first')
+        .copy()
+    )
+    df_counterpart_picks = df_counterpart_picks[(
+        (df_counterpart_picks[rank_col] <= counter_max_rank) &
+        (~df_counterpart_picks[text_col].isin(l_subs_target)) &
+        (~df_counterpart_picks[text_col].isin(df_ann_picks[text_col]))
+    )]
+    if verbose:
+        print(f"{len(l_targets)} <- Target subs")
+        print(f"{df_ann_picks.shape} <- ANN picks")
+        print(f"{df_counterpart_picks.shape} <- Counterpart picks")
+    
+    # for TARGET subs, keep the text ABOVE the actual location
+    l_target_subs_ = (
+        df_coordinates[(df_coordinates[text_col].isin(l_subs_target))]
+        [[k_ for k_ in d_rename_annot_.keys()]]
+        .assign(
+            showarrow=False,
+            xshift=0,
+            yshift=lambda df_: np.abs(df_[c_y_] * 0.35),
+            opacity=opacity_target,
+            # font={'color': "#fdfdfd", 'size': 17},
+        )
+        .rename(columns=d_rename_annot_)
+        .to_dict(orient='records')
+    )
+    # We need to update font formatting separately because it's nested dict that messes up pandas.to_dict()
+    for a_ in l_target_subs_:
+        a_['font'] = font_target_kwargs
+    
+    l_ann_subs_ = (
+        df_coordinates[[k_ for k_ in d_rename_annot_.keys()]]
+        .merge(
+            df_ann_picks
+            [[text_col, rank_col]],
+            how='inner',
+            on=text_col,
+        )
+        .assign(
+            **{
+                'showarrow': False,
+                'xshift': lambda df_: np.select(
+                    [df_[rank_col] == 2, df_[rank_col] == 3],
+                    [-np.abs(df_[x] * 0.2), np.abs(df_[x] * 0.2)],
+                    default=0,
+                ),
+                'yshift': lambda df_: np.select(
+                    [df_[rank_col] == 1, df_[rank_col] == 2, df_[rank_col] == 3],
+                    [-np.abs(df_[y] * 0.05), -np.abs(df_[y] * 0.15), -np.abs(df_[y] * 0.25)],
+                    default=0,
+                ),
+                # 'opacity': opacity_ann,
+            }
+        )
+        # .drop(columns=rank_col)
+        .rename(columns=d_rename_annot_)
+        .to_dict(orient='records')
+    )
+    # We need to update font formatting separately because it's nested dict that messes up pandas.to_dict()
+    for a_ in l_ann_subs_:
+        # update the size and color of the ANN based on the rank 
+        a_['font'] = font_ann_kwargs[a_[rank_col]]['font']
+        a_['opacity'] = font_ann_kwargs[a_[rank_col]]['opacity']
+        
+        # delete the rank b/c it's not needed for annotation
+        a_.pop(rank_col)
+    
+    l_counterpart_subs_ = (
+        df_coordinates
+        [[k_ for k_ in d_rename_annot_.keys()]]
+        .merge(
+            df_counterpart_picks
+            [[text_col, rank_col]],
+            how='inner',
+            on=text_col,
+        )
+        .assign(
+            showarrow=False,
+            xshift=0,
+            yshift=lambda df_: -np.abs(df_[c_y_] * 0.20),
+            opacity=opacity_counter,
+        )
+        # .drop(columns=rank_col)
+        .rename(columns=d_rename_annot_)
+        .to_dict(orient='records')
+    )
+    # We need to update font formatting separately because it's nested dict that messes up pandas.to_dict()
+    for a_ in l_counterpart_subs_:
+        # update the size and color of the ANN based on the rank 
+        a_['font'] = font_counter_kwargs[a_[rank_col]]['font']
+        a_['opacity'] = font_counter_kwargs[a_[rank_col]]['opacity']
+        
+        # delete the rank b/c it's not needed for annotation
+        a_.pop(rank_col)
+    
+    l_final_annots = l_counterpart_subs_ + l_ann_subs_ + l_target_subs_
+    if verbose:
+        print(f"{len(l_final_annots):,.0f} <- Total annotations")
+        print(f"** Sample Target **")
+        for k_, v_ in l_target_subs_[0].items():
+            print(f"    {k_}: {v_}")
+        print(f"** Sample ANN **")
+        for k_, v_ in l_ann_subs_[0].items():
+            print(f"    {k_}: {v_}")
+        print(f"** Sample Counterpart **")
+        for k_, v_ in l_counterpart_subs_[0].items():
+            print(f"    {k_}: {v_}")
+
+    # The last annotations get rendered last, so they'll be on top of other annotations
+    return l_final_annots
+
+
+# c_x_ = 'tsne1_jitter'
+# c_y_ = 'tsne2_jitter'
+# l_new_annots = sub_name_annotations(
+#     df_tsne_full_,
+#     x=c_x_,
+#     y=c_y_,
+#     text_col='subreddit_name',
+#     l_targets=l_subs_target,
+#     df_ann=df_ann_global,
+#     df_counterparts=df_counterparts,
+#     verbose=True,
+# )
+
 df_tsne = datasets['01 tsne_projections'].copy()
 print(df_tsne.shape)
 
@@ -628,6 +854,54 @@ df_tsne['subreddit_name_display'] = np.where(
   '',
 )
 
+# add jitter to TSNE
+def rand_uniform_seed(low, high, size=None, random_state=42):
+    """This fxn makes it so that we can make the jitter repeatable.
+    It replaces:
+    np.random.uniform(jitter_start_, jitter_end_, size=len(df_tsne))
+    """
+    rs = np.random.RandomState(random_state)
+    return rs.uniform(low=low, high=high, size=size)
+
+
+jitter_x_start_ = 1.8
+jitter_y_start_ = 2.1
+# del jitter_end_ = 2.08
+# del jitter_end_
+df_tsne['tsne1_jitter'] = (
+    df_tsne['tsne1'] * 
+    rand_uniform_seed(jitter_x_start_, jitter_x_start_ + 0.05, size=len(df_tsne), random_state=42)
+)
+df_tsne['tsne2_jitter'] = (
+    df_tsne['tsne2'] * 
+    rand_uniform_seed(jitter_y_start_, jitter_y_start_ + 0.09, size=len(df_tsne), random_state=1337)
+)
+
+%%time
+
+df_tsne['rank_by_topic_v2'] = (
+  df_tsne
+  .groupby(['curator_topic_v2'])
+  ['users_l7'].rank(method='first', ascending=False)
+).astype(int)
+
+df_tsne = df_tsne.sort_values(
+    by=['curator_topic', 'users_l7', 'curator_topic_v2', ], ascending=[True, False, True]
+)
+# df_tsne.head()
+
+l_top_subs_by_topic_v2 = df_tsne[df_tsne['rank_by_topic_v2'] <= 1]['subreddit_name'].to_list()
+l_top_subs_by_topic_v2 = l_top_subs_by_topic_v2 + df_tsne[df_tsne['rank_by_topic_v2'] == 10]['subreddit_name'].to_list()
+print(len(l_top_subs_by_topic_v2))
+print(l_top_subs_by_topic_v2[:5])
+
+# display to pick other interesting subs to show by default
+# 'leagueoflegends,cats,anime,diy,art,cars,dataisbeautiful,fitness,cooking,technology,lgbt'
+# style_df_numeric(
+#     df_tsne[df_tsne['rank_by_topic_v2'] <= 2]
+#     [['rank_by_topic_v2', 'subreddit_name', 'users_l7', 'posts_l7', 'curator_topic', 'curator_topic_v2']]
+# )
+
 style_df_numeric(
   df_tsne[['users_l7', 'posts_l7']]
   .describe(
@@ -654,10 +928,10 @@ df_tsne['users_l7_bins'] = pd.cut(
         df_tsne['users_l7'].quantile(0.70),
         
         df_tsne['users_l7'].quantile(0.75),
-        df_tsne['users_l7'].quantile(0.80),
-        df_tsne['users_l7'].quantile(0.85),
+        df_tsne['users_l7'].quantile(0.81),
+        df_tsne['users_l7'].quantile(0.87),
         
-        df_tsne['users_l7'].quantile(0.90),
+        df_tsne['users_l7'].quantile(0.91),
         df_tsne['users_l7'].quantile(0.95),
         df_tsne['users_l7'].quantile(0.97),
         
@@ -670,8 +944,8 @@ df_tsne['users_l7_bins'] = pd.cut(
         np.inf,
     ],
     labels=[
-        0.3, 0.5, 0.6,
-        0.7, 0.8, 0.9,
+        0.2, 0.4, 0.5,
+        0.6, 0.7, 0.8,
         1.0, 1.1, 1.2,
         1.3, 1.4, 1.5,
         1.8, 2.0, 2.3,
@@ -683,57 +957,7 @@ df_tsne['users_l7_bins'] = pd.cut(
 print(df_tsne['users_l7_bins'].nunique())
 # value_counts_and_pcts(df_tsne['users_l7_bins'], top_n=None, sort_index=True, sort_index_ascending=True)
 
-# add jitter to TSNE
-jitter_start_ = 2.0 
-jitter_end_ = 2.15
-df_tsne['tsne1_jitter'] = df_tsne['tsne1'] * np.random.uniform(jitter_start_, jitter_end_, size=len(df_tsne))
-df_tsne['tsne2_jitter'] = df_tsne['tsne2'] * np.random.uniform(jitter_start_, jitter_end_, size=len(df_tsne))
 
-# counts_describe(df_tsne[['curator_rating', 'curator_topic', 'curator_topic_v2']])
-
-%%time
-
-df_tsne['rank_by_topic_v2'] = (
-  df_tsne
-  .groupby(['curator_topic_v2'])
-  ['users_l7'].rank(method='first', ascending=False)
-)
-
-# df_tsne = df_tsne.sort_values(by=['users_l7', 'rank_by_topic_v2'], ascending=[False, True])
-# df_tsne.head()
-
-l_top_subs_by_topic_v2 = df_tsne[df_tsne['rank_by_topic_v2'] <= 1]['subreddit_name'].to_list()
-l_top_subs_by_topic_v2 = l_top_subs_by_topic_v2 + df_tsne[df_tsne['rank_by_topic_v2'] == 10]['subreddit_name'].to_list()
-print(len(l_top_subs_by_topic_v2))
-print(l_top_subs_by_topic_v2[:5])
-
-def shift_annot_by_rank(
-    val: str,
-    x: float,
-    y: float,
-    rank: int,
-    diff: float = 0.35,
-) -> float:
-    """Given coordinates (x,y) and a rank, return the shifted X or Y value
-    rank 1 -> shift down (x: same, y: negative)
-    rank 2 -> shift left (x: negative, y: same)
-    rank 3 -> shift right (x: positive, y: same)
-    """
-    # initialize with inputs
-    d_out_ = {
-        'x': x,
-        'y': y,
-    }
-    if rank == 1:
-        d_out_['y'] = -np.abs(diff * d_out_['y'])
-    elif rank == 2:
-        d_out_['x'] = -np.abs(diff * d_out_['x'])
-    elif rank == 3:
-        d_out_['x'] = np.abs(diff * d_out_['x'])
-        
-    return d_out_[val]
-    
-    
 def sub_name_annotations(
     df_coordinates: pd.DataFrame,
     x: str,
@@ -744,7 +968,14 @@ def sub_name_annotations(
     df_counterparts: pd.DataFrame,
     rank_col: str = 'combined_rank',
     ann_max_rank: int = 3,
+    counter_max_rank: int = 2,
     verbose: bool = False,
+    opacity_target: float = 0.99,
+    opacity_ann: float = 0.8,
+    opacity_counter: float = 0.68,
+    font_target_kwargs: dict = None,
+    font_ann_kwargs: dict = None,
+    font_counter_kwargs: dict = None,
 ) -> list:
     """Return a list of annotations for a plotly scatter plot
     We'll apply 3 layers of annotations:
@@ -752,14 +983,93 @@ def sub_name_annotations(
     - the nearest 3 subreddits (overall/global)
     - the top subreddit PER country
     """
+    # Set default values for font formatting
+    if font_target_kwargs is None:
+        font_target_kwargs = {
+            'color': '#ffffff',
+            'size': 17
+        }
+    if font_ann_kwargs is None:
+        # this dict has slightly different configs w/ the key=the rank
+        #. we want closer subs to be easier to view
+        font_ann_kwargs = {
+            1: {
+                'font': {
+                    'color': '#d3d4d5',
+                    'size': 14,
+                },
+                'opacity': 0.80,
+            },
+            2: {
+                'font': {
+                    'color': '#c3c4c5',
+                    'size': 13,
+                },
+                'opacity': 0.75,
+            },
+            3: {
+                'font': {
+                    'color': '#b3b4b5',
+                    'size': 12,
+                },
+                'opacity': 0.70,
+            },
+        }
+    if font_counter_kwargs is None:
+        font_counter_kwargs = {
+            1: {
+                'font': {
+                    'color': '#a3a4a5',
+                    'size': 9.5,
+                },
+                'opacity': 0.65,
+            },
+            2: {
+                'font': {
+                    'color': '#939495',
+                    'size': 9,
+                },
+                'opacity': 0.6,
+            },
+            3: {
+                'font': {
+                    'color': '#939495',
+                    'size': 8,
+                },
+                'opacity': 0.55,
+            },
+        }
+        
     d_rename_annot_ = {
         c_x_: 'x',
         c_y_: 'y',
         'subreddit_name': 'text',
     }
     
+    # only highlight ANNs that also aren't targets
+    df_ann_picks = df_ann[(
+        (df_ann[rank_col] <= ann_max_rank) &
+        (~df_ann[text_col].isin(l_subs_target))
+    )]
+    # if sub is already a top nearest neighbor, don't plot again as a country-specific sub
+    # sort by sub size & drop duplicates so that we don't plot the same sub twice
+    #  if it's relevant to multiple countries
+    df_counterpart_picks = (
+        df_counterparts
+        .sort_values(by=[rank_col], ascending=True)
+        .drop_duplicates(subset=[text_col], keep='first')
+        .copy()
+    )
+    df_counterpart_picks = df_counterpart_picks[(
+        (df_counterpart_picks[rank_col] <= counter_max_rank) &
+        (~df_counterpart_picks[text_col].isin(l_subs_target)) &
+        (~df_counterpart_picks[text_col].isin(df_ann_picks[text_col]))
+    )]
     if verbose:
-      print(f"{len(l_targets)} <- Target subs")
+        print(f"{len(l_targets)} <- Target subs")
+        print(f"{df_ann_picks.shape} <- ANN picks")
+        print(f"{df_counterpart_picks.shape} <- Counterpart picks")
+    
     # for TARGET subs, keep the text ABOVE the actual location
     l_target_subs_ = (
         df_coordinates[(df_coordinates[text_col].isin(l_subs_target))]
@@ -768,7 +1078,7 @@ def sub_name_annotations(
             showarrow=False,
             xshift=0,
             yshift=lambda df_: np.abs(df_[c_y_] * 0.35),
-            opacity=0.95,
+            opacity=opacity_target,
             # font={'color': "#fdfdfd", 'size': 17},
         )
         .rename(columns=d_rename_annot_)
@@ -776,17 +1086,10 @@ def sub_name_annotations(
     )
     # We need to update font formatting separately because it's nested dict that messes up pandas.to_dict()
     for a_ in l_target_subs_:
-        a_['font'] = {'color': "#fdfdfd", 'size': 17}
+        a_['font'] = font_target_kwargs
     
-    df_ann_picks = df_ann[(
-        (df_ann[rank_col] <= ann_max_rank) &
-        (~df_ann[text_col].isin(l_subs_target))
-    )]
-    if verbose:
-        print(f"{df_ann_picks.shape} <- ANN picks")
     l_ann_subs_ = (
-        df_coordinates
-        [[k_ for k_ in d_rename_annot_.keys()]]
+        df_coordinates[[k_ for k_ in d_rename_annot_.keys()]]
         .merge(
             df_ann_picks
             [[text_col, rank_col]],
@@ -798,34 +1101,30 @@ def sub_name_annotations(
                 'showarrow': False,
                 'xshift': lambda df_: np.select(
                     [df_[rank_col] == 2, df_[rank_col] == 3],
-                    [-np.abs(df_[x] * 0.3), np.abs(df_[x] * 0.3)],
+                    [-np.abs(df_[x] * 0.2), np.abs(df_[x] * 0.2)],
                     default=0,
                 ),
                 'yshift': lambda df_: np.select(
-                    [df_[rank_col] == 1],
-                    [-np.abs(df_[y] * 0.3)],
+                    [df_[rank_col] == 1, df_[rank_col] == 2, df_[rank_col] == 3],
+                    [-np.abs(df_[y] * 0.05), -np.abs(df_[y] * 0.15), -np.abs(df_[y] * 0.25)],
                     default=0,
                 ),
-                'opacity': 0.75,
+                # 'opacity': opacity_ann,
             }
         )
-        .drop(columns=rank_col)
+        # .drop(columns=rank_col)
         .rename(columns=d_rename_annot_)
         .to_dict(orient='records')
     )
     # We need to update font formatting separately because it's nested dict that messes up pandas.to_dict()
     for a_ in l_ann_subs_:
-        a_['font'] = {'color': "#b5b5b5", 'size': 13}
+        # update the size and color of the ANN based on the rank 
+        a_['font'] = font_ann_kwargs[a_[rank_col]]['font']
+        a_['opacity'] = font_ann_kwargs[a_[rank_col]]['opacity']
+        
+        # delete the rank b/c it's not needed for annotation
+        a_.pop(rank_col)
     
-    
-    # TODO(djb)if sub is already a top nearest neighbor, don't plot again as a country-specific sub
-    df_counterpart_picks = df_counterparts[(
-        (df_counterparts[rank_col] == 1) &
-        (~df_counterparts[text_col].isin(l_subs_target)) &
-        (~df_counterparts[text_col].isin(df_ann_picks[text_col]))
-    )]
-    if verbose:
-        print(f"{df_counterpart_picks.shape} <- Counterpart picks")
     l_counterpart_subs_ = (
         df_coordinates
         [[k_ for k_ in d_rename_annot_.keys()]]
@@ -838,91 +1137,51 @@ def sub_name_annotations(
         .assign(
             showarrow=False,
             xshift=0,
-            yshift=lambda df_: -np.abs(df_[c_y_] * 0.39),
-            opacity=0.6,
-            # font={'color': "#fdfdfd", 'size': 17},  # this breaks conversion to_dict()
+            yshift=lambda df_: -np.abs(df_[c_y_] * 0.20),
+            opacity=opacity_counter,
         )
-        .drop(columns=rank_col)
+        # .drop(columns=rank_col)
         .rename(columns=d_rename_annot_)
         .to_dict(orient='records')
     )
     # We need to update font formatting separately because it's nested dict that messes up pandas.to_dict()
     for a_ in l_counterpart_subs_:
-        a_['font'] = {'color': "#969795", 'size': 8}
+        # update the size and color of the ANN based on the rank 
+        a_['font'] = font_counter_kwargs[a_[rank_col]]['font']
+        a_['opacity'] = font_counter_kwargs[a_[rank_col]]['opacity']
+        
+        # delete the rank b/c it's not needed for annotation
+        a_.pop(rank_col)
     
-    # The last annotations get posted last, so they'll be on top of other annotations
-    return l_counterpart_subs_ + l_ann_subs_ + l_target_subs_
+    l_final_annots = l_counterpart_subs_ + l_ann_subs_ + l_target_subs_
+    if verbose:
+        print(f"{len(l_final_annots):,.0f} <- Total annotations")
+        print(f"** Sample Target **")
+        for k_, v_ in l_target_subs_[0].items():
+            print(f"    {k_}: {v_}")
+        print(f"** Sample ANN **")
+        for k_, v_ in l_ann_subs_[0].items():
+            print(f"    {k_}: {v_}")
+        print(f"** Sample Counterpart **")
+        for k_, v_ in l_counterpart_subs_[0].items():
+            print(f"    {k_}: {v_}")
+
+    # The last annotations get rendered last, so they'll be on top of other annotations
+    return l_final_annots
 
 
-c_x_ = 'tsne1_jitter'
-c_y_ = 'tsne2_jitter'
-
-l_new_annots = sub_name_annotations(
-    df_tsne_full_,
-    x=c_x_,
-    y=c_y_,
-    text_col='subreddit_name',
-    l_targets=l_subs_target,
-    df_ann=df_ann_global,
-    df_counterparts=df_counterparts,
-    verbose=True,
-)
-
-print(len(l_new_annots))
-
-for k_, v_ in l_new_annots[0].items():
-    print(f"{k_}: {v_}")
-print(f"")
-for k_, v_ in l_new_annots[-len(l_subs_target) - 1].items():
-    print(f"{k_}: {v_}")
-print(f"")
-for k_, v_ in l_new_annots[-1].items():
-    print(f"{k_}: {v_}")
-
-df_tsne_full_.shape
-
-# # merge the top ANN with the projection df & assign shift based on rank
-# #     rank 1 -> shift down (x: same, y: negative)
-# #     rank 2 -> shift left (x: negative, y: same)
-# #     rank 3 -> shift right (x: positive, y: same)
-# rank_col = 'combined_rank'
-# text_col = 'subreddit_name'
-# display(
-#     df_tsne_full_[['subreddit_name', 'tsne1_jitter', 'tsne2_jitter']].merge(
-#         df_ann_global[df_ann_global[rank_col] <= 3]
-#         [[text_col, rank_col]],
-#         how='inner',
-#         on=text_col,
-#     )
-#     .assign(
-#         **{
-#             'xshift': lambda df_: np.select(
-#                 [df_[rank_col] == 2, df_[rank_col] == 3],
-#                 [-np.abs(df_['tsne1_jitter'] * 0.3), np.abs(df_['tsne1_jitter'] * 0.3)],
-#                 default=0,
-#             ),
-#             'yshift': lambda df_: np.select(
-#                 [df_[rank_col] == 1],
-#                 [-np.abs(df_['tsne2_jitter'] * 0.3)],
-#                 default=0,
-#             ),
-#             'opacity': 0.7,
-#         }
-#     )
-#     .to_dict(orient='records')
+# c_x_ = 'tsne1_jitter'
+# c_y_ = 'tsne2_jitter'
+# l_new_annots = sub_name_annotations(
+#     df_tsne_full_,
+#     x=c_x_,
+#     y=c_y_,
+#     text_col='subreddit_name',
+#     l_targets=l_subs_target,
+#     df_ann=df_ann_global,
+#     df_counterparts=df_counterparts,
+#     verbose=True,
 # )
-
-# del rank_col, text_col
-
-# # convert the df to a dictionary so we can extract the top 3 nearest neighbors per subreddit
-# # (
-# #   df_ann_global[df_ann_global['combined_rank'] <= 3]
-# #   [['subreddit_name', 'combined_rank']]
-# #   .set_index('subreddit_name')
-# #   # .head()
-# #   .to_dict(orient='dict')
-# #   ['combined_rank']
-# # )
 
 # apply filters for plot
 # For detailed map only focus on input subs & ANN.
@@ -935,24 +1194,20 @@ df_tsne_full_ = df_tsne[(
 
 s_plot_name_ = f"Similar Subreddits for Search"
 c_text_display = 'subreddit_name_display'
+c_x_ = 'tsne1_jitter'
+c_y_ = 'tsne2_jitter'
 
 # add Subreddit name annotations separately. This way text should always be on top of points
-d_rename_c_top_sub_annot = {
-    'latitude': 'x',
-    'longitude': 'y',
-    'geo_city': 'text',
-}
-
-# l_new_annots = sub_name_annotations(
-#     df_tsne_full_,
-#     x=c_x_,
-#     y=c_y_,
-#     text_col='subreddit_name',
-#     l_targets=l_subs_target,
-#     df_ann=df_ann_global,
-#     df_counterparts=df_counterparts,
-#     verbose=False,
-# )
+l_new_annots = sub_name_annotations(
+    df_tsne_full_,
+    x=c_x_,
+    y=c_y_,
+    text_col='subreddit_name',
+    l_targets=l_subs_target,
+    df_ann=df_ann_global,
+    df_counterparts=df_counterparts,
+    verbose=False,
+)
 
 # Set custom text & custom hover template
 l_custom_text_ = [
@@ -970,11 +1225,11 @@ sub_hovertemplate = "<br>".join(
 
 fig = px.scatter(
     df_tsne_full_,
-    x='tsne1_jitter', 
-    y='tsne2_jitter',
+    x=c_x_, 
+    y=c_y_,
     opacity=0.7,
     # title=s_plot_name_,
-    size='users_l7_bins',
+    size='users_l7_bins',  # 'users_l7_bins'
     color='curator_topic',  # 'curator_topic_sim',
     category_orders={
         'curator_topic': sorted(df_tsne_full_['curator_topic'].dropna().unique(), reverse=False),
@@ -1017,82 +1272,96 @@ fig.update_traces(
 fig.show()
 
 
-# # apply filters for plot
-# df_tsne_full_ = (
-#     df_tsne[(
-#       (df_tsne['users_l7'] >= 700) &
-#       (df_tsne['posts_l7'] >= 5)
-#   )]
-#   # .sort_values(by=['users_l7'], ascending=True)
-# )
-# s_plot_name_ = f"{len(df_tsne_full_):,.0f} Subreddits With Recent Activity"
-# c_text_display = 'subreddit_name_display'
+# apply filters for plot
+# TODO(djb): create slider for min number of users & min # of posts
+df_tsne_full_ = (
+    df_tsne[(
+      (df_tsne['users_l7'] >= 700) &
+      (df_tsne['posts_l7'] >= 5)
+  )]
+  # .sort_values(by=['users_l7'], ascending=True)
+)
+s_plot_name_ = f"{len(df_tsne_full_):,.0f} Subreddits With Recent Activity"
+c_text_display = 'subreddit_name_display'
 
-# # Set custom text & custom hover template
-# l_custom_text_ = [
-#     'subreddit_name',
-#     'curator_topic_v2',
-#     'users_l7',
-# ]
-# sub_hovertemplate = "<br>".join(
-#     [
-#         "<b>%{customdata[0]}</b>",
-#         "<i>topic v2</i>: %{customdata[1]}",
-#         "<i>users L7</i>: %{customdata[2]:,.0f}",
-#     ]
-# )
+# Set custom text & custom hover template
+l_custom_text_ = [
+    'subreddit_name',
+    'curator_topic_v2',
+    'users_l7',
+]
+sub_hovertemplate = "<br>".join(
+    [
+        "<b>%{customdata[0]}</b>",
+        "<i>topic v2</i>: %{customdata[1]}",
+        "<i>users L7</i>: %{customdata[2]:,.0f}",
+    ]
+)
+# add Subreddit name annotations separately. This way text should always be on top of points
+l_new_annots = sub_name_annotations(
+    df_tsne_full_,
+    x=c_x_,
+    y=c_y_,
+    text_col='subreddit_name',
+    l_targets=l_subs_target,
+    df_ann=df_ann_global,
+    df_counterparts=df_counterparts,
+    verbose=False,
+)
 
-# fig = px.scatter(
-#     df_tsne_full_,
-#     x='tsne1_jitter', 
-#     y='tsne2_jitter',
-#     opacity=0.6,
-#     size='users_l7_bins',
-#     title=s_plot_name_,
-#     color='curator_topic',
-#     category_orders={'curator_topic': sorted(df_tsne_full_['curator_topic'].dropna().unique(), reverse=True)},
-#     text=c_text_display,
-#     hover_name='subreddit_name',
-#     # hover_data=[k_clusters_to_plot_],
-#     custom_data=l_custom_text_,
-# )
-# fig.update_layout(
-#     width=1100,
-#     height=650,
-#     legend_traceorder="reversed",
-#     # autosize=False,
-#     yaxis=dict(showgrid=False, zeroline=False,),
-#     xaxis=dict(showgrid=False, zeroline=False),
-#     plot_bgcolor='#040404',  # dark-gray: '#1a1a1a' '#fcfcfc'
-# )
 
-# # CHANGE color of text
-# # option A: change color of all text the same
-# # Also: apply hover template
-# fig.update_traces(
-#     hovertemplate=sub_hovertemplate,
-#     marker_line_width=0,
-#     textposition='top center',
-#     textfont=dict(
-#         color='#fcfcfc',  # '#fcfcfc' '#1a1a1a'
-#         size=17,
-#         # bgcolor='#ababab',
-#         # opacity=0.2,
-#     ),
-# )
+fig = px.scatter(
+    df_tsne_full_,
+    x='tsne1_jitter', 
+    y='tsne2_jitter',
+    opacity=0.6,
+    size='users_l7_bins',
+    # title=s_plot_name_,
+    color='curator_topic',
+    category_orders={'curator_topic': sorted(df_tsne_full_['curator_topic'].dropna().unique(), reverse=True)},
+    # text=c_text_display,
+    hover_name='subreddit_name',
+    # hover_data=[k_clusters_to_plot_],
+    custom_data=l_custom_text_,
+)
+fig.update_layout(
+    width=1100,
+    height=650,
+    legend_traceorder="reversed",
+    annotations=l_new_annots,
+    autosize=False,
+    yaxis=dict(showgrid=False, zeroline=False,),
+    xaxis=dict(showgrid=False, zeroline=False),
+    plot_bgcolor='#040404',  # dark-gray: '#1a1a1a' '#fcfcfc'
+)
 
-# # option b: match color to the dot (point in the scatter)
-# # fig.for_each_trace(lambda t: t.update(textfont_color=t.marker.color, textposition='top center'))
+# CHANGE color of text
+# option A: change color of all text the same
+# Also: apply hover template
+fig.update_traces(
+    hovertemplate=sub_hovertemplate,
+    marker_line_width=0,
+    textposition='top center',
+    textfont=dict(
+        color='#fcfcfc',  # '#fcfcfc' '#1a1a1a'
+        size=17,
+        # bgcolor='#ababab',
+        # opacity=0.2,
+    ),
+)
 
-# # fig.show(renderer='png')
-# fig.show()
+# option b: match color to the dot (point in the scatter)
+# fig.for_each_trace(lambda t: t.update(textfont_color=t.marker.color, textposition='top center'))
+
+# fig.show(renderer='png')
+fig.show()
 
 # Full projection
 
 
 # apply filters for plot
 df_tsne_full_ = df_tsne[(
-    (df_tsne['users_l7'] >= 10) &
+    (df_tsne['users_l7'] >= 500) &
     (df_tsne['posts_l7'] >= 1)
 )]
 s_plot_name_ = f"{len(df_tsne_full_):,.0f} Subreddits With Recent Activity"
@@ -1111,6 +1380,17 @@ sub_hovertemplate = "<br>".join(
         "<i>users L7</i>: %{customdata[2]:,.0f}",
     ]
 )
+# add Subreddit name annotations separately. This way text should always be on top of points
+l_new_annots = sub_name_annotations(
+    df_tsne_full_,
+    x=c_x_,
+    y=c_y_,
+    text_col='subreddit_name',
+    l_targets=l_subs_target,
+    df_ann=df_ann_global,
+    df_counterparts=df_counterparts,
+    verbose=False,
+)
 
 fig = px.scatter(
     df_tsne_full_,
@@ -1119,18 +1399,19 @@ fig = px.scatter(
     # color=k_clusters_to_plot_,
     opacity=0.7,
     size='users_l7',
-    title=s_plot_name_,
+    # title=s_plot_name_,
     color='curator_topic',
     category_orders={'curator_topic': sorted(df_tsne_full_['curator_topic'].dropna().unique(), reverse=True)},
-    text=c_text_display,
+    # text=c_text_display,
     hover_name='subreddit_name',
     # hover_data=[k_clusters_to_plot_],
     custom_data=l_custom_text_,
 )
 fig.update_layout(
-    width=1000,
+    width=1100,
     height=800,
     # autosize=False,
+    annotations=l_new_annots,
     legend_traceorder="reversed",
     yaxis=dict(showgrid=False, zeroline=False,),
     xaxis=dict(showgrid=False, zeroline=False),
