@@ -53,12 +53,17 @@ EXTRAS_REQUIRE = {
         "gcsfs >= 2021.11.1",
     ],
 
-    "latop_dev": [
+    "laptop_dev": [
         "click == 8.0.1",
         "ipython <= 7.28.0",
         "joblib == 1.0.1",
         "jupyterlab <= 3.1.18",
         "markupsafe <= 1.1.1",
+
+        # wheel makes it easier to install some libraries
+        "wheel == 0.40.0",
+
+        # "grpcio < 1.53.0",  # Pin below this version b/c it breaks above it
 
         # Extentions to make jupyter notebook closer to jupyter lab
         "jupyter_contrib_nbextensions == 0.5.1",
