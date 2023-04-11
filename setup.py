@@ -21,6 +21,9 @@ INSTALL_REQUIRES = [
     # Use dask to load parquet files in parallel
     "dask[complete] == 2021.6.0",
 
+    # test polars to speed up parallel processing (instead of dask or spark)
+    "polars == 0.17.1",  # this creates conflicts with typing-extensions + thinc
+
     # Auth
     # "pydata-google-auth",
 
@@ -53,12 +56,17 @@ EXTRAS_REQUIRE = {
         "gcsfs >= 2021.11.1",
     ],
 
-    "latop_dev": [
+    "laptop_dev": [
         "click == 8.0.1",
         "ipython <= 7.28.0",
         "joblib == 1.0.1",
         "jupyterlab <= 3.1.18",
         "markupsafe <= 1.1.1",
+
+        # wheel makes it easier to install some libraries
+        "wheel == 0.40.0",
+
+        # "grpcio < 1.53.0",  # Pin below this version b/c it breaks above it
 
         # Extentions to make jupyter notebook closer to jupyter lab
         "jupyter_contrib_nbextensions == 0.5.1",
@@ -95,6 +103,9 @@ EXTRAS_REQUIRE = {
         "jupyterlab == 1.2.16",
         "markupsafe <= 1.1.1",
         "pyarrow == 3.0.0",
+
+        # fix for polars
+        # "typing-extensions <= 3.7.4.3",
 
         # pre-installed google libraries
         #  pin them to prevent pip from trying to over-write them

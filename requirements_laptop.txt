@@ -1,2 +1,2 @@
 # local package
--e .[latop_dev]
+-e .[laptop_dev]

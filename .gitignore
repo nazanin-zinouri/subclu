@@ -142,7 +142,11 @@ dmypy.json
 
 # exclude testing/scratch notebooks
 *djb*-IGNORE.*py*
+*djb*-ignore.*py*
 *djb*ignore/
+
+# test parquet files
+*djb*-IGNORE.parquet
 
 # Annoy index from openTSNE
 *annoy_index*.ann
