@@ -21,6 +21,9 @@ INSTALL_REQUIRES = [
     # Use dask to load parquet files in parallel
     "dask[complete] == 2021.6.0",
 
+    # test polars to speed up parallel processing (instead of dask or spark)
+    "polars == 0.17.1",  # this creates conflicts with typing-extensions + thinc
+
     # Auth
     # "pydata-google-auth",
 
@@ -100,6 +103,9 @@ EXTRAS_REQUIRE = {
         "jupyterlab == 1.2.16",
         "markupsafe <= 1.1.1",
         "pyarrow == 3.0.0",
+
+        # fix for polars
+        # "typing-extensions <= 3.7.4.3",
 
         # pre-installed google libraries
         #  pin them to prevent pip from trying to over-write them
