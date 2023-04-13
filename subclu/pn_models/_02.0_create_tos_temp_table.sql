@@ -63,3 +63,14 @@ WHERE
 --     , COUNT(DISTINCT user_id) AS user_id_count
 -- FROM `reddit-employee-datasets.david_bermejo.pn_test_user_tos_30_pct_20230413`
 -- ;
+
+
+-- Export data to GCS because querying such a huge table takes forever and a half
+EXPORT DATA OPTIONS(
+    uri='gs://i18n-subreddit-clustering/pn_model/runs/20230413/user_tos_30_pct/*.parquet',
+    format='PARQUET',
+    overwrite=true
+) AS
+SELECT *
+FROM `reddit-employee-datasets.david_bermejo.pn_test_user_tos_30_pct_20230413`
+;

@@ -8,7 +8,7 @@ import polars as pl
 import numpy as np
 
 
-def query_user_tos() -> str:
+def query_user_tos_test() -> str:
     """Generate query to get user Time on subreddit
     We can add parameter later if needed to extend windows.
     Ideally we could convert to rows in BQ, but I couldn't get to do it
