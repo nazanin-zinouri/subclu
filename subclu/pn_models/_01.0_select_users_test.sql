@@ -65,8 +65,8 @@ GROUP BY 1,2,3,4,5,6
 );
 
 
-SELECT
-    COUNT(*) AS row_count
-    , COUNT(DISTINCT user_id) AS user_id_count
-FROM `reddit-employee-datasets.david_bermejo.pn_test_users_for_embedding_20230412`
-;
+-- SELECT
+--     COUNT(*) AS row_count
+--     , COUNT(DISTINCT user_id) AS user_id_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_test_users_for_embedding_20230412`
+-- ;
