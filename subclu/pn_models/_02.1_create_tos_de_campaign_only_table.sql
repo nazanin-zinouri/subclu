@@ -18,7 +18,7 @@ LANGUAGE js AS """
 ;
 
 
-CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_tos_30_pct_20230417`
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_tos_30_pct_20230418`
 CLUSTER BY user_id
 AS (
 WITH tos_filtered AS (
@@ -29,7 +29,7 @@ FROM `data-prod-165221.user_feature_platform.time_on_subreddit_pct_time_over_30_
     INNER JOIN(
         SELECT
             DISTINCT user_id
-        FROM `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_20230417`
+        FROM `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_20230418`
         -- LIMIT 10
     ) AS u
         ON u.user_id = t.entity_id
@@ -53,6 +53,7 @@ FROM tos_exploded
 
 WHERE
     -- Limit smallest sub b/c at some point it's a waste to try to aggregate such small embeddings
+    -- 0.001 -> 1000 subreddits evenly split
     tos_30_pct >= 0.0001
 );
 
