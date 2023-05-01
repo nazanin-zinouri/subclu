@@ -1,4 +1,4 @@
--- Select trainig data AND users to train PN model. v2023-04-30
+-- Select trainig data AND users to train PN model. v2023-05-01
 DECLARE PT_FEATURES DATE DEFAULT "2022-12-01";
 DECLARE PT_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 
@@ -30,6 +30,7 @@ WITH subreddit_per_user_count AS (
         -- Need to fill cases where user_id is missing from new selection criteria
         COALESCE(act.user_id, f.user_id) AS user_id
         , act.target_subreddit
+        , slo.subreddit_id AS target_subreddit_id
         , COALESCE(act.send, 0) AS send
         , COALESCE(act.receive, 0) AS receive
         , COALESCE(act.click, 0) AS click
@@ -45,6 +46,19 @@ WITH subreddit_per_user_count AS (
         FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.pn_training_data_test_20230428` AS act
             ON f.user_id = act.user_id
                 AND f.subreddit_name = act.target_subreddit
+
+        -- Add subreddit_id so we can join to ToS_pct
+        -- NOTE: it's possible that the join will fail if the subreddit_name changes!
+        LEFT JOIN (
+            SELECT LOWER(name) AS subreddit_name, subreddit_id
+            FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+            -- Use greatest to pull most recent date:
+            --  - oldest partition ~90 days
+            --  - or same date as other features
+            WHERE dt = GREATEST((CURRENT_DATE() - 80), PT_FEATURES)
+        ) AS slo
+            ON LOWER(act.target_subreddit) = slo.subreddit_name
+
     WHERE target_subreddit IS NOT NULL
 )
 , user_actions_t7 AS (
@@ -73,17 +87,19 @@ SELECT
     -- Need to fill cases where user_id is missing from new selection criteria
     ct.user_id
     , ct.target_subreddit
+    , ct.target_subreddit_id
     , ct.send
     , ct.receive
     , ct.click
-    , COALESCE(tos.tos_sub_count, 0) AS tos_sub_count
+    , COALESCE(tsc.tos_sub_count, 0) AS tos_30_sub_count
+    , COALESCE(tos.tos_30_pct, 0) AS tos_30_pct
     , COALESCE(sv.feature_value, 0) AS screen_view_count_14d
     , COALESCE(cl.legacy_user_cohort, '_missing_') AS legacy_user_cohort
     , CASE
         WHEN cl.legacy_user_cohort = 'new' THEN 1
         WHEN cl.legacy_user_cohort = 'resurrected' THEN 2
         WHEN cl.legacy_user_cohort = 'casual' THEN 3
-        WHEN cl.legacy_user_cohort IS NULL THEN 4 -- '_missing_' or 'dead'?
+        WHEN cl.legacy_user_cohort IS NULL THEN 4  -- '_missing_' or 'dead'
         WHEN cl.legacy_user_cohort = 'core' THEN 5
         ELSE 0
     END AS legacy_user_cohort_ord
@@ -93,8 +109,8 @@ SELECT
 
 FROM core_train_info AS ct
     -- Get count of subs in ToS
-    LEFT JOIN subreddit_per_user_count AS tos
-        ON ct.user_id = tos.user_id
+    LEFT JOIN subreddit_per_user_count AS tsc
+        ON ct.user_id = tsc.user_id
     -- Recent PN activity
     LEFT JOIN user_actions_t7 AS pna
         ON ct.user_id = pna.user_id
@@ -116,9 +132,14 @@ FROM core_train_info AS ct
     LEFT JOIN post_consumes_agg AS co
         ON ct.user_id = co.user_id
 
+    -- Add ToS_pct for target subreddit
+    LEFT JOIN `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_tos_30_pct_20230418` AS tos
+        ON ct.user_id = tos.user_id
+            AND ct.target_subreddit_id = tos.subreddit_id
+
 WHERE ct.receive = 1
     -- TODO(djb): add all clicks & limit receives that were suppressed
 
 -- Only order to check data, no need to spend time ordering for training
-ORDER BY click DESC, tos_sub_count DESC
+-- ORDER BY tos_30_pct DESC, click DESC, tos_sub_count DESC
 ;
