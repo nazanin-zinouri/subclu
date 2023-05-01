@@ -79,6 +79,14 @@ SELECT
     , COALESCE(tos.tos_sub_count, 0) AS tos_sub_count
     , COALESCE(sv.feature_value, 0) AS screen_view_count_14d
     , COALESCE(cl.legacy_user_cohort, '_missing_') AS legacy_user_cohort
+    , CASE
+        WHEN cl.legacy_user_cohort = 'new' THEN 1
+        WHEN cl.legacy_user_cohort = 'resurrected' THEN 2
+        WHEN cl.legacy_user_cohort = 'casual' THEN 3
+        WHEN cl.legacy_user_cohort IS NULL THEN 4 -- '_missing_' or 'dead'?
+        WHEN cl.legacy_user_cohort = 'core' THEN 5
+        ELSE 0
+    END AS legacy_user_cohort_ord
     , pna.* EXCEPT(user_id)
     , co.* EXCEPT(user_id)
     , ct.* EXCEPT(user_id, target_subreddit, send, receive, click)
