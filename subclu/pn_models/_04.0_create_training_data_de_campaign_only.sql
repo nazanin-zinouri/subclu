@@ -1,4 +1,4 @@
--- Select trainig data AND users to train PN model. v2023-04-27
+-- Select trainig data AND users to train PN model. v2023-04-30
 DECLARE PT_FEATURES DATE DEFAULT "2022-12-01";
 DECLARE PT_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 
@@ -29,7 +29,7 @@ WITH subreddit_per_user_count AS (
     SELECT
         -- Need to fill cases where user_id is missing from new selection criteria
         COALESCE(act.user_id, f.user_id) AS user_id
-        , COALESCE(act.target_subreddit, f.subreddit_name) AS subreddit_name
+        , act.target_subreddit
         , COALESCE(act.send, 0) AS send
         , COALESCE(act.receive, 0) AS receive
         , COALESCE(act.click, 0) AS click
@@ -41,10 +41,11 @@ WITH subreddit_per_user_count AS (
     FROM (
         SELECT *
         FROM `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_20230418`
-        WHERE subreddit_name = 'de'
     ) AS f
-        FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.pn_training_data_test` AS act
+        FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.pn_training_data_test_20230428` AS act
             ON f.user_id = act.user_id
+                AND f.subreddit_name = act.target_subreddit
+    WHERE target_subreddit IS NOT NULL
 )
 , user_actions_t7 AS (
     SELECT
@@ -71,7 +72,7 @@ WITH subreddit_per_user_count AS (
 SELECT
     -- Need to fill cases where user_id is missing from new selection criteria
     ct.user_id
-    , ct.subreddit_name
+    , ct.target_subreddit
     , ct.send
     , ct.receive
     , ct.click
@@ -80,7 +81,7 @@ SELECT
     , COALESCE(cl.legacy_user_cohort, '_missing_') AS legacy_user_cohort
     , pna.* EXCEPT(user_id)
     , co.* EXCEPT(user_id)
-    , ct.* EXCEPT(user_id, subreddit_name, send, receive, click)
+    , ct.* EXCEPT(user_id, target_subreddit, send, receive, click)
 
 FROM core_train_info AS ct
     -- Get count of subs in ToS
@@ -108,6 +109,8 @@ FROM core_train_info AS ct
         ON ct.user_id = co.user_id
 
 WHERE ct.receive = 1
+    -- TODO(djb): add all clicks & limit receives that were suppressed
 
--- ORDER BY click DESC, tos_sub_count DESC
+-- Only order to check data, no need to spend time ordering for training
+ORDER BY click DESC, tos_sub_count DESC
 ;
