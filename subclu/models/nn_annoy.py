@@ -3,9 +3,8 @@ Get nearest neighbors with ANNOY
 """
 import logging
 from logging import info
-from typing import Tuple
+from typing import Tuple, Union
 
-import dask
 import annoy
 import pandas as pd
 from tqdm import tqdm
@@ -114,12 +113,14 @@ class AnnoyIndex():
             )
 
         # add col for rank so it's eaiser to filter by rank instead of only distances
+        # TODO(djb): FIX: keep the index as index b/c pandas is super fast when joining on index! (??)
         df_results_ = (
             df_results_.reset_index()
             .rename(columns={'index': col_distance_rank})
         )
 
         if append_i:
+            # TODO(djb): FIX: keep the index as index b/c pandas is super fast when joining on index!  (??)
             df_i = (
                 pd.DataFrame(
                     {f"{self.index_labels_name}": [self.index_labels[item_i]] * k,}
@@ -169,7 +170,7 @@ class AnnoyIndex():
         This one reduces pandas overhead from some dict lookups and tries to do as
         many vectorized functions as possible.
 
-        NOTE: using dask.delayed actually took longer than this optimized method
+        NOTE: using dask.delayed actually took longer than this method
 
         We'll use the output of this table to create SQL table that can be shared & used by others.
 
@@ -228,7 +229,6 @@ class AnnoyIndex():
         df_nn_top = pd.concat(l_topk_dfs, ignore_index=True)
         info(f"{df_nn_top.shape} <- df_nn_top shape")
 
-        # TODO(djb): add sub names & IDs
         if append_i:
             info(f"Adding index labels (subreddit ID & Name)")
             df_labels_reset_index = self.index_labels_df.copy().reset_index(drop=True)
@@ -322,5 +322,37 @@ class AnnoyIndex():
 
         logging.info(f"{df_full.shape} <- df_top_items shape")
         return df_full
+
+    # def _append_index(
+    #         self,
+    #         df_nns: pd.DataFrame,
+    # ) -> pd.DataFrame:
+    #     """Given an input of df_nn, append the index valaues.
+    #     WARNING: It assumes THE SAME index ORDER AS THE INPUTS!
+    #     """
+
+    # def get_top_nns_by_vector(
+    #         self,
+    #         v: Union,
+    #         n=100,
+    #         search_k: int = -1,
+    #         include_distances: bool = True,
+    #         append_i: bool = True,
+    #         col_distance: str = 'distance',
+    #         col_distance_rank: str = 'distance_rank',
+    #         cosine_similarity: bool = False,
+    #         col_cosine_similarity: str = 'cosine_similarity',
+    # ) -> pd.DataFrame:
+    #     """
+    #     Use this method to get ANNs for a given input.
+    #     Main use-case: Create index of USERS & get the nearest USERS to an input SUBREDDIT.
+    #
+    #     Best to compute cosine similarity on all dfs rather than one at a time.
+    #     from [github](https://github.com/spotify/annoy/issues/112#issuecomment-686513356)
+    #
+    #     cosine_similarity = 1 - cosine_distance^2/2
+    #     """
+
+
 
 

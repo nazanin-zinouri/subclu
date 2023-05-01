@@ -1,6 +1,6 @@
--- Select trainig data AND users to train PN model
+-- Select trainig data AND users to train PN model. v2023-04-27
 DECLARE PT_FEATURES DATE DEFAULT "2022-12-01";
-
+DECLARE PT_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 
 WITH subreddit_per_user_count AS (
     SELECT
@@ -27,7 +27,7 @@ WITH subreddit_per_user_count AS (
 )
 , core_train_info AS (
     SELECT
-        -- CREATE CTE because we need to fill cases where user_id is missing from new selection criteria
+        -- Need to fill cases where user_id is missing from new selection criteria
         COALESCE(act.user_id, f.user_id) AS user_id
         , COALESCE(act.target_subreddit, f.subreddit_name) AS subreddit_name
         , COALESCE(act.send, 0) AS send
@@ -46,6 +46,27 @@ WITH subreddit_per_user_count AS (
         FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.pn_training_data_test` AS act
             ON f.user_id = act.user_id
 )
+, user_actions_t7 AS (
+    SELECT
+      pne.user_id,
+      COUNT(receive_endpoint_timestamp) user_receives_pn_t7,
+      COUNT(click_endpoint_timestamp) user_clicks_pn_t7,
+      COUNT(
+        CASE
+          WHEN notification_type='lifecycle_post_suggestions'
+            THEN click_endpoint_timestamp
+          ELSE NULL
+        END
+    ) user_clicks_trnd_t7
+    FROM `data-prod-165221.channels.push_notification_events` AS pne
+    INNER JOIN core_train_info AS c
+        ON pne.user_id = c.user_id
+    WHERE
+        DATE(pt) BETWEEN PT_WINDOW_START AND PT_FEATURES
+        AND NOT REGEXP_CONTAINS(notification_type, "email")
+        AND receive_endpoint_timestamp IS NOT NULL
+  GROUP BY user_id
+)
 
 SELECT
     -- Need to fill cases where user_id is missing from new selection criteria
@@ -56,7 +77,8 @@ SELECT
     , ct.click
     , COALESCE(tos.tos_sub_count, 0) AS tos_sub_count
     , COALESCE(sv.feature_value, 0) AS screen_view_count_14d
-    , cl.legacy_user_cohort
+    , COALESCE(cl.legacy_user_cohort, '_missing_') AS legacy_user_cohort
+    , pna.* EXCEPT(user_id)
     , co.* EXCEPT(user_id)
     , ct.* EXCEPT(user_id, subreddit_name, send, receive, click)
 
@@ -64,6 +86,9 @@ FROM core_train_info AS ct
     -- Get count of subs in ToS
     LEFT JOIN subreddit_per_user_count AS tos
         ON ct.user_id = tos.user_id
+    -- Recent PN activity
+    LEFT JOIN user_actions_t7 AS pna
+        ON ct.user_id = pna.user_id
     -- Get view counts (all subreddits)
     LEFT JOIN (
         SELECT entity_id, feature_value
@@ -83,9 +108,6 @@ FROM core_train_info AS ct
         ON ct.user_id = co.user_id
 
 WHERE ct.receive = 1
---     AND (
---     subreddit_name = 'de'
---     OR target_subreddit = 'de'
--- )
-ORDER BY tos_sub_count DESC, click DESC
+
+-- ORDER BY click DESC, tos_sub_count DESC
 ;
