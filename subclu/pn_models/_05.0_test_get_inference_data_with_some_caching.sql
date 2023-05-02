@@ -1,6 +1,3 @@
-%%time
-%%bigquery df_inference_raw --project data-science-prod-218515
-
 -- Select subreddit<>user data for INFERENCE. v2023-05-01
 --   For this version pick data already processes for training
 --   The main use case is to get the data outputs in the right shape/format so we can
@@ -12,7 +9,7 @@ DECLARE PT_VIEWS_START DATE DEFAULT PT_FEATURES - 29;
 
 -- TODO(djb): Steps to create inference data:
 --  Create CANDIDATES table users with subreddit<>users views in L30 days
---  Create TARGET table with
+--  Create TARGET table with selected subs<>users
 --  Create exploded ToS table for users in user<>subreddit table
 
 
@@ -39,40 +36,35 @@ WITH subreddit_per_user_count AS (
     WHERE DATE(pt) = PT_FEATURES
     GROUP BY 1
 )
-, core_train_info AS (
+, candidate_sub_users AS (
     SELECT
-        -- Need to fill cases where user_id is missing from new selection criteria
+        -- Need to fill user_id where user_id is missing from new selection criteria
         COALESCE(f.user_id, act.user_id) AS user_id
-        , COALESCE(f.subreddit_name, act.target_subreddit) AS target_subreddit
-        , COALESCE(f.subreddit_id, slo.subreddit_id) AS target_subreddit_id
+        -- But for other ids, only keep the raw data (don't fill from training b/c that data has some dupes)
+        , f.subreddit_name AS target_subreddit
+        , f.subreddit_id AS target_subreddit_id
+
         , COALESCE(act.send, 0) AS send
         , COALESCE(act.receive, 0) AS receive
         , COALESCE(act.click, 0) AS click
 
-        , f.* EXCEPT(pt, pt_window_start, user_id, subreddit_name, subreddit_id)
+        -- The subscribed column in the old test table was wrong (all 0)
+        , f.* EXCEPT(pt, pt_window_start, user_id, subreddit_name, subreddit_id, subscribed)
 
     FROM (
         SELECT *
         FROM `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_20230418`
     ) AS f
-        FULL OUTER JOIN `reddit-employee-datasets.david_bermejo.pn_training_data_test_20230428` AS act
+        -- TODO(djb): remove this join. For normal inference, we won't need to join on actual sends/clicks
+        --  Only doing it for this query because we want to explore the users that the model ranks high, but didn't receive it
+        LEFT JOIN `reddit-employee-datasets.david_bermejo.pn_training_data_test_20230428` AS act
             ON f.user_id = act.user_id
                 AND f.subreddit_name = act.target_subreddit
 
-        -- Add subreddit_id so we can join to ToS_pct
-        -- NOTE: it's possible that the join will fail if the subreddit_name changes!
-        LEFT JOIN (
-            SELECT LOWER(name) AS subreddit_name, subreddit_id
-            FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-            -- Use GREATEST to pull most recent date:
-            --  - oldest partition ~90 days
-            --  - or same date as other features
-            WHERE dt = GREATEST((CURRENT_DATE() - 80), PT_FEATURES)
-        ) AS slo
-            ON LOWER(act.target_subreddit) = slo.subreddit_name
-
-    -- For inference, we don't need this clause to only keep sends|receives
-    -- WHERE act.target_subreddit IS NOT NULL
+    WHERE f.subreddit_id IS NOT NULL
+        -- For inference, we don't need this clause.
+        --   Only need to keep sends|receives for TRAINING
+        -- AND act.target_subreddit IS NOT NULL
 )
 , user_actions_t7 AS (
     SELECT
@@ -87,7 +79,7 @@ WITH subreddit_per_user_count AS (
         END
     ) user_clicks_trnd_t7
     FROM `data-prod-165221.channels.push_notification_events` AS pne
-    INNER JOIN core_train_info AS c
+    INNER JOIN candidate_sub_users AS c
         ON pne.user_id = c.user_id
     WHERE
         DATE(pt) BETWEEN PT_WINDOW_START AND PT_FEATURES
@@ -95,7 +87,23 @@ WITH subreddit_per_user_count AS (
         AND receive_endpoint_timestamp IS NOT NULL
   GROUP BY user_id
 )
+, subscribes AS (
+    SELECT
+        -- We need distinct in case a user subscribes multiple times to the same sub
+        DISTINCT
+        u.user_id,
+        su.subreddit_id AS subreddit_id
+    from data-prod-165221.ds_v2_postgres_tables.account_subscriptions AS s
+        LEFT JOIN UNNEST(subscriptions) AS su
 
+        INNER JOIN candidate_sub_users AS u
+            ON s.user_id = u.user_id
+
+    WHERE DATE(_PARTITIONTIME) = (CURRENT_DATE() - 2)
+        AND DATE(subscribe_date) <= PT_FEATURES
+)
+
+-- Select final data
 SELECT
     ct.user_id
     , ct.target_subreddit
@@ -103,6 +111,7 @@ SELECT
     , ct.send
     , ct.receive
     , ct.click
+    , IF(s.subreddit_id IS NOT NULL, 1, 0) subscribed
     , COALESCE(tsc.tos_sub_count, 0) AS tos_30_sub_count
     , COALESCE(tos.tos_30_pct, 0) AS tos_30_pct
     , COALESCE(sv.feature_value, 0) AS screen_view_count_14d
@@ -118,7 +127,7 @@ SELECT
     , co.* EXCEPT(user_id)
     , ct.* EXCEPT(user_id, target_subreddit, target_subreddit_id, send, receive, click)
 
-FROM core_train_info AS ct
+FROM candidate_sub_users AS ct
     -- Get count of subs in ToS
     LEFT JOIN subreddit_per_user_count AS tsc
         ON ct.user_id = tsc.user_id
@@ -151,6 +160,11 @@ FROM core_train_info AS ct
     LEFT JOIN `reddit-employee-datasets.david_bermejo.pn_test_users_de_campaign_tos_30_pct_20230418` AS tos
         ON ct.user_id = tos.user_id
             AND ct.target_subreddit_id = tos.subreddit_id
+
+    -- Get flag for user subscribed/not subscribed to sub
+    LEFT JOIN subscribes AS s
+        ON ct.user_id = s.user_id
+        AND ct.target_subreddit_id = s.subreddit_id
 
 -- For Inference, there's no need for WHERE clause because we want to score ALL users, even those that didn't receive the PN
 -- WHERE ct.receive = 1
