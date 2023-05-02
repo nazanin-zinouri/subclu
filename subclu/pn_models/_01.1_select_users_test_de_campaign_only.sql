@@ -62,18 +62,18 @@ FROM (
 GROUP BY 1,2,3,4
 )
 , subscribes AS (
--- Subscription tables expire after 90 days... (sigh)
---  So we'll have imperfect data for training models before 2023-02
--- Maybe we should just exclude it for historical campaigns and
---  Only add it going forward?
+-- TODO(djb): FIX: use date_subscribed (nested) to get actual subscription
 SELECT
+    -- We need distinct in case a user subscribes multiple times to the same sub
+    DISTINCT
     u.user_id,
     subscriptions.subreddit_id subreddit_id
-from data-prod-165221.ds_v2_postgres_tables.account_subscriptions AS s,
-    UNNEST(subscriptions) as subscriptions
+from data-prod-165221.ds_v2_postgres_tables.account_subscriptions AS s
+    LEFT JOIN UNNEST(subscriptions) as subscriptions
     INNER JOIN selected_users AS u
         ON s.user_id = u.user_id
-WHERE DATE(_PARTITIONTIME) = PT_DT
+WHERE DATE(_PARTITIONTIME) = (CURRENT_DATE() - 2)
+        AND DATE(subscribe_date) <= PT_DT
 )
 
 SELECT
