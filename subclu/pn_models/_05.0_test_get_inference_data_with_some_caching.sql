@@ -7,6 +7,15 @@ DECLARE PT_FEATURES DATE DEFAULT "2022-12-01";
 DECLARE PT_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 DECLARE PT_VIEWS_START DATE DEFAULT PT_FEATURES - 29;
 
+DECLARE TARGET_COUNTRY_CODES DEFAULT [
+    "MX", "ES", "AR"
+    , "DE", "AT", "CH"
+    , "US", "GB", "IN", "CA", "AU", "IE"
+    , "FR", "NL", "IT"
+    , "BR", "PT"
+    , "PH"
+];
+
 -- TODO(djb): Steps to create inference data:
 --  Create CANDIDATES table users with subreddit<>users views in L30 days
 --  Create TARGET table with selected subs<>users
@@ -111,6 +120,11 @@ SELECT
     , ct.send
     , ct.receive
     , ct.click
+    , CASE
+        WHEN ct.geo_country_code IS NULL THEN 'MISSING'
+        WHEN ct.geo_country_code IN UNNEST(TARGET_COUNTRY_CODES) THEN ct.geo_country_code
+        ELSE 'ROW'
+    END AS geo_country_code_top
     , IF(s.subreddit_id IS NOT NULL, 1, 0) subscribed
     , COALESCE(tsc.tos_sub_count, 0) AS tos_30_sub_count
     , COALESCE(tos.tos_30_pct, 0) AS tos_30_pct
@@ -125,7 +139,7 @@ SELECT
     END AS legacy_user_cohort_ord
     , pna.* EXCEPT(user_id)
     , co.* EXCEPT(user_id)
-    , ct.* EXCEPT(user_id, target_subreddit, target_subreddit_id, send, receive, click)
+    , ct.* EXCEPT(user_id, target_subreddit, target_subreddit_id, send, receive, click, user_in_actual_but_missing_from_new)
 
 FROM candidate_sub_users AS ct
     -- Get count of subs in ToS
