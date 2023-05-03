@@ -96,6 +96,7 @@ FROM post_consumes_agg AS pc
 
 -- This assumes we've already created the table and we're only inserting
 FOR cur_date IN (select distinct cur_date from unnest(dates_lst) as cur_date order by cur_date) DO
+    -- TODO(djb): add try/except logic to create table if it doesn't already exist
     execute immediate "DELETE " || table_name || " " || parametrized_delete
     USING cur_date.cur_date as cur_date;
 
