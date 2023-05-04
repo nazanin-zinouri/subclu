@@ -1,6 +1,7 @@
 -- Loop through different dates to backfill user-level data
 DECLARE DATES_LST array<date> default [
     -- Pick dates when we sent PNs we want to use for model training
+    DATE("2023-05-02"),
     DATE("2022-11-30"),
     DATE("2022-12-01"),
     DATE("2022-12-13"),
@@ -103,5 +104,3 @@ FOR cur_date IN (select distinct cur_date from unnest(dates_lst) as cur_date ord
     execute immediate "INSERT INTO " || table_name || " " || parametrized_insert
     USING cur_date.cur_date as cur_date;
 END FOR;
-
-
