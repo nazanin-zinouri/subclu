@@ -107,3 +107,35 @@ FROM post_consumes_agg AS pc
         ) AS g
             ON pc.user_id = g.user_id
 ); -- Close CREATE/INSERT parens
+
+
+-- ============
+-- Test final table
+-- ===
+-- Check for dupes in general
+-- SELECT
+--     COUNT(*) AS row_count
+--     , COUNT(DISTINCT user_id) as user_id_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230509`
+-- WHERE pt = "2023-05-07"
+--     -- AND user_id IS NOT NULL
+--     AND user_clicks_pn_t7 >= 1
+--     OR (
+--         (COALESCE(num_post_consumes, 0) + COALESCE(screen_view_count_14d, 0)) >= 3
+--     )
+-- ;
+
+
+-- Find duplicated user IDs
+-- SELECT
+--     user_id
+--     -- , user_geo_country_code
+
+--     , COUNT(*) AS dupe_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230509`
+-- WHERE pt = "2023-05-07"
+-- GROUP BY 1  --,2
+-- -- HAVING dupe_count > 1
+
+-- ORDER BY dupe_count DESC, user_id
+-- ;
