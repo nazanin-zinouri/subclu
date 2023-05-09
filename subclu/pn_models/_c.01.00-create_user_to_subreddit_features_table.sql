@@ -1,4 +1,4 @@
--- B. Get user<>subreddit features for top-subreddits (query A)
+-- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B)
 
 -- NOTE: for final inference Pick users who have more than 2 (screenview + consumes)
 --  b/c otherwise we waste time processing & scoring users with only consumes

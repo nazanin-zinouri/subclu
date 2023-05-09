@@ -1,4 +1,4 @@
--- C. Loop through different dates to backfill user-level data
+-- B. Loop through different dates to backfill user-level data
 DECLARE DATES_LST array<date> default [
     -- Pick dates when we sent PNs we want to use for model training
     DATE("2023-05-02"),
