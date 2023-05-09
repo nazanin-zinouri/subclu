@@ -1,11 +1,8 @@
--- Create table with Consumes in L30 + PN activity in L7 days
+-- C. Create table with Consumes in L30 + PN activity in L7 days
 DECLARE PT_FEATURES DATE DEFAULT CURRENT_DATE() - 2;
 DECLARE PT_PN_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 -- DECLARE PT_CONSUMES_START DATE DEFAULT PT_FEATURES - 2;  -- 29
 
--- test: 1 day PN WINDOW start
--- 764,570,576 Users when not using VIEW count
--- 764,570,576 Users WITH view count
 
 -- ==================
 -- Only need to create the first time we run it
