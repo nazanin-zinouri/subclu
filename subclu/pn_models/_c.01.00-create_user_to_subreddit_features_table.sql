@@ -1,8 +1,8 @@
 -- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B)
 -- ETA:
 --    * 2 minutes. test data:  1-day window,  03 subreddits, users with 3+ consumes_and_views
---    * 2.5 HOURS. full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views
-
+--    * 1.5 HOURS. full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views
+--      slot time: ~90 days
 -- For model INFERENCE we pick users who have some activity in L7 to L30 days (clicks, screenview, consumes)
 --   b/c otherwise we waste time processing & scoring users with very low probability of receiving & clicking
 -- HOWEVER for model TRAINING we need to keep ALL users that received a PN (even low activity users)

@@ -1,8 +1,8 @@
 -- D. Get time on subreddit for selected USERs (from user<>subreddit table C)
--- ETA:
+-- ETA: 2 minutes
 --   Use JavaScript temp function because it's much faster to expand ToS in BQ than in python
 --   We need to write the data to a table because the response can be huge (billions of rows)
-DECLARE PT_TOS DATE DEFAULT "2023-05-01";
+DECLARE PT_TOS DATE DEFAULT "2023-05-07";
 
 CREATE TEMP FUNCTION
 tosParser(tosString STRING)
@@ -21,8 +21,7 @@ LANGUAGE js AS """
 -- ==================
 -- Only need to create the first time we run it
 -- === OR REPLACE
--- TODO(djb): change to final table name: 20230509
--- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230502`
+-- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230509`
 -- PARTITION BY pt
 -- CLUSTER BY user_id
 -- AS (
@@ -31,12 +30,12 @@ LANGUAGE js AS """
 -- After table is created, we can delete a partition & update it
 -- ===
 DELETE
-    `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230502`
+    `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230509`
 WHERE
     pt = PT_TOS
 ;
 -- Insert latest data
-INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230502`
+INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230509`
 (
 
 WITH tos_filtered AS (
@@ -47,11 +46,10 @@ WITH tos_filtered AS (
         INNER JOIN(
             SELECT
                 DISTINCT user_id
-            -- TODO(djb): change for final table: 20230509
-            FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230502`
+            FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
             WHERE pt = PT_TOS
 
-            -- LIMIT for testing
+            -- Limit for testing
             -- LIMIT 10
         ) AS u
             ON u.user_id = t.entity_id
