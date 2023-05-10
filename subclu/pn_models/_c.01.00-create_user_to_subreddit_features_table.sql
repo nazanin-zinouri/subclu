@@ -1,62 +1,64 @@
 -- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B)
+-- ETA:
+--    * 2 minutes. test data:  1-day window,  03 subreddits, users with 3+ consumes_and_views
+--    * 2.5 HOURS. full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views
 
--- NOTE: for final inference Pick users who have more than 2 (screenview + consumes)
---  b/c otherwise we waste time processing & scoring users with only consumes
---  But for training we want to keep these low activity users b/c we don't know how they were
---  selected/filtered
--- TODO(djb): Filters
---   - Keep subscribers w/o subreddit view ONLY if they have
---       * 5+ (consumes + views) in all subreddits OR
---       * 1+ PN click in L7
---   - Keep only view users with
---       * 3+ (consumes + views) in all subreddits OR
---       * 1+ PN click in L7
+-- For model INFERENCE we pick users who have some activity in L7 to L30 days (clicks, screenview, consumes)
+--   b/c otherwise we waste time processing & scoring users with very low probability of receiving & clicking
+-- HOWEVER for model TRAINING we need to keep ALL users that received a PN (even low activity users)
+--    b/c we don't know how they were selected
+-- Example filters for activity:
+--   * 3+ (consumes + views) on all subreddits OR
+--   * 1+ PN click in L7
 
-DECLARE PT_DT DATE DEFAULT "2023-05-01";
+DECLARE PT_DT DATE DEFAULT "2023-05-07";
 -- Expand to 30 days total to get at least 1 month's given that in the prev model 1 month was the minimum
-DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 1;  -- 1 month = -29 days = (30 days)
+DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 29;  -- 1 month = -29 days = (30 days)
+
+DECLARE MIN_CONSUMES_AND_VIEWS NUMERIC DEFAULT 3;
 
 
 -- ==================
 -- Only need to create the first time we run it
 -- === OR REPLACE
-CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230502`
-PARTITION BY PT
-AS (
+-- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
+-- PARTITION BY PT
+-- AS (
 
 -- ==================
 -- After table is created, we can delete a partition & update it
 -- ===
--- DELETE
---     `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230502`
--- WHERE
---     pt = PT_FEATURES
--- ;
--- -- Insert latest data
--- INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230502`
--- (
+DELETE
+    `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
+WHERE
+    pt = PT_DT
+;
+-- Insert latest data
+INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
+(
 
 WITH
 selected_subreddits AS (
     -- Pick subreddits from table where we filter by rating & activity
     SELECT subreddit_id, subreddit_name
-    FROM `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230502`
+    FROM `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
     WHERE pt = PT_DT
-        -- For testing, we can limit to only the top subreddits
+
+    -- For testing, we can limit to only the top subreddits
     --     AND relevant_geo_country_code_count >= 2
     --     AND users_l7 >= 1000
     -- ORDER BY users_l7 DESC
     -- LIMIT 3
 )
 , users_above_threshold AS (
-    -- adding this filter actually seems to take longer!
     SELECT
         user_id
-    FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230502`
+        , user_geo_country_code
+    FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230509`
     WHERE pt = PT_DT
         AND user_clicks_pn_t7 >= 1
         OR (
-            (num_post_consumes + screen_view_count_14d) >= 3
+            (COALESCE(num_post_consumes, 0) + COALESCE(screen_view_count_14d, 0)) >= MIN_CONSUMES_AND_VIEWS
         )
 )
 , subscribes_base AS (
@@ -64,6 +66,7 @@ selected_subreddits AS (
         -- We need distinct in case a user subscribes multiple times to the same sub
         DISTINCT
         s.user_id
+        , ua.user_geo_country_code
         , subscriptions.subreddit_id AS subreddit_id
     from `data-prod-165221.ds_v2_postgres_tables.account_subscriptions` AS s
         LEFT JOIN UNNEST(subscriptions) as subscriptions
@@ -79,6 +82,7 @@ selected_subreddits AS (
         -- Get the subreddit name at the end b/c we don't want to get errors when a subreddit name changes
         v.user_id
         , v.subreddit_id
+        , v.user_geo_country_code
 
         , COALESCE(
             COUNT(DISTINCT v.post_id), 0
@@ -95,6 +99,7 @@ selected_subreddits AS (
             -- Don't use subreddit name here b/c it could change in a given window
             pc.subreddit_id
             , pc.user_id
+            , ua.user_geo_country_code
             , post_id
             , app_name
             , action
@@ -108,43 +113,27 @@ selected_subreddits AS (
             AND pc.user_id IS NOT NULL
             AND action IN ('consume', 'view')
     ) AS v
-    GROUP BY 1,2
+    GROUP BY 1,2,3
 )
 , users_views_and_subscribes AS (
     SELECT
+        -- Merge views & subscribers into a single table
         COALESCE(su.user_id, v.user_id) AS user_id
         , COALESCE(su.subreddit_id, v.subreddit_id) AS subreddit_id
+        , COALESCE(su.user_geo_country_code, v.user_geo_country_code) AS user_geo_country_code
         , IF(su.subreddit_id IS NOT NULL, 1, 0) subscribed
-        , v.* EXCEPT(user_id, subreddit_id)
+        , v.* EXCEPT(user_id, subreddit_id, user_geo_country_code)
     FROM users_with_views AS v
         FULL OUTER JOIN subscribes_base AS su
             ON v.user_id = su.user_id AND v.subreddit_id = su.subreddit_id
 )
-, users_with_geo AS (
-    SELECT
-        se.subreddit_name
-        , uv.*
-        , g.geo_country_code AS user_geo_country_code
 
-    FROM users_views_and_subscribes AS uv
-        LEFT JOIN selected_subreddits AS se
-            ON uv.subreddit_id = se.subreddit_id
-        LEFT JOIN (
-            SELECT
-                user_id
-                , geo_country_code
-            FROM `data-prod-165221.channels.user_geo_6mo_lookback`
-            WHERE
-                DATE(pt) = PT_DT
-        ) AS g
-            ON uv.user_id = g.user_id
-)
-
+-- Final CREATE/INSERT query
 SELECT
     PT_DT AS pt
     , PT_WINDOW_START AS pt_window_start
     , v.subreddit_id AS target_subreddit_id
-    , v.subreddit_name AS target_subreddit
+    , se.subreddit_name AS target_subreddit
     , v.user_id
     , v.subscribed
     , v.user_geo_country_code
@@ -158,10 +147,14 @@ SELECT
     , SAFE_DIVIDE(consume_ios_count, consume_count) AS consume_ios_pct
     , SAFE_DIVIDE(consume_android_count, consume_count) AS consume_android_pct
 
-    , v.* EXCEPT(subreddit_id, subreddit_name, user_id, user_geo_country_code, subscribed)
+    , v.* EXCEPT(subreddit_id, user_id, user_geo_country_code, subscribed)
 
-FROM users_with_geo AS v
-    -- Get pct & z-score for user<>subredit GEO
+FROM users_views_and_subscribes AS v
+    -- Join to get subreddit_name
+    LEFT JOIN selected_subreddits AS se
+        ON v.subreddit_id = se.subreddit_id
+
+    -- Get pct & z-score where  user geo = subredit geo
     LEFT JOIN (
         SELECT
             subreddit_id
@@ -200,4 +193,46 @@ FROM users_with_geo AS v
 -- SELECT *
 -- FROM users_with_geo
 -- LIMIT 2000
+-- ;
+
+
+-- ============
+-- Test final table
+-- ===
+-- Check overall counts rows in user<>subreddit features table
+-- SELECT
+--     -- We expect many more rows than users & subreddits
+--     COUNT(*) AS row_count
+--     , COUNT(DISTINCT user_id) as user_id_count
+--     , COUNT(DISTINCT target_subreddit_id) as target_subreddit_id_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
+-- WHERE pt = "2023-05-07"
+    -- AND user_id IS NOT NULL
+-- ;
+
+
+-- Check for dupes in this table
+-- We expecte zero dupes WHEN we group by user_id + target_subreddit (or target_subreddit_id)
+-- SELECT
+--     user_id
+--     -- , target_subreddit_id
+--     , target_subreddit
+
+--     , COUNT(*) AS dupe_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
+-- WHERE pt = "2023-05-07"
+-- GROUP BY 1,2
+-- -- HAVING dupe_count > 1
+
+-- ORDER BY dupe_count DESC, target_subreddit, user_id
+-- ;
+
+
+-- Select users with NULL geo-country
+--  We expect them to have pct by country = -1, z-score = 0.0
+-- SELECT *
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230509`
+-- WHERE pt = "2023-05-07"
+--     AND user_geo_country_code IS NULL
+-- LIMIT 1000
 -- ;
