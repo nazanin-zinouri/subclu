@@ -1,8 +1,8 @@
 -- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B)
 -- ETA:
---    * 2 minutes. test data:  1-day window,  03 subreddits, users with 3+ consumes_and_views
---    * 1.5 HOURS. full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views
---      slot time: ~90 days
+--    *  6 minutes. test data:  1-day window,  03 subreddits, users with 5+ consumes_and_views.  slot time:  17 hours
+--    *  ?? HOURS.  full data: 21-day window, 25k subreddits, users with 5+ consumes_and_views.  slot time: ~90 days
+--    * 1.5 HOURS.  full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views.  slot time: ~90 days
 -- For model INFERENCE we pick users who have some activity in L7 to L30 days (clicks, screenview, consumes)
 --   b/c otherwise we waste time processing & scoring users with very low probability of receiving & clicking
 -- HOWEVER for model TRAINING we need to keep ALL users that received a PN (even low activity users)
@@ -11,11 +11,20 @@
 --   * 3+ (consumes + views) on all subreddits OR
 --   * 1+ PN click in L7
 
-DECLARE PT_DT DATE DEFAULT "2023-05-07";
--- Expand to 30 days total to get at least 1 month's given that in the prev model 1 month was the minimum
-DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 29;  -- 1 month = -29 days = (30 days)
+-- 2023-05-10 Changes (running inference on 9 Billion rows is too much)
+--  * Increase min consumes & views: 3 -> 5
+--  * Add iOS & android min consumes: 0 -> 2
+--  * Decrease view count window: -29 -> -20
+--  * Increase receives for subscribers: 0 -> 1 (for ANY PN type)
 
-DECLARE MIN_CONSUMES_AND_VIEWS NUMERIC DEFAULT 3;
+DECLARE PT_DT DATE DEFAULT "2023-05-06";
+-- Expand to 30 days total to get at least 1 month's given that in the prev model 1 month was the minimum
+-- 1 month = -29 days = (30 days)
+-- 3 weeks = -20 days = (21 days)
+DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 20;
+
+DECLARE MIN_CONSUMES_AND_VIEWS NUMERIC DEFAULT 5;
+DECLARE MIN_CONSUMES_IOS_OR_ANDROID NUMERIC DEFAULT 2;
 
 
 -- ==================
@@ -54,11 +63,20 @@ selected_subreddits AS (
     SELECT
         user_id
         , user_geo_country_code
+        , user_receives_pn_t7
+        , user_clicks_pn_t7
     FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230509`
     WHERE pt = PT_DT
-        AND user_clicks_pn_t7 >= 1
-        OR (
-            (COALESCE(num_post_consumes, 0) + COALESCE(screen_view_count_14d, 0)) >= MIN_CONSUMES_AND_VIEWS
+        -- Make sure to apply the other clauses as part of an AND so that we don't look at previous partitions and get
+        --  multiple rows per user
+        AND (
+            user_clicks_pn_t7 >= 1
+            OR (
+                (COALESCE(num_post_consumes_ios, 0) + COALESCE(num_post_consumes_android, 0)) >= MIN_CONSUMES_IOS_OR_ANDROID
+            )
+            OR (
+                (COALESCE(num_post_consumes, 0) + COALESCE(screen_view_count_14d, 0)) >= MIN_CONSUMES_AND_VIEWS
+            )
         )
 )
 , subscribes_base AS (
@@ -150,6 +168,10 @@ SELECT
     , v.* EXCEPT(subreddit_id, user_id, user_geo_country_code, subscribed)
 
 FROM users_views_and_subscribes AS v
+    -- Join to keep only target users
+    INNER JOIN users_above_threshold AS ua
+        ON v.user_id = ua.user_id
+
     -- Join to get subreddit_name
     LEFT JOIN selected_subreddits AS se
         ON v.subreddit_id = se.subreddit_id
@@ -157,6 +179,8 @@ FROM users_views_and_subscribes AS v
     -- Get pct & z-score where  user geo = subredit geo
     LEFT JOIN (
         SELECT
+            -- We need distinct b/c there can be duplicates in the community_local_scores table :((
+            DISTINCT
             subreddit_id
             , geo_country_code
             , sub_dau_perc_l28
@@ -166,6 +190,18 @@ FROM users_views_and_subscribes AS v
     ) AS cl
         ON v.subreddit_id = cl.subreddit_id
             AND v.user_geo_country_code = cl.geo_country_code
+WHERE
+    -- Add some more constraints on top of users-above-threshold:
+    -- Keep all users who viewed target subreddit
+    v.view_and_consume_unique_count >= 1
+
+    OR (
+        -- TODO(djb): Only keep subscribers w/o view IF they have 1+ receive or click on ANY PN
+        v.subscribed = 1
+        AND (
+            COALESCE(ua.user_receives_pn_t7, 0) + COALESCE(ua.user_clicks_pn_t7, 0)
+        ) >= 1
+    )
 
 );  -- Close CREATE TABLE parens
 
@@ -176,6 +212,18 @@ FROM users_views_and_subscribes AS v
 
 -- SELECT *
 -- FROM selected_subreddits;
+
+-- SELECT *
+-- FROM users_above_threshold
+-- WHERE user_geo_country_code NOT IN (
+--     "MX", "ES", "AR"
+--     , "DE", "AT", "CH"
+--     , "US", "GB", "IN", "CA", "AU", "IE"
+--     , "FR", "NL", "IT"
+--     , "BR", "PT"
+--     , "PH"
+-- )
+-- ;
 
 -- SELECT *
 -- FROM subscribes_base;
@@ -191,7 +239,7 @@ FROM users_views_and_subscribes AS v
 -- ;
 
 -- SELECT *
--- FROM users_with_geo
+-- FROM users_views_and_subscribes
 -- LIMIT 2000
 -- ;
 
@@ -211,7 +259,7 @@ FROM users_views_and_subscribes AS v
 -- ;
 
 
--- Check for dupes in this table
+-- Check for dupes in this table. ETA: 7 mins
 -- We expecte zero dupes WHEN we group by user_id + target_subreddit (or target_subreddit_id)
 -- SELECT
 --     user_id
