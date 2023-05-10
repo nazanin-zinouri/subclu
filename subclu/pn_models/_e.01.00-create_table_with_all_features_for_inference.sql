@@ -119,7 +119,7 @@ subreddit_ft AS (
         -- Subreddit features, also limit subreddits to score by using inner join
         INNER JOIN subreddit_ft AS s
             ON us.target_subreddit_id = s.subreddit_id
-        -- User-level features
+        -- User-level features, inner join to focus only on target countries
         INNER JOIN user_ft AS u
             ON us.user_id = u.user_id
 
@@ -131,6 +131,21 @@ subreddit_ft AS (
 SELECT *
 FROM final_table
 );  -- Close CREATE/INSERT parens
+
+
+
+-- ============
+-- Export data to GCS because querying such a huge table takes forever and a half
+-- ===
+-- EXPORT DATA OPTIONS(
+--     uri='gs://i18n-subreddit-clustering/pn_model/runs/inference/20230507/*.parquet',
+--     format='PARQUET',
+--     overwrite=true
+-- ) AS
+-- SELECT *
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230509`
+-- WHERE pt = '2023-05-07'
+-- ;
 
 
 -- ============
