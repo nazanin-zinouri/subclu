@@ -1,12 +1,12 @@
 -- A. Select top subreddits as targets for PNs
 --   ETA: 15 seconds
-DECLARE PARTITION_DATE DATE DEFAULT CURRENT_DATE() - 2;
+DECLARE PARTITION_DATE DATE DEFAULT '2023-05-06';
 
-DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 250;
-DECLARE MIN_USERS_L7_ROW NUMERIC DEFAULT 125;
+DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 300;
+DECLARE MIN_USERS_L7_ROW NUMERIC DEFAULT 150;
 
-DECLARE MIN_POSTS_L7_ENGLISH NUMERIC DEFAULT 1;
-DECLARE MIN_POSTS_L7_ROW_NO_RATING NUMERIC DEFAULT 4;
+DECLARE MIN_POSTS_L7_ENGLISH NUMERIC DEFAULT 3;
+DECLARE MIN_POSTS_L7_ROW_NO_RATING NUMERIC DEFAULT 6;
 DECLARE MIN_POSTS_L7_ROW_W_RATING NUMERIC DEFAULT 1;
 
 DECLARE TARGET_GEOS_ENG DEFAULT [
@@ -25,7 +25,7 @@ DECLARE TARGET_GEOS_ROW DEFAULT [
 -- ==================
 -- Only need to create the first time we run it
 -- === OR REPLACE
--- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230502`
+-- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
 -- PARTITION BY pt
 -- AS (
 
@@ -33,13 +33,13 @@ DECLARE TARGET_GEOS_ROW DEFAULT [
 -- After table is created, we can delete a partition & update it
 -- ===
 DELETE
-    `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230502`
+    `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
 WHERE
     pt = PARTITION_DATE
 ;
 
--- -- Insert latest data
-INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230502`
+-- Insert latest data
+INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
 (
 
 WITH
@@ -141,7 +141,13 @@ subs_above_thresholds AS (
 
     FROM (
         SELECT
-            *
+            -- We need distinct b/c there can be duplicates in the community-local-scores table :((
+            DISTINCT
+            subreddit_id
+            , geo_country_code
+            , sub_dau_perc_l28
+            , perc_by_country_sd
+            , localness
         FROM `data-prod-165221.i18n.community_local_scores`
         WHERE DATE(pt) = PARTITION_DATE
             -- Start with only target countries & somewhat local subs
@@ -202,11 +208,13 @@ subs_above_thresholds AS (
             ON sa.subreddit_id = sm.subreddit_id
 )
 
+-- Final select for table CREATE/INSERT
 SELECT
   PARTITION_DATE AS pt
   , *
 FROM selected_subs_with_meta
 );  -- Close CREATE/INSERT parens
+
 
 -- ============
 -- Test CTEs
