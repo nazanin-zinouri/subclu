@@ -30,18 +30,25 @@ def pn_model_schema() -> List[bigquery.SchemaField]:
         ),
 
         bigquery.SchemaField(
+            name="target_subreddit_id",
+            field_type="STRING",
+            description="Subreddit ID",
+        ),
+
+        bigquery.SchemaField(
             name="target_subreddit",
             field_type="STRING",
             description="Subreddit Name (lowercase)",
             mode="REQUIRED"
         ),
         bigquery.SchemaField(
-            name="target_subreddit_id",
-            field_type="STRING",
-            description="Subreddit ID",
+            name="subscribed",
+            field_type="INTEGER",
+            description="1 = users subscribed to target subreddit, 0 = users viewed sub in L30 days but not subscribed",
+            mode="REQUIRED"
         ),
         bigquery.SchemaField(
-            name="geo_country_code_top",
+            name="user_geo_country_code",
             field_type="STRING",
             description=(
                 "Geo-country-code for target users. "
