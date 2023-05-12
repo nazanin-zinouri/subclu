@@ -17,6 +17,8 @@ INSTALL_REQUIRES = [
     # pandas, np, and sklearn versions are managed by Google notebooks and
     #  are not guaranteed to be the same, so don't pin them to prevent errors
     "mlflow == 1.16.0",
+    "scikit-learn == 1.0.2",
+    "xgboost == 1.6.2",
 
     # Use dask to load parquet files in parallel
     "dask[complete] == 2021.6.0",
