@@ -1,8 +1,8 @@
 -- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B)
 -- ETA:
 --    *  6 minutes. test data:  1-day window,  03 subreddits, users with 5+ consumes_and_views.  slot time:  17 hours
---    *  ?? HOURS.  full data: 21-day window, 25k subreddits, users with 5+ consumes_and_views.  slot time: ~90 days
---    * 1.5 HOURS.  full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views.  slot time: ~90 days
+--    * 1.5 HOURS.  full data: 21-day window, 25k subreddits, users with 5+ consumes_and_views.  slot time: ~34 days
+--    * 2.5 HOURS.  full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views.  slot time: ~90 days
 -- For model INFERENCE we pick users who have some activity in L7 to L30 days (clicks, screenview, consumes)
 --   b/c otherwise we waste time processing & scoring users with very low probability of receiving & clicking
 -- HOWEVER for model TRAINING we need to keep ALL users that received a PN (even low activity users)
@@ -17,11 +17,11 @@
 --  * Decrease view count window: -29 -> -20
 --  * Increase receives for subscribers: 0 -> 1 (for ANY PN type)
 
-DECLARE PT_DT DATE DEFAULT "2023-05-06";
+DECLARE PT_DT DATE DEFAULT "2023-05-09";
 -- Expand to 30 days total to get at least 1 month's given that in the prev model 1 month was the minimum
 -- 1 month = -29 days = (30 days)
 -- 3 weeks = -20 days = (21 days)
-DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 20;
+DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 29;
 
 DECLARE MIN_CONSUMES_AND_VIEWS NUMERIC DEFAULT 5;
 DECLARE MIN_CONSUMES_IOS_OR_ANDROID NUMERIC DEFAULT 2;
@@ -190,18 +190,20 @@ FROM users_views_and_subscribes AS v
     ) AS cl
         ON v.subreddit_id = cl.subreddit_id
             AND v.user_geo_country_code = cl.geo_country_code
-WHERE
-    -- Add some more constraints on top of users-above-threshold:
-    -- Keep all users who viewed target subreddit
-    v.view_and_consume_unique_count >= 1
 
-    OR (
-        -- TODO(djb): Only keep subscribers w/o view IF they have 1+ receive or click on ANY PN
-        v.subscribed = 1
-        AND (
-            COALESCE(ua.user_receives_pn_t7, 0) + COALESCE(ua.user_clicks_pn_t7, 0)
-        ) >= 1
-    )
+-- TODO(djb): decide whether these extra filters are worth it. We might score a lot of low probability subscribers
+-- WHERE
+--     -- Add some more constraints on top of users-above-threshold:
+--     -- Keep all users who viewed target subreddit
+--     v.view_and_consume_unique_count >= 1
+
+--     OR (
+--         -- TODO(djb): Only keep subscribers w/o view IF they have 1+ receive or click on ANY PN or a consume on ios/android
+--         v.subscribed = 1
+--         AND (
+--             COALESCE(ua.user_receives_pn_t7, 0) + COALESCE(ua.user_clicks_pn_t7, 0)
+--         ) >= 1
+--     )
 
 );  -- Close CREATE TABLE parens
 
