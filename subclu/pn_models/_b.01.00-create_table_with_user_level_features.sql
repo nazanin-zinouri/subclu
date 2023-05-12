@@ -1,6 +1,6 @@
 -- B. Create table with Consumes in L30 + PN activity in L7 days
 --   ETA: 2-4 minutes (with geo)
-DECLARE PT_FEATURES DATE DEFAULT "2023-05-06";
+DECLARE PT_FEATURES DATE DEFAULT "2023-05-09";
 DECLARE PT_PN_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 DECLARE TARGET_COUNTRY_CODES DEFAULT [
     "MX", "ES", "AR"
@@ -114,7 +114,6 @@ FROM post_consumes_agg AS pc
             AND COALESCE(geo_country_code, "") IN UNNEST(TARGET_COUNTRY_CODES)
     ) AS g
         ON pc.user_id = g.user_id
-WHERE COALESCE(geo_country_code, "") IN UNNEST(TARGET_COUNTRY_CODES)
 ); -- Close CREATE/INSERT parens
 
 
