@@ -111,3 +111,114 @@ ORDER BY user_count DESC
 ;
 
 
+-- Create prod table for PN subreddit<>user model
+DECLARE PT_TARGET DATE DEFAULT "2023-05-07";
+
+-- ==================
+-- Only need to create the first time we run the script
+-- === OR REPLACE
+CREATE TABLE `reddit-growth-prod.pn_targeting.pn_model_subreddit_user_click_v1`
+PARTITION BY pt
+AS (
+
+-- ==================
+-- After table is created, we can delete a partition & update it
+-- ===
+-- DELETE
+--     `reddit-growth-prod.pn_targeting.pn_model_subreddit_user_click_v1`
+-- WHERE
+--     pt = PT_TARGET
+-- ;
+
+-- -- Insert latest data
+-- INSERT INTO `reddit-growth-prod.pn_targeting.pn_model_subreddit_user_click_v1`
+-- (
+
+
+
+SELECT *
+FROM `reddit-employee-datasets.david_bermejo.pn_model_output_20230510`
+WHERE pt = PT_TARGET
+);  -- Close CREATE/INSERT parens
+
+
+-- Check zeldan PN (Sahil's table)
+SELECT
+    -- COUNT(DISTINCT device_id) AS device_count
+    -- , COUNT(DISTINCT user_id) AS user_id_count
+    *
+FROM `reddit-employee-datasets.sahil_verma.totk_pn_ml_targeting_20230512`
+LIMIT 1000
+;
+
+-- Check overal stats for training data
+SELECT
+    -- pt_send
+    pn_id
+    , SUM(send) AS send_total
+    , SUM(receive) AS receive_total
+    , SUM(receive_not_suppressed) AS receive_not_suppressed_total
+    , SUM(click) AS click_total
+    , SAFE_DIVIDE(SUM(click), SUM(receive)) AS ctr_receive
+    , SAFE_DIVIDE(SUM(click), SUM(receive_not_suppressed)) AS ctr_receive_no_suppressed
+FROM `reddit-employee-datasets.david_bermejo.pn_training_data_20230515`
+GROUP BY 1
+ORDER BY send_total DESC
+;
+
+
+-- ============
+-- Test counts for different thresholds
+-- ===
+-- The main table should include more users
+-- ~102 million users
+-- SELECT
+--     pt
+--     , COUNT(*) AS row_count
+--     , COUNT(DISTINCT target_subreddit_id) AS subreddit_count
+--     , COUNT(DISTINCT user_geo_country_code) AS country_code_count
+--     , COUNT(DISTINCT t.user_id) AS user_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_model_output_20230510`
+--     LEFT JOIN UNNEST(top_users) AS t
+-- GROUP BY 1
+-- ORDER BY user_count DESC
+-- ;
+
+
+-- This `test` table should include fewer users (b/c of a higher threshold and lower rank)
+--  Only ~4 million users
+-- SELECT
+--     pt
+--     , COUNT(*) AS row_count
+--     , COUNT(DISTINCT target_subreddit_id) AS subreddit_count
+--     , COUNT(DISTINCT user_geo_country_code) AS country_code_count
+--     , COUNT(DISTINCT t.user_id) AS user_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_model_output_test_20230510`
+--     LEFT JOIN UNNEST(top_users) AS t
+-- GROUP BY 1
+-- ;
+
+-- check duplicates
+-- SELECT
+--     pt
+--     , target_subreddit
+--     , user_geo_country_code
+--     , subscribed
+
+--     , COUNT(*) AS dupe_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_model_output_test_20230510`
+-- GROUP BY 1,2,3,4
+-- ORDER BY dupe_count DESC, target_subreddit
+-- ;
+
+-- Select latest partition
+SELECT
+    MAX(partition_id)
+    -- , DATE(MAX(partition_id))
+    , DATE(PARSE_TIMESTAMP("%Y%m%d", MAX(partition_id)))
+    -- , CAST(MAX(partition_id) AS DATE FORMAT "%Y%m%d") AS latest_pt
+FROM
+  `reddit-growth-prod.pn_targeting`.INFORMATION_SCHEMA.PARTITIONS
+WHERE
+  table_name = "pn_model_subreddit_user_click_v1"
+;

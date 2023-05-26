@@ -1,4 +1,4 @@
--- A. Select top subreddits as targets for PNs
+-- A. Select top subreddits as targets for PNs. v2023-05-26
 --   ETA: 15 seconds
 DECLARE PARTITION_DATE DATE DEFAULT ${pt_date};
 
