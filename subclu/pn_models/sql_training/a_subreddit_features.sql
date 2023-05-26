@@ -1,10 +1,10 @@
--- A. Select top subreddits as targets for PNs. v2023-05-26
---   ETA: 15 seconds
-DECLARE PARTITION_DATE DATE DEFAULT ${pt_date};
+-- A. Select top subreddits as targets for PNs (TRAINING)
+--   ETA: 20 seconds per PT
+DECLARE PARTITION_DATE DATE DEFAULT "2023-05-11";
 
 -- For training, lower these to make sure we capture all target subreddits
-DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 20;  -- 250
-DECLARE MIN_USERS_L7_ROW NUMERIC DEFAULT 20;  -- 150
+DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 10;  -- 250
+DECLARE MIN_USERS_L7_ROW NUMERIC DEFAULT 10;  -- 150
 
 DECLARE MIN_POSTS_L7_ENGLISH NUMERIC DEFAULT 1;  -- 2
 DECLARE MIN_POSTS_L7_ROW_NO_RATING NUMERIC DEFAULT 1;  -- 6
@@ -26,6 +26,7 @@ DECLARE TARGET_GEOS_ROW DEFAULT [
 -- Create a temp table so that we can cache the outputs of our query w/o duplicating code
 --  Then we can create a table or insert if it already exists
 CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.tmp_pn` AS (
+
 WITH
 subs_above_thresholds AS (
     SELECT
@@ -70,16 +71,17 @@ subs_above_thresholds AS (
             , LN(1 + votes_l28) AS votes_log_l28
 
         FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
-        WHERE DATE(pt) = PARTITION_DATE
-            AND users_l7 >= LEAST(MIN_USERS_L7_ENGLISH, MIN_USERS_L7_ROW)
-            AND posts_l7 >= LEAST(MIN_POSTS_L7_ENGLISH, MIN_POSTS_L7_ROW_W_RATING)
+        WHERE pt = TIMESTAMP(GREATEST(PARTITION_DATE, CURRENT_DATE - 21))
+            -- TODO(djb): Train only - exclude minimum filters
+            -- AND users_l7 >= LEAST(MIN_USERS_L7_ENGLISH, MIN_USERS_L7_ROW)
+            -- AND posts_l7 >= LEAST(MIN_POSTS_L7_ENGLISH, MIN_POSTS_L7_ROW_W_RATING)
             AND NOT REGEXP_CONTAINS(LOWER(subreddit_name), r'^u_.*')
     ) AS asr
         -- Get subreddit-id & exclude banned subreddits
         INNER JOIN (
             SELECT name, subreddit_id, over_18
             FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-            WHERE dt = PARTITION_DATE
+            WHERE dt = GREATEST(PARTITION_DATE, CURRENT_DATE - 21)
                 -- Exclude user-profiles + spam & sketchy subs [optional]
                 AND COALESCE(verdict, 'f') <> 'admin-removed'
                 AND COALESCE(is_spam, FALSE) = FALSE
@@ -90,30 +92,38 @@ subs_above_thresholds AS (
         ) AS slo
             ON asr.subreddit_name = LOWER(slo.name)
 
+        -- TODO(djb): For training, keep all ratings b/c rating migth've changed
+        INNER JOIN (
+            SELECT DISTINCT LOWER(target_subreddit) AS subreddit_name
+            FROM `reddit-employee-datasets.david_bermejo.pn_training_data_20230515`
+            WHERE pt_send = (PARTITION_DATE + 1)
+        ) AS sel
+            ON asr.subreddit_name = sel.subreddit_name
+
         -- Get ratings
         LEFT JOIN `data-prod-165221.taxonomy.daily_export` AS tx
             ON slo.subreddit_id = tx.subreddit_id
     WHERE 1=1
-        AND NOT (
-            -- exclude ALL subs about trauma & support, independent of rating, like r/selfharmscars, r/rape
-            COALESCE(tx.curator_topic_v2, "") IN (
-                'Trauma Support', 'Addiction Support', 'Illegal & Recreational Drugs'
-            )
-        )
-        AND NOT (
-            (
-                -- exclude subs over-18 dedicated to celebrities (usually porn/fetish)
-                COALESCE(tx.curator_topic_v2, "") IN ("Celebrities")
-                -- exclude over-18 and unrated
-                OR tx.curator_rating IS NULL
-            )
-            AND COALESCE(over_18, '') = 't'
-        )
         -- TODO(djb): For training, keep all ratings b/c rating migth've changed
---         AND (
---             -- We can keep the unrated subs here because we filtered out the combinations where unrated is riskier
---             COALESCE(tx.curator_rating, "") IN ('Everyone', "Mature 1", "")
---         )
+        -- AND NOT (
+        --     -- exclude ALL subs about trauma & support, independent of rating, like r/selfharmscars, r/rape
+        --     COALESCE(tx.curator_topic_v2, "") IN (
+        --         'Trauma Support', 'Addiction Support', 'Illegal & Recreational Drugs'
+        --     )
+        -- )
+        -- AND NOT (
+        --     (
+        --         -- exclude subs over-18 dedicated to celebrities (usually porn/fetish)
+        --         COALESCE(tx.curator_topic_v2, "") IN ("Celebrities")
+        --         -- exclude over-18 and unrated
+        --         OR tx.curator_rating IS NULL
+        --     )
+        --     AND COALESCE(over_18, '') = 't'
+        -- )
+        -- AND (
+        --     -- We can keep the unrated subs here because we filtered out the combinations where unrated is riskier
+        --     COALESCE(tx.curator_rating, "") IN ('Everyone', "Mature 1", "")
+        -- )
 )
 , subs_with_geo_long AS (
     -- Get geo data for subs & apply filters based on country group
@@ -206,26 +216,40 @@ BEGIN
     -- If table exists, we can delete the partition with the target date & update it with new data
     -- ===
     DELETE
-        `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_${table_dt}`
+        `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525`
     WHERE
         pt = PARTITION_DATE
     ;
 
     -- Insert latest data
-    INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_${table_dt}` (
-        SELECT * FROM `reddit-employee-datasets.david_bermejo.tmp_pn`
+    INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525` (
+        SELECT *
+        FROM `reddit-employee-datasets.david_bermejo.tmp_pn`
     );
 EXCEPTION WHEN ERROR THEN
     -- ==================
     -- If table doesn't exist, create it & insert the data
     -- ===
-    CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_${table_dt}`
+    CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525`
     PARTITION BY pt
     AS (
-        SELECT * FROM `reddit-employee-datasets.david_bermejo.tmp_pn`
+        SELECT *
+        FROM `reddit-employee-datasets.david_bermejo.tmp_pn`
     );
 END;
 
 
 -- Drop the temp table after inserting is done
-DROP TABLE `reddit-employee-datasets.david_bermejo.tmp_pn`;
+-- DROP TABLE `reddit-employee-datasets.david_bermejo.tmp_pn`;
+
+
+-- =====================
+-- test CTEs for temp table
+-- ===
+-- SELECT * FROM subs_above_thresholds;
+
+-- SELECT * FROM subs_with_geo_long;
+
+-- SELECT * FROM subs_with_geo_wide;
+
+-- SELECT * FROM selected_subs_with_meta;
