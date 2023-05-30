@@ -2,18 +2,18 @@
 --   ETA: OLD: 2-4 minutes (with geo for ALL users only with pn_events table)
 --   ETA: NEW: 1-2 minutes
 --      only selected users from training table. Get receives and clicks from separate tables to replace pn-events
---  x '2022-12-01',
---  x '2023-02-19',
---  x '2023-02-28',
---  x '2023-04-17',
---  x '2023-04-24',
---  x '2023-05-04',
---  x '2023-05-07',
---  x '2023-05-08',
---  x '2023-05-09',
---  x '2023-05-11'
+--   '2022-12-01',
+--   '2023-02-19',
+--   '2023-02-28',
+--   '2023-04-17',
+--   '2023-04-24',
+--   '2023-05-04',
+--   '2023-05-07',
+--   '2023-05-08',
+--   '2023-05-09',
+--   '2023-05-11'
 
-DECLARE PT_FEATURES DATE DEFAULT "2023-05-11";
+DECLARE PT_FEATURES DATE DEFAULT "2023-05-08";
 DECLARE PT_PN_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 DECLARE TARGET_COUNTRY_CODES DEFAULT [
     "MX", "ES", "AR"
@@ -27,7 +27,7 @@ DECLARE TARGET_COUNTRY_CODES DEFAULT [
 -- ==================
 -- Only need to create the first time we run it
 -- === OR REPLACE
--- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_user_20230525`
+-- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_user_20230529`
 -- PARTITION BY pt
 -- AS (
 
@@ -35,13 +35,13 @@ DECLARE TARGET_COUNTRY_CODES DEFAULT [
 -- After table is created, we can delete a partition & update it
 -- ===
 DELETE
-    `reddit-employee-datasets.david_bermejo.pn_ft_user_20230525`
+    `reddit-employee-datasets.david_bermejo.pn_ft_user_20230529`
 WHERE
     pt = PT_FEATURES
 ;
 
 -- Insert latest data
-INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_user_20230525`
+INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_user_20230529`
 (
 
 WITH
@@ -60,6 +60,7 @@ selected_users AS (
         COALESCE(sv.entity_id, pc.user_id) AS user_id
         , COALESCE(sv.feature_value, 0) AS screen_view_count_14d
 
+        -- TODO(djb): add subreddit views or consumes
         , SUM(num_post_consumes) AS num_post_consumes_30
         , SUM(num_post_consumes_home) AS num_post_consumes_home_30
         , SUM(num_post_consumes_community) AS num_post_consumes_community_30
@@ -74,7 +75,7 @@ selected_users AS (
             -- TODO(djb): Train only. LIMIT to training users
             INNER JOIN selected_users AS s
                 ON c.user_id = s.user_id
-        WHERE DATE(pt) = PT_FEATURES
+        WHERE pt = TIMESTAMP(PT_FEATURES)
             AND c.user_id IS NOT NULL
     ) AS pc
         FULL OUTER JOIN (
@@ -84,7 +85,7 @@ selected_users AS (
                 -- TODO(djb): Train only. LIMIT to training users
                 INNER JOIN selected_users AS s
                     ON v.entity_id = s.user_id
-            WHERE DATE(pt) = PT_FEATURES
+            WHERE pt = TIMESTAMP(PT_FEATURES)
                 AND entity_id IS NOT NULL
         ) AS sv
             ON pc.user_id = sv.entity_id
@@ -94,11 +95,28 @@ selected_users AS (
     -- Split receives & clicks into separate CTEs to prevent duplicate errors
     SELECT
         pc.user_id
-        , COALESCE(COUNT(r.endpoint_timestamp), 0) user_receives_pn_t7
+        -- No need to do coalesce here b/c we'll have nulls later on
+        , COUNT(DISTINCT
+            CASE WHEN (pt > TIMESTAMP(PT_FEATURES - 7)) THEN r.subreddit_id
+                ELSE NULL
+            END
+        ) AS user_receives_pn_subreddit_count_t7
+        , COUNT(
+            CASE WHEN pt > TIMESTAMP(PT_FEATURES - 7) THEN r.endpoint_timestamp
+                ELSE NULL
+            END
+        ) AS user_receives_pn_t7
+        , COUNT(
+            CASE WHEN pt > TIMESTAMP(PT_FEATURES - 14) THEN r.endpoint_timestamp
+                ELSE NULL
+            END
+        ) AS user_receives_pn_t14
+        , COALESCE(COUNT(r.endpoint_timestamp), 0) user_receives_pn_t30
+
     FROM (
-        SELECT user_id, endpoint_timestamp
+        SELECT user_id, endpoint_timestamp, pt, subreddit_id
         FROM `data-prod-165221.channels.pn_receives`
-        WHERE pt BETWEEN TIMESTAMP(PT_PN_WINDOW_START) AND TIMESTAMP(PT_FEATURES)
+        WHERE pt BETWEEN TIMESTAMP(PT_FEATURES - 29) AND TIMESTAMP(PT_FEATURES)
             AND user_id IS NOT NULL
             AND endpoint_timestamp IS NOT NULL
             AND NOT REGEXP_CONTAINS(notification_type, "email")
@@ -166,7 +184,7 @@ FROM post_consumes_agg AS pc
             , geo_country_code
         FROM `data-prod-165221.channels.user_geo_6mo_lookback`
         WHERE
-            DATE(pt) = PT_FEATURES
+            pt = TIMESTAMP(PT_FEATURES)
             AND user_id IS NOT NULL
     ) AS g
         ON pc.user_id = g.user_id

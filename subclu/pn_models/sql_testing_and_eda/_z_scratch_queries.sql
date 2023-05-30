@@ -222,3 +222,130 @@ FROM
 WHERE
   table_name = "pn_model_subreddit_user_click_v1"
 ;
+
+
+-- get consumes & views for specific user & compare with other tables
+DECLARE PT_DT DATE DEFAULT '2023-05-23';
+DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 3;
+
+DECLARE TEST_USERS DEFAULT [
+    -- 't2_fej9k5ak'
+    -- , 't2_a2bjdmoi'
+    -- , 't2_1fmw9l'
+    -- -- Users with comments & upvotes, but no (or few) sessions or screenviews(!)
+    -- , 't2_6inyx6xe'
+    -- , 't2_2b8kwynv'
+
+    -- recent users
+    't2_ubebl'
+    , 't2_7zbz1kgj'
+    , 't2_adicsqpk'
+
+    , 't2_kd9eyebq'
+    , 't2_8can8w5p'
+];
+
+WITH pd_view_events AS (
+    SELECT
+        subreddit_id
+        , subreddit_name
+        , user_id
+
+        -- , COALESCE(
+        --     COUNT(DISTINCT v.post_id), 0
+        -- ) AS us_view_and_consume_unique_count
+        -- , COALESCE(
+        --     COUNT(DISTINCT(IF(v.action='view', post_id, NULL))), 0
+        -- ) AS us_view_unique_count  -- same as: ag.features.distinct_posts_viewed
+        -- , SUM(IF(v.action='view', 1, 0)) AS us_view_count -- same as: ag.features.post_screenviews
+
+        -- Remove extra checks now that this CTE only focuses on consumes
+        , COUNT(DISTINCT post_id) AS us_consume_unique_count
+        , COUNT(post_id) AS us_consume_count
+        -- , COALESCE(
+        --     COUNT(DISTINCT(IF(v.action='consume', post_id, NULL))), 0
+        -- ) AS us_consume_unique_count
+        -- , SUM(IF(v.action='consume', 1, 0)) AS us_consume_count
+    FROM `data-prod-165221.fact_tables.post_consume_post_detail_view_events` AS v
+    WHERE v.pt BETWEEN TIMESTAMP(PT_WINDOW_START) AND TIMESTAMP(PT_DT)
+        AND v.user_id IS NOT NULL
+        -- Limit to CONSUMES b/c we're already getting view info from the AGG table
+        AND action IN ('consume')
+        AND subreddit_name IN ("ich_iel")
+        AND user_id IN UNNEST(TEST_USERS)
+    GROUP BY 1,2,3
+)
+, user_sub_agg AS (
+    SELECT
+        ag.subreddit_id
+        , slo.name AS subreddit_name
+        , user_id
+
+        -- TODO(djb): add linear decay
+        -- Use 0.018518518519 to make it linear decay from a 0% reduction to today's data to 50% reduction to 30 days ago data
+        -- , 1 - TIMESTAMP_DIFF(seeds.pt, activity.pt, DAY) * 0.018518518519 AS linear_decay_multiplier
+        , SUM(features.upvotes) AS us_upvotes_l30
+        , SUM(features.comments) AS us_comments_l30
+        , SUM(features.posts) AS us_posts_l30
+
+        , SUM(features.email_digest_clicked) AS us_email_digest_click_l30
+        , SUM(features.trending_pn_received) AS us_trend_pn_receive_l30
+        , SUM(features.trending_pn_clicked) AS us_trend_pn_click_l30
+
+        , SUM(features.sessions) AS us_sessions_l30
+        , SUM(features.screenviews) AS us_screenviews_l30
+        , SUM(features.post_screenviews) AS us_post_screenviews_l30
+        , SUM(features.distinct_posts_viewed) AS us_distinct_posts_viewed_l30
+    FROM `reddit-growth-prod.growth_team_tables.data_aggregation_user_subreddit_activity` AS ag
+        INNER JOIN (
+            SELECT subreddit_id, name, dt
+            FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+            WHERE dt = GREATEST(PT_DT, CURRENT_DATE - 21)
+                AND LOWER(name) = 'ich_iel'
+        ) AS slo
+            ON ag.subreddit_id = slo.subreddit_id
+    WHERE ag.pt  BETWEEN TIMESTAMP(PT_WINDOW_START) AND TIMESTAMP(PT_DT)
+        AND ag.user_id IN UNNEST(TEST_USERS)
+    GROUP BY 1,2,3
+)
+, us_daily AS (
+    SELECT
+        slo.subreddit_id
+        , subreddit_name
+        , user_id
+
+        , SUM(ios_l1) AS us_ios_days_active_l30
+        , SUM(android_l1) AS us_android_days_active_l30
+        , SUM(l1) AS us_days_active_l30
+        -- , SUM(votes_l1) AS us_votes_l30  -- repeat from ag.features.upvotes
+        -- , SUM(comments_l1) AS us_comments_l30  -- repeat from ag.features.comments
+        -- , SUM(posts_l1) AS us_posts_l30  -- repeat from ag.features.posts
+
+    FROM `data-prod-165221.cnc.user_subreddit_daily` AS usd
+        INNER JOIN (
+            SELECT subreddit_id, name, dt
+            FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
+            WHERE dt = GREATEST(PT_DT, CURRENT_DATE - 21)
+                AND LOWER(name) = 'ich_iel'
+        ) AS slo
+            ON usd.subreddit_name = LOWER(slo.name)
+    WHERE pt BETWEEN TIMESTAMP(PT_WINDOW_START) AND TIMESTAMP(PT_DT)
+        AND subreddit_name IN ('ich_iel')
+        AND user_id IN UNNEST(TEST_USERS)
+    GROUP BY 1,2,3
+)
+
+SELECT
+    PT_DT AS pt
+    , COALESCE(ve.subreddit_id, ag.subreddit_id, usd.subreddit_id) AS subreddit_id
+    , COALESCE(ve.subreddit_name, ag.subreddit_name, usd.subreddit_name) AS subreddit_name
+    , COALESCE(ve.user_id, ag.user_id, usd.user_id) AS user_id
+    , ve.* EXCEPT(subreddit_name, subreddit_id, user_id)
+    , ag.* EXCEPT(subreddit_name, subreddit_id, user_id)
+    , usd.* EXCEPT(subreddit_name, subreddit_id, user_id)
+FROM pd_view_events AS ve
+    FULL OUTER JOIN user_sub_agg AS ag
+        USING(subreddit_id, user_id)
+    FULL OUTER JOIN us_daily AS usd
+        ON ag.subreddit_name = usd.subreddit_name AND ag.user_id = usd.user_id
+;
