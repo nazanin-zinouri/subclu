@@ -1,8 +1,8 @@
 -- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B) TRAINING
 -- ETA:
---    *  3 minutes. Training 30-day window, 1-3 subreddits. Slot time: 9.5 hours
---    *  6 minutes. test data:  1-day window,  03 subreddits, users with 5+ consumes_and_views.  slot time:  17 hours
---    * 1.5 HOURS.  full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views.  slot time: ~90 days
+--    *  4 minutes. Training 30-day window, 1-3 subreddits. Slot time: 9.5 hours
+--    *  X minutes. test data:  1-day window,  03 subreddits, users with 5+ consumes_and_views.  slot time:  17 hours
+--    * 1.5 HOURS.  [OLD] full data: 30-day window, 26k subreddits, users with 3+ consumes_and_views.  slot time: ~90 days
 
 -- For model INFERENCE we pick users who have some activity in L7 to L30 days (clicks, screenview, consumes)
 --   b/c otherwise we waste time processing & scoring users with very low probability of receiving & clicking
@@ -18,22 +18,25 @@
 --  * Decrease view count window: -29 -> -20
 --  * Increase receives for subscribers: 0 -> 1 (for ANY PN type)
 
+-- Dates to RUN: (** = high value for diversity & count of sends)
 --  x '2022-12-01', **
 --  x '2023-02-19',
---  '2023-02-28', **
---   '2023-04-17',
---   '2023-04-24',
---   '2023-05-04', **
---   '2023-05-07',
---  '2023-05-08',
---  '2023-05-09', **
---  '2023-05-11'  **
+--  x '2023-02-28', **
+--  x '2023-04-17',
+--  x '2023-04-24',
+--  x '2023-05-04', **
+--  x '2023-05-07',
+--  x '2023-05-08',
+--  x '2023-05-09', **
+--  x '2023-05-11'  **
 
-DECLARE PT_DT DATE DEFAULT "2023-05-09";
+-- TODO(djb): Fix users that have both visits AND are subscribed! for soem reason I get duplicates!
+
+DECLARE PT_DT DATE DEFAULT "2023-02-19";
 -- Expand to 30 days total to get at least 1 month's given that in the prev model 1 month was the minimum
 -- 1 month = -29 days = (30 days)
 -- 3 weeks = -20 days = (21 days)
-DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 29;
+DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 29;  -- default: 29
 
 -- TODO(djb) Training: These minimums get ignore for training
 -- DECLARE MIN_CONSUMES_AND_VIEWS NUMERIC DEFAULT 5;
@@ -118,40 +121,6 @@ selected_subreddits AS (
     WHERE _PARTITIONTIME = TIMESTAMP(CURRENT_DATE() - 2)
         AND subscribe_date <= TIMESTAMP(PT_DT)
 )
--- , user_consumes AS (
---     SELECT
---         -- THIS Consumes CTE is super expensive. Skip it for now b/c these features might not be that helpful
---         -- Get the subreddit name at the end b/c we don't want to get errors when a subreddit name changes
---         pdv.user_id
---         , pdv.subreddit_id
---         , ua.user_geo_country_code
-
---         , COUNT(DISTINCT post_id) AS us_consume_unique_count_l30
---         , COUNT(post_id) AS us_consume_count_l30
-
---         , SUM(IF(app_name='ios', 1, 0)) AS us_consume_ios_count_l30
---         , SUM(IF(app_name='android', 1, 0)) AS us_consume_android_count_l30
---     FROM (
---         SELECT
---             -- Don't use subreddit name here b/c it could change in a given window
---             pc.subreddit_id
---             , pc.user_id
---             , post_id
---             , app_name
---             , action
---         FROM `data-prod-165221.fact_tables.post_consume_post_detail_view_events` AS pc
-
---         WHERE pc.pt BETWEEN TIMESTAMP(PT_WINDOW_START) AND TIMESTAMP(PT_DT)
---             AND pc.user_id IS NOT NULL
---             -- Keep only consumes here b/c we'll do views in separate table
---             AND action IN ('consume')
---     ) AS pdv
---         INNER JOIN users_above_threshold AS ua
---             ON pdv.user_id = ua.user_id
---         INNER JOIN selected_subreddits AS sel
---             ON pdv.subreddit_id = sel.subreddit_id
---     GROUP BY 1,2,3
--- )
 , user_sub_agg AS (
     SELECT
         ag.subreddit_id
@@ -232,17 +201,27 @@ selected_subreddits AS (
 , user_subreddit_combined_raw AS (
     SELECT
         -- COALESCE views & subscribers into a single table before joining to final geo info
-        COALESCE(su.user_id, ag.user_id, usd.user_id) AS user_id
-        , COALESCE(su.subreddit_id, ag.subreddit_id, usd.subreddit_id) AS subreddit_id
-        , COALESCE(su.user_geo_country_code, ag.user_geo_country_code, usd.user_geo_country_code) AS user_geo_country_code
-        , IF(su.subreddit_id IS NOT NULL, 1, 0) subscribed
+        COALESCE(ag.user_id, usd.user_id) AS user_id
+        , COALESCE(ag.subreddit_id, usd.subreddit_id) AS subreddit_id
+        , COALESCE(ag.user_geo_country_code, usd.user_geo_country_code) AS user_geo_country_code
+        , ag.subscribed
 
-        , ag.* EXCEPT(user_id, subreddit_id, user_geo_country_code)
+        , ag.* EXCEPT(user_id, subreddit_id, user_geo_country_code, subscribed)
         , usd.* EXCEPT(user_id, subreddit_id, user_geo_country_code)
 
-    FROM user_sub_agg AS ag
+    FROM (
+        -- Coalesce in subquery to make sure we don't duplicate user rows
+        SELECT
+            COALESCE(su.user_id, ag.user_id) AS user_id
+            , COALESCE(su.subreddit_id, ag.subreddit_id) AS subreddit_id
+            , COALESCE(su.user_geo_country_code, ag.user_geo_country_code) AS user_geo_country_code
+            , IF(su.subreddit_id IS NOT NULL, 1, 0) subscribed
+            , ag.* EXCEPT(user_id, subreddit_id, user_geo_country_code)
+
+        FROM user_sub_agg AS ag
         FULL OUTER JOIN subscribes_base AS su
             ON ag.user_id = su.user_id AND ag.subreddit_id = su.subreddit_id
+    ) AS ag
         FULL OUTER JOIN us_daily AS usd
             ON ag.user_id = usd.user_id AND ag.subreddit_id = usd.subreddit_id
 )
