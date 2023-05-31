@@ -349,3 +349,67 @@ FROM pd_view_events AS ve
     FULL OUTER JOIN us_daily AS usd
         ON ag.subreddit_name = usd.subreddit_name AND ag.user_id = usd.user_id
 ;
+
+
+-- Check # of potential targets for target subreddit (final table)
+SELECT
+    m.pt
+    , m.target_subreddit
+    , m.user_geo_country_code
+    , m.subscribed
+    , COUNT(DISTINCT t.user_id) AS user_count
+FROM `reddit-growth-prod.pn_targeting.pn_model_subreddit_user_click_v1` AS m
+    LEFT JOIN UNNEST(top_users) AS t
+
+WHERE
+    pt = (
+        SELECT DATE(PARSE_TIMESTAMP("%Y%m%d", MAX(partition_id)))
+        FROM `reddit-growth-prod.pn_targeting`.INFORMATION_SCHEMA.PARTITIONS
+        WHERE table_name = "pn_model_subreddit_user_click_v1"
+    )
+    AND target_subreddit IN ('askreddit')
+GROUP BY 1,2,3,4
+ORDER BY user_count DESC
+;
+
+-- Check UPSTREAM table for max # of users in training data
+SELECT
+    m.pt
+    , m.target_subreddit
+    , m.user_geo_country_code
+    , m.subscribed
+    -- , COALESCE(m.subscribed, 0) AS subscribed  -- For some reason there are users w/o a subscribed flag
+    , COUNT(DISTINCT user_id) AS user_count
+FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530` AS m
+
+WHERE
+    pt = '2023-05-29'
+    AND target_subreddit IN (
+        'askreddit'
+        , 'de', 'mexico', 'casualuk', 'zelda'
+    )
+GROUP BY 1,2,3,4
+ORDER BY target_subreddit, user_count DESC
+;
+
+
+-- Debug - why is memexico missing? b/c it's rated Mature 2
+SELECT
+  s.name
+  , t.*
+FROM `data-prod-165221.taxonomy.daily_export` AS t
+    INNER JOIN `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup` AS s
+        ON t.subreddit_id = s.subreddit_id
+WHERE s.dt = CURRENT_DATE() - 2
+    AND LOWER(s.name) IN ('memexico')
+LIMIT 1000
+;
+
+-- SELECT *
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
+-- WHERE pt = "2023-05-09"
+--     AND subreddit_name IN (
+--         'memexico', 'dedreviil', 'mexicocity'
+--         , 'indianfashionaddicts', 'classicdesicelebs', 'california'
+--     )
+-- ;
