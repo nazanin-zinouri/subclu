@@ -413,3 +413,191 @@ LIMIT 1000
 --         , 'indianfashionaddicts', 'classicdesicelebs', 'california'
 --     )
 -- ;
+
+
+
+
+-- Check users above expected thresholds when scoring users
+-- TODO(djb) Training: These minimums get ignore for training
+DECLARE MIN_CONSUMES_AND_VIEWS NUMERIC DEFAULT 2;  -- 2
+DECLARE MIN_CONSUMES_IOS_OR_ANDROID NUMERIC DEFAULT 1;  -- 1
+
+-- SELECT
+--     COUNT(*) AS row_count
+--     , COUNT(DISTINCT user_id) AS user_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230530`
+-- WHERE pt = "2023-05-29"
+--     AND (
+--             user_clicks_pn_t7 >= 1
+--             OR user_receives_pn_t30 >= 1
+--             OR (
+--                 (COALESCE(num_post_consumes_ios_30, 0) + COALESCE(num_post_consumes_android_30, 0)) >= MIN_CONSUMES_IOS_OR_ANDROID
+--             )
+--             OR (
+--                 (COALESCE(num_post_consumes_30, 0) + COALESCE(screen_view_count_14d, 0)) >= MIN_CONSUMES_AND_VIEWS
+--             )
+--         )
+-- ;
+
+
+-- SELECT
+--     MIN(user_clicks_pn_t7) AS user_clicks_pn_t7_min
+--     , APPROX_QUANTILES(COALESCE(user_clicks_pn_t7, 0), 100)[OFFSET(1)] AS user_clicks_pn_t7_p01
+--     , APPROX_QUANTILES(COALESCE(user_clicks_pn_t7, 0), 100)[OFFSET(5)] AS user_clicks_pn_t7_p05
+--     -- , APPROX_QUANTILES(user_clicks_pn_t7, 100)[OFFSET(10)] AS user_clicks_pn_t7_p10
+--     , APPROX_QUANTILES(COALESCE(user_clicks_pn_t7, 0), 100)[OFFSET(25)] AS user_clicks_pn_t7_p25
+--     , APPROX_QUANTILES(COALESCE(user_clicks_pn_t7, 0), 100)[OFFSET(50)] AS user_clicks_pn_t7_median
+--     , ROUND(AVG(COALESCE(user_clicks_pn_t7, 0)), 2)     AS user_clicks_pn_t7_avg
+--     , APPROX_QUANTILES(COALESCE(user_clicks_pn_t7, 0), 100)[OFFSET(75)] AS user_clicks_pn_t7_p75
+--     -- , APPROX_QUANTILES(user_clicks_pn_t7, 100)[OFFSET(85)] AS user_clicks_pn_t7_p85
+--     -- , APPROX_QUANTILES(user_clicks_pn_t7, 100)[OFFSET(90)] AS user_clicks_pn_t7_p90
+--     , APPROX_QUANTILES(COALESCE(user_clicks_pn_t7, 0), 100)[OFFSET(95)] AS user_clicks_pn_t7_p95
+--     -- , APPROX_QUANTILES(user_clicks_pn_t7, 100)[OFFSET(99)] AS user_clicks_pn_t7_p99
+--     , MAX(user_clicks_pn_t7)               AS user_clicks_pn_t7_max
+
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230530`
+-- WHERE pt = "2023-05-29"
+
+WITH
+raw_counts AS (
+    SELECT
+        COUNT(DISTINCT user_id) AS user_count
+        , COUNT(
+            DISTINCT
+            CASE WHEN user_clicks_pn_t7 >= 1 THEN user_id
+                ELSE NULL
+            END
+        ) as users_with_click_t7
+        , COUNT(
+            DISTINCT
+            CASE WHEN user_receives_pn_t30 >= 1 THEN user_id
+                ELSE NULL
+            END
+        ) as users_with_receive_t30
+        , COUNT(
+            DISTINCT
+            CASE
+                WHEN (COALESCE(num_post_consumes_ios_30, 0) + COALESCE(num_post_consumes_android_30, 0)) >= MIN_CONSUMES_IOS_OR_ANDROID
+                    THEN user_id
+                ELSE NULL
+            END
+        ) as users_with_consume_ios_or_android_30
+    FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230530`
+    WHERE pt = "2023-05-29"
+)
+
+
+SELECT
+    user_count
+    , ROUND(100.0 * SAFE_DIVIDE(users_with_receive_t30, user_count), 2) AS user_with_receive_t30_pct
+    , ROUND(100.0 * SAFE_DIVIDE(users_with_click_t7, user_count), 2) AS users_with_click_t7_pct
+    , * EXCEPT(user_count)
+
+FROM raw_counts
+;
+
+
+-- Find duplicate user IDs in user<>subreddit table
+-- SOLUTION: Fix full-outer-JOINs in B(user) query
+DECLARE USER_ID_DUPE_CHECK DEFAULT [
+    't2_icnezcb'
+    , 't2_ofamm3a'
+    , 't2_n40l46b'
+    , 't2_2sh7t75d'
+    , 't2_4fnbtndo'
+    , 't2_6levcz'
+    , 't2_4xbhespk'
+];
+
+SELECT
+    pt
+    , target_subreddit
+    , COUNT(*) AS row_count
+    , COUNT(DISTINCT user_id) AS user_count
+
+FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230529` AS us
+WHERE pt IN (
+        DATE('2022-12-01')
+        -- , DATE('2023-02-19')
+        , DATE('2023-02-28')
+        -- , DATE('2023-04-17')
+        -- , DATE('2023-04-24')
+        , DATE('2023-05-04')
+        -- , DATE('2023-05-07')
+        -- , DATE('2023-05-08')
+        , DATE('2023-05-09')
+        , DATE('2023-05-11')
+    )
+GROUP BY 1,2
+;
+
+-- SELECT
+--     pt
+--     , target_subreddit
+--     , user_id
+
+--     , COUNT(*) AS dupe_check
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230529` AS us
+-- WHERE pt = '2022-12-01'
+-- GROUP BY 1,2,3
+-- HAVING dupe_check > 1
+-- ;
+
+
+-- SELECT *
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230529` AS us
+-- WHERE pt = '2022-12-01'
+--     AND user_id IN UNNEST(USER_ID_DUPE_CHECK)
+-- ORDER By user_id
+-- ;
+
+
+-- -- Check interesting columns
+-- SELECT
+--     pt, app_name, user_id, session_id, geo_country_code
+--     -- , subreddit_id
+--     , subreddit_name
+--     , action_info_page_type
+--     , action_info_pane_name, action_info_reason
+--     , `source`, action, noun
+--     , device_language
+-- FROM `data-prod-165221.fact_tables.post_consume_post_detail_view_events` AS pc
+-- WHERE pt = TIMESTAMP('2022-12-01')
+--     AND pc.user_id IS NOT NULL
+--     AND action IN ('consume', 'view')
+--     AND subreddit_name IN ("ich_iel")
+--     AND  user_id IN (
+--         't2_fej9k5ak'
+--         , 't2_a2bjdmoi'
+--         , 't2_1fmw9l'
+--     )
+-- ;
+
+-- get consumes & views for specific user & compare with other tables
+SELECT
+    pt
+    , user_id
+    , subreddit_id
+    , subreddit_name
+
+    , COALESCE(
+        COUNT(DISTINCT v.post_id), 0
+    ) AS us_view_and_consume_unique_count
+    , COALESCE(
+        COUNT(DISTINCT(IF(v.action='consume', post_id, NULL))), 0
+        ) AS us_consume_unique_count
+    , SUM(IF(v.action='view', 1, 0)) AS us_view_count
+    , SUM(IF(v.action='consume', 1, 0)) AS us_consume_count
+FROM `data-prod-165221.fact_tables.post_consume_post_detail_view_events` AS v
+WHERE pt = TIMESTAMP('2022-12-01')
+    AND v.user_id IS NOT NULL
+    AND action IN ('consume', 'view')
+    AND subreddit_name IN ("ich_iel")
+    AND  user_id IN (
+        't2_fej9k5ak'
+        , 't2_a2bjdmoi'
+        , 't2_1fmw9l'
+    )
+GROUP BY 1,2,3,4
+;
+
