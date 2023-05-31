@@ -1,13 +1,15 @@
--- A. Select top subreddits as targets for PNs
+-- A. Select top subreddits as targets for PNs (TRAINING)
 --   ETA: 15 seconds
-DECLARE PARTITION_DATE DATE DEFAULT '2023-05-09';
 
-DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 250;
-DECLARE MIN_USERS_L7_ROW NUMERIC DEFAULT 150;
+DECLARE PARTITION_DATE DATE DEFAULT "2023-05-29";
 
-DECLARE MIN_POSTS_L7_ENGLISH NUMERIC DEFAULT 2;
-DECLARE MIN_POSTS_L7_ROW_NO_RATING NUMERIC DEFAULT 6;
-DECLARE MIN_POSTS_L7_ROW_W_RATING NUMERIC DEFAULT 1;
+-- For training, lower these to make sure we capture all target subreddits
+DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 250;  -- 250
+DECLARE MIN_USERS_L7_ROW NUMERIC DEFAULT 100;  -- 150
+
+DECLARE MIN_POSTS_L7_ENGLISH NUMERIC DEFAULT 2;  -- 2
+DECLARE MIN_POSTS_L7_ROW_NO_RATING NUMERIC DEFAULT 7;  -- 6
+DECLARE MIN_POSTS_L7_ROW_W_RATING NUMERIC DEFAULT 1;  -- 1
 
 DECLARE TARGET_GEOS_ENG DEFAULT [
     "US", "CA"
@@ -22,25 +24,9 @@ DECLARE TARGET_GEOS_ROW DEFAULT [
 ];
 
 
--- ==================
--- Only need to create the first time we run it
--- === OR REPLACE
--- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
--- PARTITION BY pt
--- AS (
-
--- ==================
--- After table is created, we can delete a partition & update it
--- ===
-DELETE
-    `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
-WHERE
-    pt = PARTITION_DATE
-;
-
--- Insert latest data
-INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230509`
-(
+-- Create a temp table so that we can cache the outputs of our query w/o duplicating code
+--  Then we can create a table or insert if it already exists
+CREATE OR REPLACE TABLE `reddit-employee-datasets.david_bermejo.tmp_pn` AS (
 
 WITH
 subs_above_thresholds AS (
@@ -86,7 +72,8 @@ subs_above_thresholds AS (
             , LN(1 + votes_l28) AS votes_log_l28
 
         FROM `data-prod-165221.all_reddit.all_reddit_subreddits`
-        WHERE DATE(pt) = PARTITION_DATE
+        WHERE pt = TIMESTAMP(GREATEST(PARTITION_DATE, CURRENT_DATE - 21))
+            -- TODO(djb): Train only - exclude minimum filters
             AND users_l7 >= LEAST(MIN_USERS_L7_ENGLISH, MIN_USERS_L7_ROW)
             AND posts_l7 >= LEAST(MIN_POSTS_L7_ENGLISH, MIN_POSTS_L7_ROW_W_RATING)
             AND NOT REGEXP_CONTAINS(LOWER(subreddit_name), r'^u_.*')
@@ -95,7 +82,7 @@ subs_above_thresholds AS (
         INNER JOIN (
             SELECT name, subreddit_id, over_18
             FROM `data-prod-165221.ds_v2_postgres_tables.subreddit_lookup`
-            WHERE dt = PARTITION_DATE
+            WHERE dt = GREATEST(PARTITION_DATE, CURRENT_DATE - 21)
                 -- Exclude user-profiles + spam & sketchy subs [optional]
                 AND COALESCE(verdict, 'f') <> 'admin-removed'
                 AND COALESCE(is_spam, FALSE) = FALSE
@@ -106,10 +93,19 @@ subs_above_thresholds AS (
         ) AS slo
             ON asr.subreddit_name = LOWER(slo.name)
 
+        -- TODO(djb): For training, keep all ratings b/c rating migth've changed
+        -- INNER JOIN (
+        --     SELECT DISTINCT LOWER(target_subreddit) AS subreddit_name
+        --     FROM `reddit-employee-datasets.david_bermejo.pn_training_data_20230515`
+        --     WHERE pt_send = (PARTITION_DATE + 1)
+        -- ) AS sel
+        --     ON asr.subreddit_name = sel.subreddit_name
+
         -- Get ratings
         LEFT JOIN `data-prod-165221.taxonomy.daily_export` AS tx
             ON slo.subreddit_id = tx.subreddit_id
     WHERE 1=1
+        -- TODO(djb): For training, keep all ratings b/c rating migth've changed
         AND NOT (
             -- exclude ALL subs about trauma & support, independent of rating, like r/selfharmscars, r/rape
             COALESCE(tx.curator_topic_v2, "") IN (
@@ -208,34 +204,53 @@ subs_above_thresholds AS (
             ON sa.subreddit_id = sm.subreddit_id
 )
 
--- Final select for table CREATE/INSERT
+-- Final select for TEMP table
 SELECT
-  PARTITION_DATE AS pt
-  , *
+    PARTITION_DATE AS pt
+    , *
 FROM selected_subs_with_meta
-);  -- Close CREATE/INSERT parens
+);  -- Close TEMP table creation
 
 
--- ============
--- Test CTEs
+BEGIN
+    -- ==================
+    -- If table exists, we can delete the partition with the target date & update it with new data
+    -- ===
+    DELETE
+        `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525`
+    WHERE
+        pt = PARTITION_DATE
+    ;
+
+    -- Insert latest data
+    INSERT INTO `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525` (
+        SELECT *
+        FROM `reddit-employee-datasets.david_bermejo.tmp_pn`
+    );
+EXCEPTION WHEN ERROR THEN
+    -- ==================
+    -- If table doesn't exist, create it & insert the data
+    -- ===
+    CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525`
+    PARTITION BY pt
+    AS (
+        SELECT *
+        FROM `reddit-employee-datasets.david_bermejo.tmp_pn`
+    );
+END;
+
+
+-- Drop the temp table after inserting is done
+DROP TABLE `reddit-employee-datasets.david_bermejo.tmp_pn`;
+
+
+-- =====================
+-- test CTEs for temp table
 -- ===
+-- SELECT * FROM subs_above_thresholds;
 
--- Check the baseline subreddits
---  Note: we expect to filter more of these because we'll only allow unrated for ROW countries
---    (exclude unrated subreddits when they're only relevant to large English-speaking countries)
--- SELECT *
--- FROM subs_above_thresholds
--- ORDER BY over_18 DESC, curator_rating, curator_topic_v2, users_l7 DESC, posts_l7 DESC
--- ;
+-- SELECT * FROM subs_with_geo_long;
 
+-- SELECT * FROM subs_with_geo_wide;
 
--- Check sub<>geo CTE
--- SELECT *
--- FROM subs_with_geo
--- WHERE 1=1
---     -- AND geo_country_code IN (
---     --     'MX'
---     --     , 'US'
---     -- )
--- ORDER BY geo_country_code, posts_l7 DESC, users_l7 DESC, curator_rating, curator_topic_v2
--- ;
+-- SELECT * FROM selected_subs_with_meta;
