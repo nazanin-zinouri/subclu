@@ -1,4 +1,4 @@
--- E. Data for model TRAINING (or inference)
+-- E. Data for model for INFERENCE
 --   ETA: 2 mins. For top 1k subreddits
 --   ETA: 4 mins. For top 26k subreddits. Slot time: 3 days
 -- Combine data into flat format so it's easy to replicate & to export to GCS
@@ -17,7 +17,7 @@ DECLARE PT_FEATURES DATE DEFAULT '2023-05-29';
 
 -- ==================
 -- Only need to create the first time we run it
--- === OR REPLACE
+-- ===
 -- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530`
 -- CLUSTER BY pt, target_subreddit_id
 -- AS (
@@ -80,10 +80,12 @@ subreddit_ft AS (
         , us.target_subreddit
         , us.user_id
         , COALESCE(u.user_geo_country_code, us.user_geo_country_code) AS user_geo_country_code
+        -- Fix subscribed in case missing:
+        , COALESCE(us.subscribed, 0) AS subscribed
 
         -- The rest of the columns should be used for modeling inference
         , u.* EXCEPT(pt, user_id, user_geo_country_code)
-        , us.* EXCEPT(pt, user_id, target_subreddit, target_subreddit_id, user_geo_country_code)
+        , us.* EXCEPT(pt, user_id, target_subreddit, target_subreddit_id, user_geo_country_code, subscribed)
 
         , s.* EXCEPT(subreddit_id, pt)
 
