@@ -76,6 +76,8 @@ subreddit_ft AS (
                 AND us.target_subreddit_id = tos.subreddit_id
     WHERE us.pt = PT_FEATURES
         AND tos.pt = PT_FEATURES
+        -- Only keep users from target geos
+        AND COALESCE(us.user_geo_country_code, "") IN UNNEST(TARGET_COUNTRY_CODES)
 )
 , user_ft AS (
     SELECT
@@ -98,8 +100,6 @@ subreddit_ft AS (
             ON u.user_id = cl.user_id
 
     WHERE u.pt = PT_FEATURES
-        -- Only keep users from target geos
-        AND COALESCE(u.user_geo_country_code, "") IN UNNEST(TARGET_COUNTRY_CODES)
 )
 , final_table AS (
     SELECT
@@ -119,8 +119,8 @@ subreddit_ft AS (
         -- Subreddit features, also limit subreddits to score by using inner join
         INNER JOIN subreddit_ft AS s
             ON us.target_subreddit_id = s.subreddit_id
-        -- User-level features, inner join to focus only on target countries
-        INNER JOIN user_ft AS u
+        -- User-level features
+        LEFT JOIN user_ft AS u
             ON us.user_id = u.user_id
 
         -- Get count of subs in ToS
