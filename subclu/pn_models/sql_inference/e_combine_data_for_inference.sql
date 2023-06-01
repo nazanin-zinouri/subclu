@@ -19,7 +19,7 @@ DECLARE PT_FEATURES DATE DEFAULT '2023-05-29';
 -- Only need to create the first time we run it
 -- ===
 -- CREATE TABLE `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530`
--- CLUSTER BY pt, target_subreddit_id
+-- -- CLUSTER BY target_subreddit_id.  -- Remove clustering b/c that should help output fewer & bigger parquet files at export time
 -- AS (
 
 -- ==================
@@ -68,7 +68,7 @@ subreddit_ft AS (
         u.*
     FROM (
         SELECT *
-        FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230529`
+        FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_20230530`
         WHERE pt = PT_FEATURES  -- IN UNNEST(PT_FEATURES)
     ) AS u
 )
