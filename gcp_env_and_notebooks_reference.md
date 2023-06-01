@@ -572,6 +572,15 @@ sudo du -Lsh *  | sort -hr
 864K    mlflow
 432K    notebooks_throwaway
 4.0K    Untitled.ipynb
+
+# you can also check a directory w/o having to cd:
+sudo du -Lsh /home/jupyter/*  | sort -hr
+sudo du -Lsh /home/jupyter/subreddit_clustering_i18n/*  | sort -hr
+
+
+# the paths with the most data are usually the data cache folders:
+cd /home/jupyter/subreddit_clustering_i18n/data
+sudo du -Lsh /home/jupyter/subreddit_clustering_i18n/data/*  | sort -hr
 ```
 
 Check only hidden files/folders

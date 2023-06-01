@@ -9,6 +9,7 @@ from typing import List, Union
 
 import numpy as np
 import pandas as pd
+import joblib
 # import polars as pl
 from tqdm import tqdm
 
@@ -40,6 +41,68 @@ class NumpyEncoder(json.JSONEncoder):
             return None
 
         return json.JSONEncoder.default(self, obj)
+
+
+def run_inference_on_one_file(
+        df_path: Union[str, Path],
+        model_path: Union[str, Path],
+        path_output: Union[str, Path],
+        l_ix_columns: List[str],
+        l_feature_columns: List[str] = None,
+        c_pred_proba: str = 'click_proba',
+        out_prefix: str = 'pred-',
+        verbose: bool = False,
+) -> None:
+    """Given an input file & input model, run inference & save to path_output location.
+    The output file will preserve the same name as the input file name with a `pred-` prefix
+
+    l_feature_columns. If None, pull the features from the model itself
+    """
+    if verbose:
+        info(f"Loading model...\n  {model_path}")
+    model = joblib.load(
+        f"{model_path}"
+    )
+    if l_feature_columns is None:
+        # Get input feature names for modeling
+        l_feature_columns = [
+            '__'.join(_.split('__')[1:]) for _ in model.best_estimator_['preprocess'].get_feature_names_out()
+        ]
+
+    if verbose:
+        info(f"{len(l_feature_columns)} <- Model feature count")
+        info(
+            f"\nFeatures:"
+            f"\n  {l_feature_columns}"
+        )
+
+    if verbose:
+        info(f"Loading data:\n  {df_path}")
+    df_inference_raw = pd.read_parquet(
+        df_path,
+        columns=list(set(l_ix_columns + l_feature_columns)),
+    )
+    if verbose:
+        info(f"Create new df for predictions...")
+    df_pred = (
+        df_inference_raw[l_ix_columns]
+        .assign(
+            **{c_pred_proba: model.predict_proba(df_inference_raw[l_feature_columns])[:, 1]}
+        )
+    )
+    Path.mkdir(path_output, exist_ok=True, parents=True)
+    df_path_out = f"{path_output}/{out_prefix}{Path(df_path).name}"
+
+    if verbose:
+        info(f"Done with predictions")
+        info(f"Saving prediction to: \n{df_path_out}")
+    df_pred.to_parquet(
+        df_path_out,
+        index=False
+    )
+
+    if verbose:
+        info(f"Prediction done!")
 
 
 def apply_filters_and_save_to_json(
