@@ -16,12 +16,13 @@ def pn_model_schema() -> List[bigquery.SchemaField]:
         bigquery.SchemaField(
             name="pt",
             field_type="DATE",
-            description="Date when Nearest Neighors were computed",
+            mode="REQUIRED",
+            description="Date when inputs for PN model were pulled",
         ),
         bigquery.SchemaField(
             name="model_name",
             field_type="STRING",
-            description="Short description of the model used to create the embeddings",
+            description="Short description of the model used to create the PN model",
         ),
         bigquery.SchemaField(
             name="model_version",
@@ -52,8 +53,7 @@ def pn_model_schema() -> List[bigquery.SchemaField]:
             field_type="STRING",
             description=(
                 "Geo-country-code for target users. "
-                "Note that we roll non-target countries as ROW."
-                "  Users without a country get rolled up into `MISSING` code."
+                "Note that this table only include users from target countries"
             ),
         ),
 
@@ -79,7 +79,7 @@ def pn_model_schema() -> List[bigquery.SchemaField]:
                     name="user_rank_by_sub_and_geo",
                     field_type="INTEGER",
                     description=(
-                        "Rank for most likely users to click on a PN where 1=closest"
+                        "Rank for most likely users to click on a PN where 1=most likely"
                     ),
                 ),
             ),
