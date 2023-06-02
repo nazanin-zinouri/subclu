@@ -2,6 +2,7 @@
 Utils to run inference for PN model
 """
 from datetime import datetime
+import gc
 import json
 from logging import info
 from pathlib import Path
@@ -78,18 +79,36 @@ def run_inference_on_one_file(
 
     if verbose:
         info(f"Loading data:\n  {df_path}")
-    df_inference_raw = pd.read_parquet(
-        df_path,
-        columns=list(set(l_ix_columns + l_feature_columns)),
-    )
+    try:
+        df_inference_raw = pd.read_parquet(
+            df_path,
+            columns=list(set(l_ix_columns + l_feature_columns)),
+        )
+    except Exception as e:
+        print(e)
+        print(f"ERROR Loading data:\n  {df_path}")
+        info(e)
+        info(f"ERROR Loading data:\n  {df_path}")
+        return None
+
     if verbose:
         info(f"Create new df for predictions...")
-    df_pred = (
-        df_inference_raw[l_ix_columns]
-        .assign(
-            **{c_pred_proba: model.predict_proba(df_inference_raw[l_feature_columns])[:, 1]}
+
+    try:
+        df_pred = (
+            df_inference_raw[l_ix_columns]
+            .assign(
+                **{c_pred_proba: model.predict_proba(df_inference_raw[l_feature_columns])[:, 1]}
+            )
         )
-    )
+        gc.collect()
+    except Exception as e:
+        print(e)
+        print(f"ERROR Running inference:\n  {df_path}")
+        info(e)
+        info(f"ERROR Running inference:\n  {df_path}")
+        return None
+
     Path.mkdir(path_output, exist_ok=True, parents=True)
     df_path_out = f"{path_output}/{out_prefix}{Path(df_path).name}"
 
@@ -100,7 +119,7 @@ def run_inference_on_one_file(
         df_path_out,
         index=False
     )
-
+    gc.collect()
     if verbose:
         info(f"Prediction done!")
 
