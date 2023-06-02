@@ -29,10 +29,14 @@ def create_partitioned_table_if_not_exist(
         bq_table_name: str,
         schema: List[bigquery.SchemaField],
         partition_column: str,
-        bq_client: bigquery.Client,
+        bq_client: bigquery.Client = None,
         table_description: str = None,
         partition_expiration_days: int = 90,
+        update_table_description: bool = True,
 ) -> None:
+    if bq_client is None:
+        bq_client = bigquery.Client()
+
     bq_table = ".".join([bq_project, bq_dataset, bq_table_name])
 
     if table_exists(bq_table=bq_table, bq_client=bq_client):
@@ -56,6 +60,15 @@ def create_partitioned_table_if_not_exist(
                 table,
                 exists_ok=False,
             )
+
+            if update_table_description & (table_description is not None):
+                info(
+                    f"Updating subreddit description from:\n  {table.description}"
+                    f"\nto:\n  {table_description}"
+                )
+                table.description = table_description
+                table = bq_client.update_table(table, ['description'])
+
             info(
                 "Created table %s.%s.%s",
                 table.project,

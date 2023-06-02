@@ -1,8 +1,8 @@
 -- D. Get time on subreddit for selected USERs (from user<>subreddit table C)
 -- ETA: 2 minutes
---   Use JavaScript temp function because it's much faster to expand ToS in BQ than in python
+--   Use JavaScript temp function because it''s much faster to expand ToS in BQ than in python
 --   We need to write the data to a table because the response can be huge (billions of rows)
-DECLARE PT_TOS DATE DEFAULT "2023-05-07";
+DECLARE PT_TOS DATE DEFAULT "2023-05-08";
 
 CREATE TEMP FUNCTION
 tosParser(tosString STRING)
@@ -29,8 +29,7 @@ LANGUAGE js AS """
 -- ==================
 -- After table is created, we can delete a partition & update it
 -- ===
-DELETE
-    `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230509`
+DELETE `reddit-employee-datasets.david_bermejo.pn_ft_user_tos_30_pct_20230509`
 WHERE
     pt = PT_TOS
 ;
@@ -69,11 +68,11 @@ WITH tos_filtered AS (
 
 
 SELECT
-  PT_TOS AS pt
-  , *
+    PT_TOS AS pt
+    , *
 FROM tos_exploded
 WHERE
-    -- Limit smallest sub b/c at some point it's a waste to try to aggregate such small embeddings
+    -- Limit smallest sub b/c at some point it''s a waste to try to aggregate such small embeddings
     -- 0.001 -> 1000 subreddits evenly split
     tos_30_pct > 0.001
 );
