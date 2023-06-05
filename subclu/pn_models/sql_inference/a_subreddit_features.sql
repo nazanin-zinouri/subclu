@@ -1,7 +1,7 @@
--- A. Select top subreddits as targets for PNs (TRAINING)
+-- A. Select top subreddits as targets for PNs INFERENCE
 --   ETA: 15 seconds
 
-DECLARE PARTITION_DATE DATE DEFAULT "2023-05-29";
+DECLARE PARTITION_DATE DATE DEFAULT "2023-06-03";
 
 -- For training, lower these to make sure we capture all target subreddits
 DECLARE MIN_USERS_L7_ENGLISH NUMERIC DEFAULT 250;  -- 250

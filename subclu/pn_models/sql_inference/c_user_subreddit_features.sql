@@ -1,4 +1,4 @@
--- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B) TRAINING
+-- C. Get user<>subreddit features for top-subreddits (query A) & key users (query B) INFERENCE
 -- ETA:
 --    *  4 minutes. Training 30-day window, 1-3 subreddits. Slot time: 9.5 hours
 --    *  7 mins(!!). [NEW] full data: 30-day window, 26k subreddits, users with 2+ consumes_and_views.  slot time: ~3.5 days
@@ -13,7 +13,7 @@
 --  * Add iOS & android min consumes: 0 -> 1
 --  * Set view count window: -29
 
-DECLARE PT_DT DATE DEFAULT "2023-05-29";
+DECLARE PT_DT DATE DEFAULT "2023-06-03";
 -- Expand to 30 days total to get at least 1 month's given that in the prev model 1 month was the minimum
 -- 1 month = -29 days = (30 days)
 DECLARE PT_WINDOW_START DATE DEFAULT PT_DT - 29;  -- default: 29
