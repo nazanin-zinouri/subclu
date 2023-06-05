@@ -25,3 +25,89 @@ FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530` AS f
 
 WHERE pt = '2023-06-03'
 ;
+
+
+
+-- Previous queries with subreddit filters:
+-- ============
+-- Export data to GCS because querying such a huge table takes forever and a half
+-- ===
+-- Query to get top subreddits: 2,305,704,745 rows, 5k files
+-- EXPORT DATA OPTIONS(
+--     uri='gs://i18n-subreddit-clustering/pn_model/runs/inference/20230529_sample/*.parquet',
+--     format='PARQUET',
+--     overwrite=true
+-- ) AS
+-- SELECT
+--     pt, target_subreddit, target_subreddit_id, subscribed, user_geo_country_code, user_id
+--     , screen_view_count_14d_log, user_receives_pn_subreddit_count_t7, user_receives_pn_t7
+--     , user_receives_pn_t14, user_receives_pn_t30, log_user_clicks_pn_t7, log_user_clicks_trnd_t7
+--     , log_post_consumes_30, log_num_post_consumes_home_30, pct_post_consumes_home_30, pct_post_consumes_community_30, pct_post_consumes_post_detail_30, pct_post_consumes_ios_30
+--     , pct_post_consumes_android_30, pct_post_consumes_nsfw_30, num_post_consumes_ios_30
+--     , num_post_consumes_android_30, sub_dau_perc_l28, perc_by_country_sd, us_screenviews_l14_log
+--     , us_distinct_posts_viewed_l14_log, us_post_screenviews_l14_log, us_trend_pn_receive_l14_log
+--     , us_days_active_ios_l30_pct, us_android_days_active_l30_pct, us_upvotes_l14, us_comments_l14
+--     , us_posts_l14, us_trend_pn_click_l14, us_sessions_l14, us_ios_days_active_l30
+--     , us_android_days_active_l30, us_days_active_l30, users_log_l28, seo_users_pct_l28
+--     , loggedin_users_pct_l28, ios_users_pct_l28, android_users_pct_l28, legacy_user_cohort_ord
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530` AS f
+--     INNER JOIN (
+--         -- Pick top subreddits for sampling/testing
+--         SELECT
+--             s.subreddit_id, s.subreddit_name
+--             , ROW_NUMBER() OVER(ORDER BY users_l7 DESC) AS rank_by_users
+--         FROM `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525` AS s
+
+--         WHERE s.pt = '2023-05-29'
+--         -- For testing, we can limit to only the top subreddits
+--         QUALIFY (
+--             rank_by_users <= 2000
+--             OR subreddit_name LIKE "%street%"
+--             OR subreddit_name LIKE "%figther%"
+--         )
+--     ) AS sub
+--         ON f.target_subreddit_id = sub.subreddit_id
+
+-- WHERE pt = '2023-05-29'
+-- ;
+
+-- Query to get remaining subreddits:  XXX rows, YYk files
+-- EXPORT DATA OPTIONS(
+--     uri='gs://i18n-subreddit-clustering/pn_model/runs/inference/20230529_sample2/*.parquet',
+--     format='PARQUET',
+--     overwrite=true
+-- ) AS
+-- SELECT
+--     pt, target_subreddit, target_subreddit_id, subscribed, user_geo_country_code, user_id
+--     , screen_view_count_14d_log, user_receives_pn_subreddit_count_t7, user_receives_pn_t7
+--     , user_receives_pn_t14, user_receives_pn_t30, log_user_clicks_pn_t7, log_user_clicks_trnd_t7
+--     , log_post_consumes_30, log_num_post_consumes_home_30, pct_post_consumes_home_30, pct_post_consumes_community_30, pct_post_consumes_post_detail_30, pct_post_consumes_ios_30
+--     , pct_post_consumes_android_30, pct_post_consumes_nsfw_30, num_post_consumes_ios_30
+--     , num_post_consumes_android_30, sub_dau_perc_l28, perc_by_country_sd, us_screenviews_l14_log
+--     , us_distinct_posts_viewed_l14_log, us_post_screenviews_l14_log, us_trend_pn_receive_l14_log
+--     , us_days_active_ios_l30_pct, us_android_days_active_l30_pct, us_upvotes_l14, us_comments_l14
+--     , us_posts_l14, us_trend_pn_click_l14, us_sessions_l14, us_ios_days_active_l30
+--     , us_android_days_active_l30, us_days_active_l30, users_log_l28, seo_users_pct_l28
+--     , loggedin_users_pct_l28, ios_users_pct_l28, android_users_pct_l28, legacy_user_cohort_ord
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530` AS f
+--     INNER JOIN (
+--         -- Pick subreddits for sampling/testing
+--         SELECT
+--             s.subreddit_id, s.subreddit_name
+--             , ROW_NUMBER() OVER(ORDER BY users_l7 DESC) AS rank_by_users
+--         FROM `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525` AS s
+
+--         WHERE s.pt = '2023-05-29'
+--         -- Flip logic to get the remainig subreddits:
+--         QUALIFY (
+--             rank_by_users > 2000
+--             AND NOT (
+--                 subreddit_name LIKE "%street%"
+--                 OR subreddit_name LIKE "%figther%"
+--             )
+--         )
+--     ) AS sub
+--         ON f.target_subreddit_id = sub.subreddit_id
+
+-- WHERE pt = '2023-05-29'
+-- ;
