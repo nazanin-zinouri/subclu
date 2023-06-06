@@ -4,16 +4,7 @@
 -- Combine data into flat format so it's easy to replicate & to export to GCS
 
 -- For inference: select a SINGLE date
-DECLARE PT_FEATURES DATE DEFAULT '2023-05-29';
-
--- For training: select an ARRAY of DATES
--- DECLARE PT_FEATURES DEFAULT [
---     DATE('2023-05-29')
--- ];
--- -- Need explicit max & min for legacy user cohorts
--- DECLARE PT_FEATURES_MAX DEFAULT TIMESTAMP((SELECT MAX(dt) FROM UNNEST(PT_FEATURES) AS dt));
--- DECLARE PT_FEATURES_MIN DEFAULT TIMESTAMP((SELECT MIN(dt) FROM UNNEST(PT_FEATURES) AS dt));
-
+DECLARE PT_FEATURES DATE DEFAULT '2023-06-03';
 
 -- ==================
 -- Only need to create the first time we run it
@@ -41,7 +32,7 @@ subreddit_ft AS (
     SELECT
         s.* EXCEPT(
             subreddit_name, relevant_geo_country_codes, relevant_geo_country_code_count
-            -- TODO(djb): try encoding rating & topics later or let model ecode them
+            -- TODO(djb): try encoding rating & topics later or let model encode them
             , over_18, curator_rating, curator_topic_v2
         )
     FROM `reddit-employee-datasets.david_bermejo.pn_ft_subreddits_20230525` AS s
@@ -59,7 +50,7 @@ subreddit_ft AS (
     FROM `reddit-employee-datasets.david_bermejo.pn_ft_user_subreddit_20230529` AS us
 
     WHERE us.pt = PT_FEATURES  -- IN UNNEST(PT_FEATURES)
-        -- For Inference Only keep users from target geos. Assume that geo has been filtered upstream
+        -- For Inference: Only keep users from target geos. Assume that geo has been filtered upstream
         -- AND COALESCE(us.user_geo_country_code, "") IN UNNEST(TARGET_COUNTRY_CODES)
 )
 , user_ft AS (
@@ -133,10 +124,11 @@ FROM final_table
 -- ============
 -- Test clicks & receives on full table
 -- ===
--- With this sample, we see that ROW is about average for clicks, but null/`MISSING` is the worst performing geo group
+-- TODO(djb): fix this logic b/c it's double counting users who visit many subreddits
+--   With this sample, we see that ROW is about average for clicks, but null/`MISSING` is the worst performing geo group
 --   For now, don't run inference on ROW or NULL because we won't send PNS to these users
 -- SELECT
---     user_geo_country_code_top
+--     user_geo_country_code
 --     -- , subscribed
 
 --     , APPROX_QUANTILES(user_receives_pn_t7, 100)[OFFSET(50)] AS user_receives_pn_t7_median
@@ -145,9 +137,37 @@ FROM final_table
 --     , APPROX_QUANTILES(user_clicks_pn_t7, 100)[OFFSET(95)] AS user_clicks_pn_t7_p95
 --     -- , AVG(user_receives_pn_t7) AS user_receives_pn_t7_avg
 --     , COUNT(DISTINCT user_id) AS user_count
+--     , COUNT(DISTINCT target_subreddit_id) AS subreddit_count
 --     , COUNT(*) AS row_count
--- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230509`
--- WHERE pt = "2023-05-07"
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530`
+-- WHERE pt = "2023-06-03"
 -- GROUP BY 1 -- , 2
--- ORDER BY user_clicks_pn_t7_p90 DESC, user_count DESC
+-- ORDER BY user_count DESC
+-- ;
+
+
+-- check total # of users across different pts
+-- SELECT
+--     pt
+--     , COUNT(DISTINCT user_geo_country_code) AS country_count
+--     , COUNT(DISTINCT target_subreddit) AS subreddit_count
+--     , COUNT(DISTINCT user_id) AS user_count
+--     , COUNT(*) AS row_count
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530`
+-- WHERE pt BETWEEN "2023-05-03" AND "2023-06-03"
+-- GROUP BY 1
+-- ORDER BY pt
+-- ;
+
+
+-- Check duplicates (expect zero rows returned)
+-- SELECT
+--     target_subreddit
+--     , user_id
+--     , COUNT(*) AS dupe_check
+-- FROM `reddit-employee-datasets.david_bermejo.pn_ft_all_20230530`
+-- WHERE pt = "2023-06-03"
+-- GROUP BY 1,2
+-- HAVING dupe_check > 1
+-- ORDER BY dupe_check DESC
 -- ;

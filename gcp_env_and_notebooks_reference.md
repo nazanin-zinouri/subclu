@@ -581,6 +581,8 @@ sudo du -Lsh /home/jupyter/subreddit_clustering_i18n/*  | sort -hr
 # the paths with the most data are usually the data cache folders:
 cd /home/jupyter/subreddit_clustering_i18n/data
 sudo du -Lsh /home/jupyter/subreddit_clustering_i18n/data/*  | sort -hr
+
+sudo du -Lsh /home/jupyter/subreddit_clustering_i18n/data/local_cache/*  | sort -hr
 ```
 
 Check only hidden files/folders

@@ -1,9 +1,9 @@
--- B. Create table with Consumes in L30 + PN activity in L7 days. TRAINING
---   ETA: NEW: 13 minutes, Slot time: 1 day, 8hr
+-- B. Create table with Consumes in L30 + PN activity in L7 days. INFERENCE
+--   ETA: NEW: 4-13 minutes, Slot time: 1 day, 8hr
 --      (1-2 minutes for training)
 --        only selected users from training table. Get receives and clicks from separate tables to replace pn-events
 
-DECLARE PT_FEATURES DATE DEFAULT "2023-05-29";
+DECLARE PT_FEATURES DATE DEFAULT "2023-06-03";
 DECLARE PT_PN_WINDOW_START DATE DEFAULT PT_FEATURES - 7;
 DECLARE TARGET_COUNTRY_CODES DEFAULT [
     "MX", "ES", "AR"

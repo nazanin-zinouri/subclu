@@ -27,6 +27,8 @@ WITH ranked_users AS (
         ) rank_unique_user
     FROM `reddit-growth-prod.pn_targeting.pn_model_subreddit_user_click_v1` AS pn
         LEFT JOIN UNNEST(top_users) AS t
+        -- In case you don't have access to the production table in `reddit-growth-prod`, you can test with this table:
+        --   `reddit-employee-datasets.david_bermejo.pn_model_output_20230510`
 
     WHERE pt = (
         -- This subquery always picks the latest partition for the model
