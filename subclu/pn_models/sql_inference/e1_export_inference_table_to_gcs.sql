@@ -1,4 +1,4 @@
--- Export inference data to GCS
+-- E1. Export inference data to GCS
 --  ETA:  7 minutes for 3.4 Billion rows, ~5k files. Slot: 20 hours
 EXPORT DATA OPTIONS(
     uri='gs://i18n-subreddit-clustering/pn_model/runs/inference/20230603/*.parquet',
