@@ -13,6 +13,9 @@ WHERE
         SELECT DATE(PARSE_TIMESTAMP("%Y%m%d", MAX(partition_id)))
         FROM `reddit-growth-prod.pn_targeting`.INFORMATION_SCHEMA.PARTITIONS
         WHERE table_name = "pn_model_subreddit_user_click_v1"
+            AND COALESCE(partition_id, '__NULL__') NOT IN (
+                '__NULL__', '__UNPARTITIONED__'
+            )
     )
     AND target_subreddit IN ('streetfighter')
     AND user_geo_country_code IN (
